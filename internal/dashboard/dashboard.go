@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/szibis/claude-escalate/internal/config"
 	"github.com/szibis/claude-escalate/internal/store"
@@ -45,7 +46,12 @@ func Serve(cfg *config.Config) error {
 
 	addr := fmt.Sprintf("127.0.0.1:%d", cfg.DashboardPort)
 	fmt.Printf("claude-escalate dashboard running at http://%s\n", addr)
-	return http.ListenAndServe(addr, mux)
+	srv := &http.Server{
+		Addr:              addr,
+		Handler:           mux,
+		ReadHeaderTimeout: 10 * time.Second,
+	}
+	return srv.ListenAndServe()
 }
 
 func writeJSON(w http.ResponseWriter, v interface{}) {

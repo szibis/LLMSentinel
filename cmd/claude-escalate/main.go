@@ -98,7 +98,7 @@ func runHook() {
 	if detect.IsMetaCommand(prompt) {
 		// Handle /escalate
 		if isEsc, target := detect.IsEscalateCommand(prompt); isEsc {
-			handleEscalate(db, currentModel, target, cfg)
+			handleEscalate(db, currentModel, target)
 			return
 		}
 		_ = hook.WriteOutput(hook.PassThrough())
@@ -170,10 +170,10 @@ func runHook() {
 		return
 	}
 
-	hook.WriteOutput(hook.PassThrough())
+	_ = hook.WriteOutput(hook.PassThrough())
 }
 
-func handleEscalate(db *store.Store, currentModel, target string, cfg *config.Config) {
+func handleEscalate(db *store.Store, currentModel, target string) {
 	var modelID, label, effort string
 	switch target {
 	case "opus":
@@ -249,7 +249,7 @@ func runDashboard() {
 	port := 8077
 	for i, arg := range os.Args {
 		if arg == "--port" && i+1 < len(os.Args) {
-			fmt.Sscanf(os.Args[i+1], "%d", &port)
+			_, _ = fmt.Sscanf(os.Args[i+1], "%d", &port)
 		}
 	}
 
