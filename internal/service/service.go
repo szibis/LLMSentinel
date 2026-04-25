@@ -8,6 +8,8 @@ import (
 	"time"
 
 	"github.com/szibis/claude-escalate/internal/config"
+	"github.com/szibis/claude-escalate/internal/decisions"
+	"github.com/szibis/claude-escalate/internal/signals"
 	"github.com/szibis/claude-escalate/internal/store"
 )
 
@@ -43,6 +45,11 @@ func (s *Service) Start(addr string) error {
 	mux.HandleFunc("/api/validation/metrics", s.handleValidationMetrics)
 	mux.HandleFunc("/api/validation/stats", s.handleValidationStats)
 	mux.HandleFunc("/api/metrics/hook", s.handleHookMetrics)
+
+	// Signal detection and decision-making endpoints
+	mux.HandleFunc("/api/signals/detect", s.handleDetectSignal)
+	mux.HandleFunc("/api/decisions/make", s.handleMakeDecision)
+	mux.HandleFunc("/api/decisions/learning", s.handleDecisionLearning)
 
 	// Statusline integration endpoint (for barista, plugins, etc.)
 	mux.HandleFunc("/api/statusline", s.handleStatusline)
@@ -604,6 +611,152 @@ func updateClaudeSettings(model string) error {
 		effort = "high"
 	}
 	return config.WriteClaudeSettings(model, effort)
+}
+
+// Signal detection request/response types
+type DetectSignalRequest struct {
+	Text string `json:"text"`
+}
+
+type DetectSignalResponse struct {
+	SignalType SignalType `json:"signal_type"`
+	Confidence float64    `json:"confidence"`
+	Pattern    string      `json:"pattern"`
+	Text       string      `json:"text"`
+}
+
+type SignalType string
+
+const (
+	SignalSuccess       SignalType = "success"
+	SignalFailure       SignalType = "failure"
+	SignalEscalation    SignalType = "escalation"
+	SignalClarification SignalType = "clarification"
+	SignalEffortLow     SignalType = "effort_low"
+	SignalEffortHigh    SignalType = "effort_high"
+	SignalNone          SignalType = "none"
+)
+
+// handleDetectSignal analyzes text for user signals
+func (s *Service) handleDetectSignal(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req DetectSignalRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid request", http.StatusBadRequest)
+		return
+	}
+
+	detector := signals.NewDetector()
+	signal := detector.DetectSignal(req.Text)
+
+	resp := DetectSignalResponse{
+		SignalType: SignalType(signal.Type),
+		Confidence: signal.Confidence,
+		Pattern:    signal.Pattern,
+		Text:       signal.Text,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(resp)
+}
+
+// Decision request/response types
+type MakeDecisionRequest struct {
+	ValidationID string      `json:"validation_id"`
+	Signal       DetectSignalResponse `json:"signal"`
+}
+
+type MakeDecisionResponse struct {
+	Action              string  `json:"action"`
+	NextModel           string  `json:"next_model"`
+	NextEffort          string  `json:"next_effort"`
+	Reason              string  `json:"reason"`
+	Confidence          float64 `json:"confidence"`
+	CascadeAvailable    bool    `json:"cascade_available"`
+	EscalateAvailable   bool    `json:"escalate_available"`
+	CostSavingsEstimate float64 `json:"cost_savings_estimate"`
+}
+
+// handleMakeDecision makes optimization decisions based on validation metrics and signals
+func (s *Service) handleMakeDecision(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req MakeDecisionRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid request", http.StatusBadRequest)
+		return
+	}
+
+	validation, err := s.db.GetValidationMetric(req.ValidationID)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("validation not found: %v", err), http.StatusNotFound)
+		return
+	}
+
+	// Convert response signal to internal signal type
+	internalSignal := signals.Signal{
+		Type:       signals.SignalType(req.Signal.SignalType),
+		Confidence: req.Signal.Confidence,
+		Pattern:    req.Signal.Pattern,
+		Text:       req.Signal.Text,
+	}
+
+	engine := decisions.NewEngine()
+	decision := engine.MakeDecision(validation, internalSignal)
+
+	resp := MakeDecisionResponse{
+		Action:              decision.Action,
+		NextModel:           decision.NextModel,
+		NextEffort:          decision.NextEffort,
+		Reason:              decision.Reason,
+		Confidence:          decision.Confidence,
+		CascadeAvailable:    decision.CascadeAvailable,
+		EscalateAvailable:   decision.EscalateAvailable,
+		CostSavingsEstimate: decision.CostSavingsEstimate,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(resp)
+}
+
+// Learning analysis request/response
+type DecisionLearningResponse struct {
+	LowEffort    map[string]interface{} `json:"low_effort"`
+	MediumEffort map[string]interface{} `json:"medium_effort"`
+	HighEffort   map[string]interface{} `json:"high_effort"`
+}
+
+// handleDecisionLearning provides learning analysis across task types
+func (s *Service) handleDecisionLearning(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	validations, err := s.db.GetAllValidationMetrics()
+	if err != nil {
+		http.Error(w, fmt.Sprintf("error retrieving validations: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	engine := decisions.NewEngine()
+	learning := engine.CalculateLearning(validations)
+
+	resp := DecisionLearningResponse{
+		LowEffort:    learning["low_effort"].(map[string]interface{}),
+		MediumEffort: learning["medium_effort"].(map[string]interface{}),
+		HighEffort:   learning["high_effort"].(map[string]interface{}),
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(resp)
 }
 
 const dashboardHTML = `<!-- Dashboard HTML would be embedded here -->`

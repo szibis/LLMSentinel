@@ -415,3 +415,35 @@ func (s *Store) GetValidationStats() (map[string]interface{}, error) {
 	})
 	return stats, err
 }
+
+// GetValidationMetric retrieves a single validation metric by ID.
+func (s *Store) GetValidationMetric(id string) (ValidationMetric, error) {
+	var metric ValidationMetric
+	err := s.db.View(func(tx *bolt.Tx) error {
+		b := tx.Bucket(bucketValidation)
+		v := b.Get([]byte(id))
+		if v == nil {
+			return fmt.Errorf("validation metric not found: %s", id)
+		}
+		return json.Unmarshal(v, &metric)
+	})
+	return metric, err
+}
+
+// GetAllValidationMetrics retrieves all validation metrics.
+func (s *Store) GetAllValidationMetrics() ([]ValidationMetric, error) {
+	var metrics []ValidationMetric
+	err := s.db.View(func(tx *bolt.Tx) error {
+		b := tx.Bucket(bucketValidation)
+		c := b.Cursor()
+		for k, v := c.First(); k != nil; k, v = c.Next() {
+			var m ValidationMetric
+			if err := json.Unmarshal(v, &m); err != nil {
+				continue
+			}
+			metrics = append(metrics, m)
+		}
+		return nil
+	})
+	return metrics, err
+}
