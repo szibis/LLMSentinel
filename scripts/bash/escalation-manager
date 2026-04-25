@@ -582,8 +582,116 @@ handle_post_tool() {
 }
 
 # =============================================================================
+# Stats Output (CLI command for dashboard and reporting)
+# =============================================================================
+
+output_stats() {
+    local escalations=0
+    local deescalations=0
+    local task_types=$(mktemp)
+
+    if [ -f "$DATA_DIR/escalations.log" ]; then
+        escalations=$(wc -l < "$DATA_DIR/escalations.log")
+    fi
+
+    if [ -f "$DATA_DIR/deescalations.log" ]; then
+        deescalations=$(wc -l < "$DATA_DIR/deescalations.log")
+    fi
+
+    # Calculate cascade metrics
+    local cascade_rate=$([ "$escalations" -eq 0 ] && echo "0" || echo $(( (deescalations * 100) / escalations )))
+    local avg_depth=$([ "$escalations" -eq 0 ] && echo "0" || echo $(( deescalations / escalations )))
+
+    # Current model
+    local current_model=$(get_current_model)
+    local current_effort=$(get_current_effort)
+    local model_display=""
+    local model_color=""
+
+    if [[ "$current_model" == *"opus"* ]]; then
+        model_display="Opus"
+        model_color="#FF6B6B"
+    elif [[ "$current_model" == *"sonnet"* ]]; then
+        model_display="Sonnet"
+        model_color="#FFA502"
+    else
+        model_display="Haiku"
+        model_color="#51CF66"
+    fi
+
+    # Task type analysis
+    local task_breakdown=""
+    if [ -f "$DATA_DIR/last_task_context" ]; then
+        task_breakdown=$(cat "$DATA_DIR/last_task_context")
+    fi
+
+    # Success rate (de-escalations out of opportunities)
+    local success_rate=$([ "$escalations" -eq 0 ] && echo "0" || echo $(( (deescalations * 100) / escalations )))
+
+    # Output as JSON
+    cat << STATS_JSON
+{
+  "currentState": {
+    "model": "$model_display",
+    "fullModel": "$current_model",
+    "modelColor": "$model_color",
+    "effort": "$(echo $current_effort | tr '[:lower:]' '[:upper:]')",
+    "lastTaskType": "$task_breakdown"
+  },
+  "stats": {
+    "escalations": $escalations,
+    "deescalations": $deescalations,
+    "cascadeRate": $cascade_rate,
+    "successRate": $success_rate,
+    "avgCascadeDepth": $avg_depth,
+    "tokensCost": $(( deescalations * 200 ))
+  },
+  "metrics": {
+    "totalSessions": $escalations,
+    "problemsResolved": $deescalations,
+    "costSavings": "~$((deescalations * 3)) tokens"
+  }
+}
+STATS_JSON
+}
+
+# =============================================================================
 # Main Dispatch
 # =============================================================================
+
+# Check for CLI commands
+if [ "${1:-}" = "stats" ] || [ "${1:-}" = "--stats" ]; then
+    output_stats
+    exit 0
+elif [ "${1:-}" = "version" ] || [ "${1:-}" = "--version" ]; then
+    echo "escalation-manager v2.0 (bash)"
+    exit 0
+elif [ "${1:-}" = "help" ] || [ "${1:-}" = "--help" ]; then
+    cat << HELP
+escalation-manager - Unified escalation control for Claude Code
+
+Usage:
+  escalation-manager [COMMAND]
+
+Commands:
+  stats        Output current escalation statistics (JSON)
+  version      Show version
+  help         Show this help
+
+As hook:
+  HOOK_TYPE=on-prompt escalation-manager < input.json
+  HOOK_TYPE=pre-tool escalation-manager < input.json
+  HOOK_TYPE=post-tool escalation-manager < input.json
+
+Environment:
+  HOOK_TYPE    Hook execution type (on-prompt, pre-tool, post-tool)
+
+Examples:
+  escalation-manager stats | jq .
+  HOOK_TYPE=on-prompt escalation-manager < hook.json
+HELP
+    exit 0
+fi
 
 case "${HOOK_TYPE}" in
     on-prompt)   handle_on_prompt ;;
