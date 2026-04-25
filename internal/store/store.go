@@ -52,23 +52,23 @@ type TaskTypeStats struct {
 
 // ValidationMetric tracks estimated vs actual token usage.
 type ValidationMetric struct {
-	ID                   int64     `json:"id"`
-	Timestamp            time.Time `json:"timestamp"`
-	Prompt               string    `json:"prompt"`
-	DetectedTaskType     string    `json:"detected_task_type"`
-	DetectedEffort       string    `json:"detected_effort"`
-	RoutedModel          string    `json:"routed_model"`
-	EstimatedInputTokens int       `json:"estimated_input_tokens"`
-	EstimatedOutputTokens int      `json:"estimated_output_tokens"`
-	EstimatedTotalTokens int       `json:"estimated_total_tokens"`
-	EstimatedCost        float64   `json:"estimated_cost"`
-	ActualInputTokens    int       `json:"actual_input_tokens"`
-	ActualOutputTokens   int       `json:"actual_output_tokens"`
-	ActualTotalTokens    int       `json:"actual_total_tokens"`
-	ActualCost           float64   `json:"actual_cost"`
-	TokenError           float64   `json:"token_error_percent"`
-	CostError            float64   `json:"cost_error_percent"`
-	Validated            bool      `json:"validated"`
+	ID                    int64     `json:"id"`
+	Timestamp             time.Time `json:"timestamp"`
+	Prompt                string    `json:"prompt"`
+	DetectedTaskType      string    `json:"detected_task_type"`
+	DetectedEffort        string    `json:"detected_effort"`
+	RoutedModel           string    `json:"routed_model"`
+	EstimatedInputTokens  int       `json:"estimated_input_tokens"`
+	EstimatedOutputTokens int       `json:"estimated_output_tokens"`
+	EstimatedTotalTokens  int       `json:"estimated_total_tokens"`
+	EstimatedCost         float64   `json:"estimated_cost"`
+	ActualInputTokens     int       `json:"actual_input_tokens"`
+	ActualOutputTokens    int       `json:"actual_output_tokens"`
+	ActualTotalTokens     int       `json:"actual_total_tokens"`
+	ActualCost            float64   `json:"actual_cost"`
+	TokenError            float64   `json:"token_error_percent"`
+	CostError             float64   `json:"cost_error_percent"`
+	Validated             bool      `json:"validated"`
 }
 
 // Open creates or opens the bbolt database at the given directory.
