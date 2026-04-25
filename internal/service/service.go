@@ -94,7 +94,9 @@ func (s *Service) handleHook(w http.ResponseWriter, r *http.Request) {
 		if err := s.db.LogEscalation("haiku", target, "manual", "user_command"); err != nil {
 			fmt.Printf("error logging escalation: %v\n", err)
 		}
-		updateClaudeSettings(target)
+		if err := updateClaudeSettings(target); err != nil {
+			fmt.Printf("error updating settings: %v\n", err)
+		}
 	}
 
 	// Check for success signals (de-escalation triggers)
@@ -108,7 +110,9 @@ func (s *Service) handleHook(w http.ResponseWriter, r *http.Request) {
 			if err := s.db.LogEscalation(settings.Model, nextModel, "success", "success_signal"); err != nil {
 				fmt.Printf("error logging deescalation: %v\n", err)
 			}
-			updateClaudeSettings(nextModel)
+			if err := updateClaudeSettings(nextModel); err != nil {
+				fmt.Printf("error updating settings: %v\n", err)
+			}
 		}
 	}
 
@@ -120,7 +124,9 @@ func (s *Service) handleHook(w http.ResponseWriter, r *http.Request) {
 		if err := s.db.LogEscalation("haiku", model, "auto", effort); err != nil {
 			fmt.Printf("error logging effort detection: %v\n", err)
 		}
-		updateClaudeSettings(model)
+		if err := updateClaudeSettings(model); err != nil {
+			fmt.Printf("error updating settings: %v\n", err)
+		}
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -158,7 +164,9 @@ func (s *Service) handleEscalate(w http.ResponseWriter, r *http.Request) {
 	if err := s.db.LogEscalation(from, target, "manual", "user_command"); err != nil {
 		fmt.Printf("error logging escalation: %v\n", err)
 	}
-	updateClaudeSettings(modelToFull(target))
+	if err := updateClaudeSettings(modelToFull(target)); err != nil {
+		fmt.Printf("error updating settings: %v\n", err)
+	}
 
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(map[string]interface{}{
@@ -200,7 +208,9 @@ func (s *Service) handleDeescalate(w http.ResponseWriter, r *http.Request) {
 	if err := s.db.LogEscalation(modelShortName(from), to, "cascade", req.Reason); err != nil {
 		fmt.Printf("error logging deescalation: %v\n", err)
 	}
-	updateClaudeSettings(modelToFull(to))
+	if err := updateClaudeSettings(modelToFull(to)); err != nil {
+		fmt.Printf("error updating settings: %v\n", err)
+	}
 
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(map[string]interface{}{
@@ -229,7 +239,9 @@ func (s *Service) handleEffort(w http.ResponseWriter, r *http.Request) {
 	}
 
 	model := effortToModel(req.Level)
-	updateClaudeSettings(modelToFull(model))
+	if err := updateClaudeSettings(modelToFull(model)); err != nil {
+		fmt.Printf("error updating settings: %v\n", err)
+	}
 
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(map[string]interface{}{
