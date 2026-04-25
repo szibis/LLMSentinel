@@ -18,6 +18,7 @@ import (
 	"github.com/szibis/claude-escalate/internal/dashboard"
 	"github.com/szibis/claude-escalate/internal/detect"
 	"github.com/szibis/claude-escalate/internal/hook"
+	"github.com/szibis/claude-escalate/internal/service"
 	"github.com/szibis/claude-escalate/internal/store"
 )
 
@@ -28,6 +29,8 @@ func main() {
 	}
 
 	switch os.Args[1] {
+	case "service":
+		runService()
 	case "hook":
 		runHook()
 	case "dashboard":
@@ -397,6 +400,30 @@ func runInstallHook() {
 }`)
 	fmt.Println()
 	fmt.Println("This single hook replaces all 6 bash scripts (detect, escalate, de-escalate, analyze, track, auto-effort).")
+}
+
+func runService() {
+	cfg := config.DefaultConfig()
+
+	// Parse flags
+	port := "9000"
+	for i, arg := range os.Args[2:] {
+		if arg == "--port" && i+1 < len(os.Args)-2 {
+			port = os.Args[i+3]
+		}
+	}
+
+	svc, err := service.New(cfg)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to create service: %v\n", err)
+		os.Exit(1)
+	}
+
+	addr := "127.0.0.1:" + port
+	if err := svc.Start(addr); err != nil {
+		fmt.Fprintf(os.Stderr, "Service error: %v\n", err)
+		os.Exit(1)
+	}
 }
 
 func capitalize(s string) string {
