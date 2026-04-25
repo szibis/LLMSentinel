@@ -247,14 +247,30 @@ func handleDeEscalate(db *store.Store, currentModel, taskType string) {
 
 func runDashboard() {
 	port := 8077
+	bind := ""
 	for i, arg := range os.Args {
 		if arg == "--port" && i+1 < len(os.Args) {
 			_, _ = fmt.Sscanf(os.Args[i+1], "%d", &port)
 		}
+		if arg == "--bind" && i+1 < len(os.Args) {
+			bind = os.Args[i+1]
+		}
+	}
+	// Environment variable override (for Docker)
+	if v := os.Getenv("ESCALATE_BIND"); v != "" {
+		bind = v
+	}
+	if v := os.Getenv("ESCALATE_DATA_DIR"); v != "" {
+		// handled below via cfg
+		_ = v
 	}
 
 	cfg := config.DefaultConfig()
 	cfg.DashboardPort = port
+	cfg.DashboardBind = bind
+	if v := os.Getenv("ESCALATE_DATA_DIR"); v != "" {
+		cfg.DataDir = v
+	}
 
 	if err := dashboard.Serve(cfg); err != nil {
 		fmt.Fprintf(os.Stderr, "Dashboard error: %v\n", err)

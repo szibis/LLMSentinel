@@ -24,5 +24,8 @@ COPY --from=builder /app/claude-escalate /app/claude-escalate
 
 EXPOSE 8077
 
+ENV ESCALATE_BIND=0.0.0.0
+ENV ESCALATE_DATA_DIR=/data
+
 ENTRYPOINT ["/app/claude-escalate"]
 CMD ["dashboard", "--port", "8077"]

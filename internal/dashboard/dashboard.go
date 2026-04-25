@@ -44,7 +44,11 @@ func Serve(cfg *config.Config) error {
 		_, _ = w.Write([]byte(dashboardHTML))
 	})
 
-	addr := fmt.Sprintf("127.0.0.1:%d", cfg.DashboardPort)
+	host := "127.0.0.1"
+	if cfg.DashboardBind != "" {
+		host = cfg.DashboardBind
+	}
+	addr := fmt.Sprintf("%s:%d", host, cfg.DashboardPort)
 	fmt.Printf("claude-escalate dashboard running at http://%s\n", addr)
 	srv := &http.Server{
 		Addr:              addr,
