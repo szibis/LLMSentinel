@@ -28,8 +28,21 @@ Start here based on what you need:
 | **[SERVICE_MODE.md](SERVICE_MODE.md)** | 🔄 HTTP service architecture & API |
 | **[SETUP.md](SETUP.md)** | 🚀 Installation & configuration |
 | **[USAGE.md](USAGE.md)** | 📖 How to use escalation commands |
+
+### Validation & Metrics
+| Document | Purpose |
+|----------|---------|
+| **[VALIDATION_QUICKSTART.md](VALIDATION_QUICKSTART.md)** | ⚡ 15-minute validation setup |
+| **[ARCHITECTURE_DIAGRAMS.md](ARCHITECTURE_DIAGRAMS.md)** | 📊 12 Mermaid system diagrams |
+| **[VALIDATION_INTEGRATION.md](VALIDATION_INTEGRATION.md)** | 🔍 Complete validation implementation |
+| **[STATUSLINE_INTEGRATION.md](STATUSLINE_INTEGRATION.md)** | 🔌 Plugin integration for metrics |
+| **[VALIDATION_PURE_BINARY.md](VALIDATION_PURE_BINARY.md)** | 💾 Pure binary design (no scripts) |
+| **[FULL_CYCLE_FLOW.md](FULL_CYCLE_FLOW.md)** | 🔄 End-to-end validation workflow |
+
+### Dashboards & Deployment
+| Document | Purpose |
+|----------|---------|
 | **[DASHBOARD.md](DASHBOARD.md)** | 📊 Dashboard features and metrics |
-| **[VALIDATION_INTEGRATION.md](VALIDATION_INTEGRATION.md)** | ✅ Token cost validation framework |
 | **[ARCHITECTURE.md](ARCHITECTURE.md)** | 🏗️ Technical design |
 | **[DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md)** | 🌐 Production deployment |
 | **[TROUBLESHOOTING.md](TROUBLESHOOTING.md)** | 🔧 Common issues and fixes |
@@ -65,14 +78,16 @@ escalation-manager service --port 9000
 
 **Access Dashboard**: http://localhost:9000/
 
-## ✨ v2.0 Monolithic Service
+## ✨ v2.0 Monolithic Service with Token Validation
 
 ### Single HTTP-Based Go Service
 - ✅ **Monolithic binary**: All logic in one service (no bash scripts)
 - ✅ **HTTP endpoints**: Clean API for all operations
-- ✅ **Zero bash dependencies**: Pure Go implementation
+- ✅ **Zero bash dependencies**: Pure Go implementation (3-line hook only)
 - ✅ **SQLite database**: Persistent, queryable storage
 - ✅ **Performance**: <50ms response time per request
+- ✅ **Token validation**: Compare estimated vs actual token usage
+- ✅ **Statusline integration**: `/api/statusline` endpoint for plugins
 
 ### Consolidated Architecture
 - ✅ `/api/hook` — Detects `/escalate`, success signals, auto-effort
@@ -95,19 +110,30 @@ escalation-manager service --port 9000
 
 ### Architecture
 ```
-Claude Code
-    ↓ (hook)
-http-hook.sh (stdin)
+Claude Code Session
+    ↓ (user prompt)
+http-hook.sh (3-line bash)
     ↓ POST /api/hook
 Go Service (localhost:9000)
     ├─ Parses prompt
     ├─ Detects /escalate, success signals
     ├─ Auto-effort classification
-    ├─ Logs to SQLite
+    ├─ ESTIMATES tokens (Phase 1)
+    ├─ Creates validation record
     ├─ Updates settings.json
-    └─ Returns response
+    └─ Returns routing decision
+    ↓
+Claude generates response
+    ↓
+Monitor/Integration
+    └─ Extracts ACTUAL token counts
+        ↓ POST /api/validate
+        Service matches & calculates accuracy
     ↓
 Dashboard (http://localhost:9000/)
+    ├─ Shows estimated vs actual
+    ├─ Displays accuracy metrics
+    └─ Real-time validation updates
 ```
 
 ### 1. Auto-Effort Routing
@@ -132,7 +158,30 @@ Service: ⬇️ Cascade: Sonnet → Haiku
 → Next task automatically routed to cheap Haiku
 ```
 
-### 4. Dashboard Monitoring
+### 4. Cost Validation Framework
+```
+Two-Phase Validation System:
+
+Phase 1 (Pre-Response):
+  - Hook estimates tokens from prompt
+  - Detects effort level and model routing
+  - Creates validation record with estimates
+  - Returns routing decision
+
+Phase 2 (Post-Response):
+  - Monitor/Integration captures actual tokens from Claude
+  - Compares actual vs estimated
+  - Calculates accuracy metrics
+  - Updates validation record
+
+Results:
+  - Token error: Target ±15%, Shows estimate accuracy
+  - Cost error: Target ±10%, Shows cost estimation accuracy
+  - Model accuracy: Target 85%+, Validates routing decisions
+  - Cascade savings: 40%+, Verifies cost reduction
+```
+
+### 5. Dashboard Monitoring
 ```
 http://localhost:9000/ shows:
 - Current model, cost multiplier, effort level
@@ -141,6 +190,8 @@ http://localhost:9000/ shows:
 - Cost analysis (tokens saved)
 - Session history with details
 - Model distribution charts
+- VALIDATION metrics (estimated vs actual)
+- Accuracy statistics and error rates
 - Real-time updates every 2 seconds
 ```
 
