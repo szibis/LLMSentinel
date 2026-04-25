@@ -1,0 +1,65 @@
+# Production Configuration - Conservative Spending
+# Use this for production environments with tight controls
+
+statusline:
+  sources:
+    - type: barista
+      enabled: true
+      path: ~/.claude/data/escalation/barista-metrics.json
+      timeout_ms: 2000
+    - type: claude-native
+      enabled: true
+      path: ~/.claude/statusline.json
+    - type: envvar
+      enabled: true
+
+budgets:
+  daily_usd: 5.0
+  monthly_usd: 50.0
+  session_tokens: 5000
+  hard_limit: true        # Reject over-budget requests
+  soft_limit: false
+  auto_downgrade_at: 0.70 # Downgrade early (70%)
+
+  model_daily_limits:
+    opus: 2.0             # Limited Opus usage
+    sonnet: 2.0
+    haiku: 0              # Unlimited (cheap)
+
+  task_type_budgets:
+    concurrency: 3000
+    parsing: 1000
+    debugging: 2000
+    architecture: 2500
+
+  alert_thresholds:
+    warn_low: 0.50
+    warn_med: 0.75
+    warn_high: 0.90
+
+sentiment:
+  enabled: true
+  frustration_trigger_escalate: true
+  frustration_risk_threshold: 0.70
+  learning_enabled: true
+  track_satisfaction: true
+
+decisions:
+  success_signal_threshold: 0.80
+  failure_signal_threshold: 0.80
+  token_error_threshold: 15.0
+  auto_escalate_on_frustration: true
+  max_attempts_before_opus: 2
+
+display:
+  display_model: true
+  display_effort: true
+  display_tokens: true
+  display_sentiment: true
+  display_budget_remaining: true
+  refresh_interval_ms: 500
+
+logging:
+  level: warn                         # Only warnings and errors
+  file: ~/.claude/data/escalation/escalation.log
+  retention_days: 7                   # Keep 1 week of logs

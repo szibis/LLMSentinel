@@ -104,6 +104,11 @@ func (s *Store) Close() error {
 	return s.db.Close()
 }
 
+// GetDB returns the underlying bolt database for analytics access.
+func (s *Store) GetDB() *bolt.DB {
+	return s.db
+}
+
 func itob(v uint64) []byte {
 	b := make([]byte, 8)
 	binary.BigEndian.PutUint64(b, v)
