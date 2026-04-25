@@ -114,7 +114,7 @@ func handlePredictions(w http.ResponseWriter, _ *http.Request, db *store.Store, 
 	writeJSON(w, predictions)
 }
 
-// dashboardHTML is the embedded enhanced dashboard with cost analysis, sessions, and theme toggle.
+// dashboardHTML is the embedded enhanced dashboard with sentiment, budget, and cost analysis tabs.
 const dashboardHTML = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -174,6 +174,27 @@ th { color: var(--dim); font-weight: 600; text-transform: uppercase; font-size: 
 .logo { font-size: 32px; margin-right: 12px; }
 tr:hover { background: var(--border); }
 td { max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tabs { display: flex; gap: 8px; margin-bottom: 24px; border-bottom: 2px solid var(--border); }
+.tab { padding: 12px 16px; background: none; border: none; color: var(--dim); cursor: pointer; font-size: 14px; font-weight: 600; border-bottom: 3px solid transparent; transition: all 0.2s; }
+.tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+.tab:hover { color: var(--text); }
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+.sentiment-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 16px; margin-bottom: 24px; }
+.sentiment-card { background: var(--bg); padding: 16px; border-radius: 8px; border: 1px solid var(--border); text-align: center; }
+.sentiment-emoji { font-size: 32px; margin-bottom: 8px; }
+.sentiment-value { font-size: 24px; font-weight: 700; margin-bottom: 4px; }
+.sentiment-label { font-size: 12px; color: var(--dim); text-transform: uppercase; }
+.chart-container { background: var(--bg); padding: 24px; border-radius: 8px; border: 1px solid var(--border); margin-bottom: 24px; }
+.budget-bar { height: 24px; background: var(--border); border-radius: 4px; overflow: hidden; margin: 8px 0; }
+.budget-fill { height: 100%; border-radius: 4px; transition: width 0.3s; }
+.warning-yellow { background: var(--yellow); }
+.warning-red { background: var(--red); }
+.success-green { background: var(--green); }
+.frustration-event { background: var(--bg); padding: 16px; border-radius: 8px; border-left: 4px solid var(--red); margin-bottom: 12px; }
+.frustration-time { font-size: 12px; color: var(--dim); }
+.frustration-task { font-weight: 600; margin: 4px 0; }
+.frustration-resolution { font-size: 13px; color: var(--green); margin-top: 4px; }
 </style>
 </head>
 <body>
@@ -221,45 +242,200 @@ td { max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: n
     </div>
   </div>
 
-  <div class="section card">
-    <div class="section-title">💰 Cost Analysis</div>
-    <div id="cost-analysis">
-      <div style="text-align:center;padding:32px;color:var(--dim)">Loading cost data...</div>
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('overview')">📊 Overview</button>
+    <button class="tab" onclick="switchTab('sentiment')">😊 Sentiment</button>
+    <button class="tab" onclick="switchTab('budget')">💰 Budget</button>
+    <button class="tab" onclick="switchTab('optimization')">🎯 Optimization</button>
+  </div>
+
+  <!-- Overview Tab -->
+  <div id="overview" class="tab-content active">
+    <div class="section card">
+      <div class="section-title">💰 Cost Analysis</div>
+      <div id="cost-analysis">
+        <div style="text-align:center;padding:32px;color:var(--dim)">Loading cost data...</div>
+      </div>
+    </div>
+
+    <div class="grid" style="grid-template-columns: repeat(3, 1fr);">
+      <div class="card">
+        <div class="card-label">Haiku Sessions</div>
+        <div id="haiku-count" class="card-value accent">—</div>
+        <div class="progress"><div class="progress-fill" id="haiku-bar" style="background:var(--accent);width:0%"></div></div>
+      </div>
+      <div class="card">
+        <div class="card-label">Sonnet Sessions</div>
+        <div id="sonnet-count" class="card-value purple">—</div>
+        <div class="progress"><div class="progress-fill" id="sonnet-bar" style="background:var(--purple);width:0%"></div></div>
+      </div>
+      <div class="card">
+        <div class="card-label">Opus Sessions</div>
+        <div id="opus-count" class="card-value green">—</div>
+        <div class="progress"><div class="progress-fill" id="opus-bar" style="background:var(--green);width:0%"></div></div>
+      </div>
+    </div>
+
+    <div class="section card">
+      <div class="section-title">📊 Task Type Performance</div>
+      <table>
+        <thead><tr><th>Task Type</th><th>Escalations</th><th>Success</th><th>Rate</th><th>Prediction</th></tr></thead>
+        <tbody id="types-body"><tr><td colspan="5" class="empty-state">No data yet.</td></tr></tbody>
+      </table>
+    </div>
+
+    <div class="section card">
+      <div class="section-title">📈 Recent Sessions (Last 30)</div>
+      <table>
+        <thead><tr><th>Time</th><th>Duration</th><th>Start</th><th>End</th><th>Tokens</th><th>Saved</th><th>Status</th></tr></thead>
+        <tbody id="history-body"><tr><td colspan="7" class="empty-state">No sessions yet.</td></tr></tbody>
+      </table>
     </div>
   </div>
 
-  <div class="grid" style="grid-template-columns: repeat(3, 1fr);">
-    <div class="card">
-      <div class="card-label">Haiku Sessions</div>
-      <div id="haiku-count" class="card-value accent">—</div>
-      <div class="progress"><div class="progress-fill" id="haiku-bar" style="background:var(--accent);width:0%"></div></div>
+  <!-- Sentiment Tab -->
+  <div id="sentiment" class="tab-content">
+    <div class="section card">
+      <div class="section-title">😊 User Sentiment Trends (Last 24h)</div>
+      <div class="sentiment-grid">
+        <div class="sentiment-card">
+          <div class="sentiment-emoji">😊</div>
+          <div class="sentiment-value" id="sentiment-satisfied">—</div>
+          <div class="sentiment-label">Satisfied</div>
+        </div>
+        <div class="sentiment-card">
+          <div class="sentiment-emoji">😐</div>
+          <div class="sentiment-value" id="sentiment-neutral">—</div>
+          <div class="sentiment-label">Neutral</div>
+        </div>
+        <div class="sentiment-card">
+          <div class="sentiment-emoji">😤</div>
+          <div class="sentiment-value" id="sentiment-frustrated">—</div>
+          <div class="sentiment-label">Frustrated</div>
+        </div>
+        <div class="sentiment-card">
+          <div class="sentiment-emoji">🤔</div>
+          <div class="sentiment-value" id="sentiment-confused">—</div>
+          <div class="sentiment-label">Confused</div>
+        </div>
+        <div class="sentiment-card">
+          <div class="sentiment-emoji">⏱️</div>
+          <div class="sentiment-value" id="sentiment-impatient">—</div>
+          <div class="sentiment-label">Impatient</div>
+        </div>
+      </div>
+
+      <div style="background: var(--bg); padding: 16px; border-radius: 8px; margin-bottom: 16px;">
+        <div style="font-size: 14px; margin-bottom: 8px;"><strong>Satisfaction Rate:</strong> <span id="sentiment-rate" style="color: var(--green); font-weight: 700;">—</span></div>
+        <div class="progress"><div class="progress-fill success-green" id="sentiment-rate-bar" style="width:0%"></div></div>
+      </div>
     </div>
-    <div class="card">
-      <div class="card-label">Sonnet Sessions</div>
-      <div id="sonnet-count" class="card-value purple">—</div>
-      <div class="progress"><div class="progress-fill" id="sonnet-bar" style="background:var(--purple);width:0%"></div></div>
+
+    <div class="section card">
+      <div class="section-title">🚨 Frustration Events (Last 24h)</div>
+      <div id="frustration-events">
+        <div style="text-align:center;padding:32px;color:var(--dim)">No frustration events.</div>
+      </div>
     </div>
-    <div class="card">
-      <div class="card-label">Opus Sessions</div>
-      <div id="opus-count" class="card-value green">—</div>
-      <div class="progress"><div class="progress-fill" id="opus-bar" style="background:var(--green);width:0%"></div></div>
+
+    <div class="section card">
+      <div class="section-title">⭐ Model Satisfaction by Task Type</div>
+      <table>
+        <thead><tr><th>Task Type</th><th>Haiku</th><th>Sonnet</th><th>Opus</th><th>Recommendation</th></tr></thead>
+        <tbody id="model-satisfaction-body"><tr><td colspan="5" class="empty-state">Loading...</td></tr></tbody>
+      </table>
     </div>
   </div>
 
-  <div class="section card">
-    <div class="section-title">📊 Task Type Performance</div>
-    <table>
-      <thead><tr><th>Task Type</th><th>Escalations</th><th>Success</th><th>Rate</th><th>Prediction</th></tr></thead>
-      <tbody id="types-body"><tr><td colspan="5" class="empty-state">No data yet.</td></tr></tbody>
-    </table>
+  <!-- Budget Tab -->
+  <div id="budget" class="tab-content">
+    <div class="section card">
+      <div class="section-title">💳 Daily Budget Status</div>
+      <div class="grid">
+        <div class="card">
+          <div class="card-label">Daily Limit</div>
+          <div class="card-value" id="budget-daily-limit">—</div>
+        </div>
+        <div class="card">
+          <div class="card-label">Daily Used</div>
+          <div class="card-value" id="budget-daily-used">—</div>
+        </div>
+        <div class="card">
+          <div class="card-label">Daily Remaining</div>
+          <div class="card-value green" id="budget-daily-remaining">—</div>
+        </div>
+        <div class="card">
+          <div class="card-label">Daily Usage %</div>
+          <div class="card-value" id="budget-daily-percent">—</div>
+        </div>
+      </div>
+      <div style="margin-top: 16px;">
+        <div style="font-size: 14px; margin-bottom: 8px;">Daily Budget Progress:</div>
+        <div class="budget-bar"><div class="budget-fill success-green" id="budget-daily-bar" style="width:0%"></div></div>
+      </div>
+    </div>
+
+    <div class="section card">
+      <div class="section-title">📅 Monthly Budget Status</div>
+      <div class="grid">
+        <div class="card">
+          <div class="card-label">Monthly Limit</div>
+          <div class="card-value" id="budget-monthly-limit">—</div>
+        </div>
+        <div class="card">
+          <div class="card-label">Monthly Used</div>
+          <div class="card-value" id="budget-monthly-used">—</div>
+        </div>
+        <div class="card">
+          <div class="card-label">Days Remaining</div>
+          <div class="card-value accent" id="budget-days-remaining">—</div>
+        </div>
+        <div class="card">
+          <div class="card-label">Monthly Usage %</div>
+          <div class="card-value" id="budget-monthly-percent">—</div>
+        </div>
+      </div>
+      <div style="margin-top: 16px;">
+        <div style="font-size: 14px; margin-bottom: 8px;">Monthly Budget Progress:</div>
+        <div class="budget-bar"><div class="budget-fill" id="budget-monthly-bar" style="width:0%"></div></div>
+      </div>
+    </div>
+
+    <div class="section card">
+      <div class="section-title">🎯 Model Daily Limits</div>
+      <table>
+        <thead><tr><th>Model</th><th>Daily Limit</th><th>Used</th><th>Remaining</th><th>Usage %</th></tr></thead>
+        <tbody id="model-limits-body"><tr><td colspan="5" class="empty-state">Loading...</td></tr></tbody>
+      </table>
+    </div>
   </div>
 
-  <div class="section card">
-    <div class="section-title">📈 Recent Sessions (Last 30)</div>
-    <table>
-      <thead><tr><th>Time</th><th>Duration</th><th>Start</th><th>End</th><th>Tokens</th><th>Saved</th><th>Status</th></tr></thead>
-      <tbody id="history-body"><tr><td colspan="7" class="empty-state">No sessions yet.</td></tr></tbody>
-    </table>
+  <!-- Optimization Tab -->
+  <div id="optimization" class="tab-content">
+    <div class="section card">
+      <div class="section-title">🎯 Cost Optimization Opportunities</div>
+      <div id="cost-recommendations">
+        <div style="text-align:center;padding:32px;color:var(--dim)">Loading recommendations...</div>
+      </div>
+    </div>
+
+    <div class="section card">
+      <div class="section-title">📈 Potential Savings Summary</div>
+      <div class="grid">
+        <div class="card">
+          <div class="card-label">Total Identified Opportunities</div>
+          <div class="card-value accent" id="opt-count">—</div>
+        </div>
+        <div class="card">
+          <div class="card-label">Estimated Monthly Savings</div>
+          <div class="card-value green" id="opt-savings">—</div>
+        </div>
+        <div class="card">
+          <div class="card-label">Average Savings per Task</div>
+          <div class="card-value purple" id="opt-avg-savings">—</div>
+        </div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -274,12 +450,23 @@ function toggleTheme() {
   localStorage.setItem('theme', isDarkMode ? 'dark' : 'light');
 }
 
+function switchTab(tab) {
+  document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
+  document.getElementById(tab).classList.add('active');
+  event.target.classList.add('active');
+}
+
 async function loadAll() {
   try {
-    const [stats, types, history] = await Promise.all([
+    const [stats, types, history, sentiment, budget, satisfaction, optimization] = await Promise.all([
       fetch('/api/stats').then(r => r.json()).catch(() => ({})),
       fetch('/api/types').then(r => r.json()).catch(() => []),
       fetch('/api/history').then(r => r.json()).catch(() => []),
+      fetch('/api/analytics/sentiment-trends?hours=24').then(r => r.json()).catch(() => ({})),
+      fetch('/api/analytics/budget-status').then(r => r.json()).catch(() => ({})),
+      fetch('/api/analytics/model-satisfaction?task_type=concurrency').then(r => r.json()).catch(() => ({})),
+      fetch('/api/analytics/cost-optimization').then(r => r.json()).catch(() => ({})),
     ]);
 
     // Main stats
@@ -365,6 +552,89 @@ async function loadAll() {
         return '<tr><td>' + time + '</td><td>—</td><td class="model model-' + from.toLowerCase() + '">' + from +
           '</td><td class="model model-' + to.toLowerCase() + '">' + to + '</td><td>' + tokens + '</td><td style="color:var(--green)">~' + Math.round(tokens * 0.3) + '</td><td>' + status + '</td></tr>';
       }).join('');
+    }
+
+    // Sentiment data
+    if (sentiment && sentiment.summary) {
+      const s = sentiment.summary;
+      document.getElementById('sentiment-satisfied').textContent = s.satisfied || 0;
+      document.getElementById('sentiment-neutral').textContent = s.neutral || 0;
+      document.getElementById('sentiment-frustrated').textContent = s.frustrated || 0;
+      document.getElementById('sentiment-confused').textContent = s.confused || 0;
+      document.getElementById('sentiment-impatient').textContent = s.impatient || 0;
+
+      const rate = Math.round((s.satisfaction_rate || 0) * 100);
+      document.getElementById('sentiment-rate').textContent = rate + '%';
+      document.getElementById('sentiment-rate-bar').style.width = rate + '%';
+    }
+
+    // Frustration events
+    if (sentiment && sentiment.events && sentiment.events.length > 0) {
+      const evHTML = sentiment.events.map(e => {
+        const time = new Date(e.Timestamp).toLocaleString(undefined, {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
+        const resolvedBadge = e.Resolved ? '<span class="badge badge-green">✓ Resolved</span>' : '<span class="badge badge-red">✗ Unresolved</span>';
+        return '<div class="frustration-event">' +
+          '<div class="frustration-time">' + time + '</div>' +
+          '<div class="frustration-task">' + (e.TaskType || 'unknown') + ' on ' + (e.InitialModel || 'haiku') + ' → ' + (e.EscalatedTo || 'N/A') + '</div>' +
+          '<div class="frustration-resolution">' + resolvedBadge + '</div>' +
+          '</div>';
+      }).join('');
+      document.getElementById('frustration-events').innerHTML = evHTML;
+    }
+
+    // Budget data
+    if (budget && budget.daily_budget) {
+      const db = budget.daily_budget;
+      const mb = budget.monthly_budget;
+      document.getElementById('budget-daily-limit').textContent = '$' + db.limit.toFixed(2);
+      document.getElementById('budget-daily-used').textContent = '$' + db.used.toFixed(2);
+      document.getElementById('budget-daily-remaining').textContent = '$' + db.remaining.toFixed(2);
+      document.getElementById('budget-daily-percent').textContent = Math.round(db.percentage) + '%';
+      document.getElementById('budget-daily-bar').style.width = Math.min(db.percentage, 100) + '%';
+
+      const dailyBarColor = db.percentage > 90 ? 'warning-red' : db.percentage > 75 ? 'warning-yellow' : 'success-green';
+      document.getElementById('budget-daily-bar').className = 'budget-fill ' + dailyBarColor;
+
+      document.getElementById('budget-monthly-limit').textContent = '$' + mb.limit.toFixed(2);
+      document.getElementById('budget-monthly-used').textContent = '$' + mb.used.toFixed(2);
+      document.getElementById('budget-days-remaining').textContent = (mb.days_left || 0) + 'd';
+      document.getElementById('budget-monthly-percent').textContent = Math.round(mb.percentage) + '%';
+      document.getElementById('budget-monthly-bar').style.width = Math.min(mb.percentage, 100) + '%';
+
+      const monthlyBarColor = mb.percentage > 90 ? 'warning-red' : mb.percentage > 75 ? 'warning-yellow' : 'success-green';
+      document.getElementById('budget-monthly-bar').className = 'budget-fill ' + monthlyBarColor;
+    }
+
+    // Model satisfaction table
+    const msBody = document.getElementById('model-satisfaction-body');
+    if (satisfaction && satisfaction.satisfactions && satisfaction.satisfactions.length > 0) {
+      msBody.innerHTML = satisfaction.satisfactions.map(s => {
+        const rate = Math.round(s.SatisfactionRate * 100);
+        const badgeClass = rate > 80 ? 'badge-green' : rate > 60 ? 'badge-yellow' : 'badge-red';
+        return '<tr><td><strong>' + s.Model + '</strong></td><td>' + rate + '%</td><td colspan="2"></td>' +
+          '<td><span class="badge ' + badgeClass + '">' + rate + '% success</span></td></tr>';
+      }).join('');
+    }
+
+    // Cost optimization recommendations
+    if (optimization && optimization.recommendations && optimization.recommendations.length > 0) {
+      const recHTML = optimization.recommendations.map(r => {
+        const savings = Math.round(r.estimated_savings_percent);
+        return '<div style="background:var(--bg);padding:16px;border-radius:8px;border-left:4px solid var(--green);margin-bottom:12px">' +
+          '<div style="font-weight:600;margin-bottom:8px">' + r.task_type + ': ' + r.current_model + ' → ' + r.recommended_model + '</div>' +
+          '<div style="font-size:13px;color:var(--dim);margin-bottom:8px">' +
+          'Current: ' + Math.round(r.current_satisfaction * 100) + '% satisfaction | ' +
+          'Recommended: ' + Math.round(r.recommended_satisfaction * 100) + '% satisfaction</div>' +
+          '<div style="color:var(--green);font-weight:600">💰 Potential Savings: ' + savings + '%</div>' +
+          '</div>';
+      }).join('');
+      document.getElementById('cost-recommendations').innerHTML = recHTML || '<div style="text-align:center;padding:32px;color:var(--dim)">No optimization opportunities at this time.</div>';
+
+      const totalSavings = optimization.recommendations.reduce((sum, r) => sum + r.estimated_savings_percent, 0);
+      const avgSavings = optimization.count > 0 ? Math.round(totalSavings / optimization.count) : 0;
+      document.getElementById('opt-count').textContent = optimization.count || 0;
+      document.getElementById('opt-savings').textContent = Math.round(totalSavings) + '%';
+      document.getElementById('opt-avg-savings').textContent = avgSavings + '%';
     }
   } catch (err) {
     console.error('Load error:', err);

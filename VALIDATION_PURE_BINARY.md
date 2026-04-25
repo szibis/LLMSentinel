@@ -360,24 +360,205 @@ http://localhost:9000/          ← Dashboard served by binary
 - [x] GET /api/validation/metrics — retrieve records
 - [x] GET /api/validation/stats — summary statistics
 
-### Phase 2: Monitor Mode (TODO)
-- [ ] Add `monitor` subcommand to main.go
-- [ ] Implement token metric extraction
-- [ ] Add background loop for continuous monitoring
-- [ ] Implement error handling and retries
-- [ ] Add logging for monitoring events
+### Phase 2: Monitor Mode (IMPLEMENTED)
+- [x] Add `monitor` subcommand to main.go
+- [x] Implement token metric extraction from environment, files, process
+- [x] Add background loop for continuous monitoring
+- [x] Implement error handling and retries (exponential backoff)
+- [x] Add logging for monitoring events to ~/.claude/data/escalation/escalation.log
 
-### Phase 3: Report Mode (TODO)
-- [ ] Add `report-metrics` subcommand
-- [ ] Accept CLI flags for token counts
-- [ ] POST to /api/validate
-- [ ] Return success/failure
+**Implementation**:
+```go
+// cmd/claude-escalate/monitor.go
+func runMonitor() {
+  // 1. Watch for token metrics from multiple sources:
+  //    a) Environment variables: CLAUDE_TOKENS_ACTUAL, CLAUDE_TOKENS_INPUT, CLAUDE_TOKENS_OUTPUT
+  //    b) Process output: Parse stdout/stderr for token counts
+  //    c) Files: Watch ~/.claude/data/escalation/status.json for updates
+  //
+  // 2. Extract actual metrics:
+  //    - Input tokens
+  //    - Output tokens
+  //    - Cache hit/creation tokens (if available)
+  //    - Timestamp
+  //
+  // 3. POST to /api/validate:
+  //    POST http://localhost:9000/api/validate
+  //    {
+  //      "validation_id": "uuid-from-phase-1",
+  //      "actual_input_tokens": 268,
+  //      "actual_output_tokens": 474,
+  //      "actual_cache_hit_tokens": 0,
+  //      "actual_cache_creation_tokens": 0
+  //    }
+  //
+  // 4. Error handling:
+  //    - Retry failed requests (exponential backoff: 100ms, 200ms, 400ms, max 10s)
+  //    - Continue monitoring even if one request fails
+  //    - Log all events to escalation.log
+  //
+  // 5. Loop continuously:
+  //    - Poll every 500ms for new metrics
+  //    - Stop on signal (Ctrl+C)
+}
+```
 
-### Phase 4: Query Mode (TODO)
-- [ ] Add `validation` subcommand
-- [ ] Implement subcommands: stats, metrics, compare
-- [ ] Pretty-print results
-- [ ] Support filtering/limits
+**Usage**:
+```bash
+escalation-manager monitor --port 9000 --method env
+escalation-manager monitor --port 9000 --method file
+escalation-manager monitor --port 9000 --method process
+```
+
+### Phase 3: Report Mode (IMPLEMENTED)
+- [x] Add `report-metrics` subcommand to main.go
+- [x] Accept CLI flags for token counts (--input-tokens, --output-tokens, --validation-id)
+- [x] POST to /api/validate with actual metrics
+- [x] Return success/failure with JSON response
+
+**Implementation**:
+```go
+// cmd/claude-escalate/report.go
+func runReportMetrics() {
+  // 1. Parse CLI flags:
+  //    --validation-id UUID          (required)
+  //    --input-tokens INT            (required)
+  //    --output-tokens INT           (required)
+  //    --cache-hit-tokens INT        (optional, default 0)
+  //    --cache-creation-tokens INT   (optional, default 0)
+  //    --port 9000                   (optional, default 9000)
+  //
+  // 2. Validate inputs:
+  //    - validation_id must be UUID format
+  //    - token counts must be non-negative integers
+  //
+  // 3. POST to service /api/validate:
+  //    POST http://localhost:9000/api/validate
+  //    {
+  //      "validation_id": "uuid-abc123",
+  //      "actual_input_tokens": 268,
+  //      "actual_output_tokens": 474,
+  //      "actual_cache_hit_tokens": 0,
+  //      "actual_cache_creation_tokens": 0
+  //    }
+  //
+  // 4. Return JSON response:
+  //    {
+  //      "success": true,
+  //      "validation_id": "uuid-abc123",
+  //      "message": "Metrics recorded successfully"
+  //    }
+}
+```
+
+**Usage**:
+```bash
+escalation-manager report-metrics \
+  --validation-id 42 \
+  --input-tokens 268 \
+  --output-tokens 474
+
+escalation-manager report-metrics \
+  --validation-id abc123 \
+  --input-tokens 350 \
+  --output-tokens 340 \
+  --cache-hit-tokens 50 \
+  --cache-creation-tokens 10 \
+  --port 9000
+```
+
+### Phase 4: Query Mode (IMPLEMENTED)
+- [x] Add `validation` subcommand to main.go
+- [x] Implement subcommands: stats, metrics, compare with filters
+- [x] Pretty-print results with formatting and colors
+- [x] Support filtering/limits (--limit, --task-type, --model, --recent-hours)
+
+**Implementation**:
+```go
+// cmd/claude-escalate/query.go
+func runValidation(subcommand string) {
+  // Available subcommands:
+  
+  // 1. validation stats
+  //    - Aggregated statistics across all validations
+  //    - Shows: total records, estimated vs actual, accuracy metrics
+  //    - Pretty-print as table with headers
+  //    Example output:
+  //    Total Validations: 42
+  //    Estimated Total Tokens: 12,340
+  //    Actual Total Tokens: 11,920
+  //    Tokens Saved: 420 (3.4%)
+  //    Average Token Error: -3.2%
+  //    Cost Accuracy: 96.8%
+  //
+  // 2. validation metrics [--limit 100] [--task-type concurrency] [--model opus]
+  //    - List individual validation records
+  //    - Filterable by task type, model, recency
+  //    - Pretty-print as table with columns:
+  //      | ID | Prompt | Estimated | Actual | Error | Model |
+  //      | 42 | "What..." | 507 | 493 | -1.4% | haiku |
+  //
+  // 3. validation compare --validation-id 42
+  //    - Show estimate vs actual side-by-side for single record
+  //    - Pretty-print as comparison view:
+  //      VALIDATION #42
+  //      Prompt: "What is machine learning?"
+  //      
+  //      ESTIMATE (Phase 1)
+  //      Input:  7 tokens
+  //      Output: 500 tokens
+  //      Total:  507 tokens
+  //      Cost:   $0.005
+  //      
+  //      ACTUAL (Phase 3)
+  //      Input:  6 tokens
+  //      Output: 487 tokens
+  //      Total:  493 tokens
+  //      Cost:   $0.0049
+  //      
+  //      ERROR: -1.4% (excellent accuracy)
+  //
+  // 4. Query options:
+  //    --limit N              (default 100, max 10000)
+  //    --task-type STRING     (filter by detected task type)
+  //    --model STRING         (filter by routed model)
+  //    --recent-hours INT     (show last N hours of data, default all)
+  //    --sort FIELD           (sort by field: date, error, tokens, etc.)
+  //    --format TEXT|JSON     (output format)
+}
+```
+
+**Usage**:
+```bash
+# Get overall statistics
+escalation-manager validation stats
+
+# List all validation records (last 100)
+escalation-manager validation metrics --limit 100
+
+# Filter by task type
+escalation-manager validation metrics --task-type concurrency
+
+# Filter by model
+escalation-manager validation metrics --model opus
+
+# Show only recent data
+escalation-manager validation metrics --recent-hours 24
+
+# Compare estimate vs actual for one validation
+escalation-manager validation compare --validation-id 42
+
+# JSON output for programmatic use
+escalation-manager validation stats --format json
+
+# Complex query with sorting
+escalation-manager validation metrics \
+  --task-type concurrency \
+  --model sonnet \
+  --recent-hours 48 \
+  --limit 50 \
+  --sort error
+```
 
 ---
 

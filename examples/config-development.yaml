@@ -1,0 +1,62 @@
+# Development Configuration - High Flexibility
+# Use this for local development with generous budgets
+
+statusline:
+  sources:
+    - type: envvar
+      enabled: true
+    - type: barista
+      enabled: false
+    - type: claude-native
+      enabled: false
+
+budgets:
+  daily_usd: 50.0
+  monthly_usd: 500.0
+  session_tokens: 50000
+  hard_limit: false       # Warn but allow
+  soft_limit: true        # Show warnings
+  auto_downgrade_at: 0.95 # Only downgrade near limit
+
+  model_daily_limits:
+    opus: 30.0            # Generous Opus limit
+    sonnet: 15.0
+    haiku: 0              # Unlimited
+
+  task_type_budgets:
+    concurrency: 15000
+    parsing: 10000
+    debugging: 15000
+    architecture: 20000
+
+  alert_thresholds:
+    warn_low: 0.70
+    warn_med: 0.85
+    warn_high: 0.95
+
+sentiment:
+  enabled: true
+  frustration_trigger_escalate: true
+  frustration_risk_threshold: 0.65
+  learning_enabled: true
+  track_satisfaction: true
+
+decisions:
+  success_signal_threshold: 0.75
+  failure_signal_threshold: 0.75
+  token_error_threshold: 25.0
+  auto_escalate_on_frustration: true
+  max_attempts_before_opus: 3
+
+display:
+  display_model: true
+  display_effort: true
+  display_tokens: true
+  display_sentiment: true
+  display_budget_remaining: true
+  refresh_interval_ms: 500
+
+logging:
+  level: debug                        # Full logging
+  file: ~/.claude/data/escalation/escalation.log
+  retention_days: 30

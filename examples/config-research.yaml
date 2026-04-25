@@ -1,0 +1,65 @@
+# Research Configuration - Maximum Capabilities
+# Use for research/analysis with complex tasks
+
+statusline:
+  sources:
+    - type: barista
+      enabled: true
+      path: ~/.claude/data/escalation/barista-metrics.json
+      timeout_ms: 2000
+    - type: webhook
+      enabled: false
+      url: http://localhost:8080/metrics
+    - type: envvar
+      enabled: true
+
+budgets:
+  daily_usd: 100.0
+  monthly_usd: 1000.0
+  session_tokens: 100000
+  hard_limit: false       # Allow with warning
+  soft_limit: true
+  auto_downgrade_at: 0.99 # Almost never downgrade
+
+  model_daily_limits:
+    opus: 80.0            # Lots of Opus for research
+    sonnet: 30.0
+    haiku: 0              # Unlimited
+
+  task_type_budgets:
+    concurrency: 20000
+    parsing: 15000
+    debugging: 20000
+    architecture: 50000   # High for design work
+
+  alert_thresholds:
+    warn_low: 0.80
+    warn_med: 0.90
+    warn_high: 0.99
+
+sentiment:
+  enabled: true
+  frustration_trigger_escalate: true
+  frustration_risk_threshold: 0.75
+  learning_enabled: true
+  track_satisfaction: true
+
+decisions:
+  success_signal_threshold: 0.85
+  failure_signal_threshold: 0.70
+  token_error_threshold: 30.0
+  auto_escalate_on_frustration: true
+  max_attempts_before_opus: 1
+
+display:
+  display_model: true
+  display_effort: true
+  display_tokens: true
+  display_sentiment: true
+  display_budget_remaining: true
+  refresh_interval_ms: 1000
+
+logging:
+  level: info
+  file: ~/.claude/data/escalation/escalation.log
+  retention_days: 60

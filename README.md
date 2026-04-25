@@ -20,7 +20,20 @@ Intelligent model escalation system for Claude Code that automatically routes ta
 
 ## 📚 Documentation
 
-Start here based on what you need:
+### ⭐ Start Here (New Structure)
+
+**[Complete Documentation Index →](docs/README.md)** — All guides organized by topic
+
+The documentation has been reorganized for clarity:
+- **[Quick Start](docs/quick-start/)** — Get running in 5 minutes
+- **[Architecture](docs/architecture/)** — How the system works
+- **[Integration](docs/integration/)** — Connect with your environment
+- **[Operations](docs/operations/)** — Deploy and monitor
+- **[Analytics](docs/analytics/)** — Understand your usage
+
+### Legacy Documentation
+
+Older guides (still valid):
 
 | Document | Purpose |
 |----------|---------|

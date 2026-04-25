@@ -3,6 +3,7 @@
 ## 1. Overall System Architecture
 
 ```mermaid
+%%{init: { 'theme': 'auto' } }%%
 graph TB
     Claude["🔵 Claude Code Session"]
     Hook["⚙️ Hook<br/>3-line bash<br/>localhost"]
@@ -26,6 +27,7 @@ graph TB
 ## 2. Pre-Response Flow (Hook Phase)
 
 ```mermaid
+%%{init: { 'theme': 'auto' } }%%
 sequenceDiagram
     participant User as User
     participant Hook as http-hook.sh
@@ -54,6 +56,7 @@ sequenceDiagram
 ## 3. Post-Response Flow (Validation Phase)
 
 ```mermaid
+%%{init: { 'theme': 'auto' } }%%
 sequenceDiagram
     participant Claude as Claude<br/>Processing
     participant Monitor as Monitor/Integration
@@ -85,6 +88,7 @@ sequenceDiagram
 ## 4. Statusline Plugin Integration
 
 ```mermaid
+%%{init: { 'theme': 'auto' } }%%
 graph LR
     Plugin["🔌 Statusline Plugin<br/>Barista/Custom"]
     Endpoint["GET /api/statusline"]
@@ -97,14 +101,12 @@ graph LR
     Service -->|"Query"| DB
     Service -->|"Return JSON"| Plugin
     Plugin -->|"Format & Display"| Render
-    
-    style Endpoint fill:#90EE90
-    style Render fill:#87CEEB
 ```
 
 ## 5. Full Cycle: User Interaction to Validation
 
 ```mermaid
+%%{init: { 'theme': 'auto' } }%%
 timeline
     title Complete Escalation & Validation Cycle
     
@@ -146,6 +148,7 @@ timeline
 ## 6. Data Model: Validation Metric
 
 ```mermaid
+%%{init: { 'theme': 'auto' } }%%
 graph TD
     A["ValidationMetric (SQLite Record)"]
     
@@ -175,15 +178,12 @@ graph TD
     F --> F1["TokenError: -5.3%"]
     F --> F2["CostError: -2.0%"]
     F --> F3["Validated: true"]
-    
-    style D fill:#FFE4B5
-    style E fill:#E0F0FF
-    style F fill:#E8F5E9
 ```
 
 ## 7. API Endpoint Architecture
 
 ```mermaid
+%%{init: { 'theme': 'auto' } }%%
 graph TB
     HTTP["HTTP Server<br/>localhost:9000"]
     
@@ -207,16 +207,12 @@ graph TB
     HTTP --> H4["GET /api/validation/*<br/>Dashboard"]
     H4 --> H4A["Return metrics"]
     H4A --> H4B["Return stats"]
-    
-    style H1 fill:#FFE4B5
-    style H2 fill:#E0F0FF
-    style H3 fill:#E8F5E9
-    style H4 fill:#F0E8FF
 ```
 
 ## 8. Information Flow: Hook to Dashboard
 
 ```mermaid
+%%{init: { 'theme': 'auto' } }%%
 graph LR
     A["User Input:<br/>Prompt"] -->|"Hook<br/>Analyzes"| B["Estimate:<br/>500 tokens<br/>low effort"]
     
@@ -235,16 +231,12 @@ graph LR
     D -->|"Dashboard<br/>Queries"| H["Real-time<br/>Display<br/>Est vs Act"]
     
     H -->|"Show<br/>Accuracy"| I["Metrics:<br/>-1.4% error<br/>98.6% accuracy"]
-    
-    style B fill:#FFE4B5
-    style E fill:#FFE4E1
-    style F fill:#E0F0FF
-    style I fill:#E8F5E9
 ```
 
 ## 9. Component Interaction Matrix
 
 ```mermaid
+%%{init: { 'theme': 'auto' } }%%
 graph TB
     subgraph Binary["Go Binary<br/>(escalation-manager)"]
         Service["Service Mode<br/>:9000"]
@@ -270,19 +262,12 @@ graph TB
     Service -->|"Serve"| Dashboard
     Service -->|"Query"| DB
     Plugin -->|"HTTP GET"| Service
-    
-    style Service fill:#90EE90
-    style Monitor fill:#90EE90
-    style Dashboard fill:#90EE90
-    style Hook fill:#FFE4E1
-    style DB fill:#87CEEB
-    style Claude fill:#DDA0DD
-    style Plugin fill:#F0E68C
 ```
 
 ## 10. Deployment Architecture
 
 ```mermaid
+%%{init: { 'theme': 'auto' } }%%
 graph TD
     Start["1. Copy binary<br/>~/.local/bin/escalation-manager"]
     
@@ -303,16 +288,12 @@ graph TD
     O3 --> Done
     
     Done --> Live["Live validation:<br/>Estimate vs Actual"]
-    
-    style Start fill:#FFE4E1
-    style S2 fill:#90EE90
-    style Done fill:#E8F5E9
-    style Live fill:#87CEEB
 ```
 
 ## 11. Data Flow: Hook Analysis
 
 ```mermaid
+%%{init: { 'theme': 'auto' } }%%
 graph TB
     Prompt["User Prompt:<br/>'What is ML?'"]
     
@@ -334,17 +315,12 @@ graph TB
     P4A --> Decision
     
     Decision --> Output["Route: HAIKU<br/>Effort: LOW<br/>Est: 500 tokens<br/>ValidationID: 42"]
-    
-    style P1A fill:#FFE4B5
-    style P2A fill:#FFE4B5
-    style P3A fill:#FFE4B5
-    style P4A fill:#FFE4B5
-    style Output fill:#E8F5E9
 ```
 
 ## 12. Validation Statistics Calculation
 
 ```mermaid
+%%{init: { 'theme': 'auto' } }%%
 graph TB
     Records["All ValidationMetric<br/>Records in DB<br/>42 total"]
     
@@ -373,9 +349,5 @@ graph TB
     S1D --> Display["Display on Dashboard<br/>& Statusline"]
     S2C --> Display
     S3C --> Display
-    
-    style Records fill:#87CEEB
-    style Calc fill:#FFE4B5
-    style Display fill:#E8F5E9
 ```
 
