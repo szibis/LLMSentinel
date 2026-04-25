@@ -7,16 +7,21 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/szibis/claude-escalate/internal/budgets"
 	"github.com/szibis/claude-escalate/internal/config"
 	"github.com/szibis/claude-escalate/internal/decisions"
+	"github.com/szibis/claude-escalate/internal/sentiment"
 	"github.com/szibis/claude-escalate/internal/signals"
 	"github.com/szibis/claude-escalate/internal/store"
 )
 
 // Service handles all escalation logic via HTTP.
 type Service struct {
-	db  *store.Store
-	cfg *config.Config
+	db                 *store.Store
+	cfg                *config.Config
+	escCfg             *config.EscalationConfig
+	sentimentDetector  *sentiment.Detector
+	budgetEngine       *budgets.Engine
 }
 
 // New creates a new service instance.
@@ -25,7 +30,38 @@ func New(cfg *config.Config) (*Service, error) {
 	if err != nil {
 		return nil, fmt.Errorf("opening database: %w", err)
 	}
-	return &Service{db: db, cfg: cfg}, nil
+
+	// Load escalation configuration
+	escCfg, err := config.LoadEscalationConfig()
+	if err != nil {
+		fmt.Printf("Warning: failed to load escalation config, using defaults: %v\n", err)
+		escCfg = config.DefaultEscalationConfig()
+	}
+
+	// Initialize sentiment detector
+	sentimentDetector := sentiment.NewDetector()
+
+	// Initialize budget engine
+	budgetCfg := budgets.BudgetConfig{
+		DailyBudgetUSD:       escCfg.Budgets.DailyUSD,
+		MonthlyBudgetUSD:     escCfg.Budgets.MonthlyUSD,
+		SessionBudgetTokens:  escCfg.Budgets.SessionTokens,
+		ModelDailyLimits:     escCfg.Budgets.ModelDailyLimits,
+		TaskTypeBudgets:      escCfg.Budgets.TaskTypeBudgets,
+		HardLimit:            escCfg.Budgets.HardLimit,
+		SoftLimit:            escCfg.Budgets.SoftLimit,
+		AutoDowngradeAtPercent: escCfg.Budgets.AutoDowngradeAt,
+		AlertThresholds:      escCfg.Budgets.AlertThresholds,
+	}
+	budgetEngine := budgets.NewEngine(budgetCfg)
+
+	return &Service{
+		db:                db,
+		cfg:               cfg,
+		escCfg:            escCfg,
+		sentimentDetector: sentimentDetector,
+		budgetEngine:      budgetEngine,
+	}, nil
 }
 
 // Start begins the HTTP server.
@@ -54,6 +90,16 @@ func (s *Service) Start(addr string) error {
 	// Statusline integration endpoint (for barista, plugins, etc.)
 	mux.HandleFunc("/api/statusline", s.handleStatusline)
 
+	// Analytics endpoints (3-phase data) - TODO: implement with BoltDB instead of SQL
+	// mux.HandleFunc("/api/analytics/phase-1", s.handleAnalyticsPhase1)
+	// mux.HandleFunc("/api/analytics/phase-2", s.handleAnalyticsPhase2)
+	// mux.HandleFunc("/api/analytics/phase-3", s.handleAnalyticsPhase3)
+	// mux.HandleFunc("/api/analytics/sentiment-trends", s.handleSentimentTrends)
+	// mux.HandleFunc("/api/analytics/budget-status", s.handleBudgetStatus)
+	// mux.HandleFunc("/api/analytics/model-satisfaction", s.handleModelSatisfaction)
+	// mux.HandleFunc("/api/analytics/frustration-events", s.handleFrustrationEvents)
+	// mux.HandleFunc("/api/analytics/cost-optimization", s.handleCostOptimization)
+
 	// Dashboard endpoints
 	mux.HandleFunc("/", s.handleDashboard)
 
@@ -65,6 +111,8 @@ func (s *Service) Start(addr string) error {
 
 	fmt.Printf("claude-escalate service starting on http://%s\n", addr)
 	fmt.Printf("  - Hook endpoint: POST /api/hook\n")
+	fmt.Printf("  - Analytics (3-phase): GET /api/analytics/phase-{1,2,3}\n")
+	fmt.Printf("  - Analytics (trends): GET /api/analytics/{sentiment-trends,budget-status,model-satisfaction,frustration-events,cost-optimization}\n")
 	fmt.Printf("  - Dashboard: GET /\n")
 	fmt.Printf("  - Stats: GET /api/stats\n")
 
@@ -100,6 +148,55 @@ func (s *Service) handleHook(w http.ResponseWriter, r *http.Request) {
 
 	prompt := req.Prompt
 	response := HookResponse{Continue: true, SuppressOutput: true}
+
+	// Phase 1: Sentiment Detection (if enabled)
+	if s.escCfg.Sentiment.Enabled {
+		sentimentScore := s.sentimentDetector.Detect(prompt, false, 0)
+
+		// If high frustration risk and enabled, offer escalation
+		if sentimentScore.FrustrationRisk > s.escCfg.Sentiment.FrustrationRiskThreshold &&
+			s.escCfg.Sentiment.FrustrationTriggerEscalate {
+			settings, _ := config.ReadClaudeSettings()
+			currentModel := "haiku"
+			if settings != nil {
+				currentModel = modelShortName(settings.Model)
+			}
+
+			// Auto-escalate on frustration
+			nextModel := escalateByOne(currentModel)
+			response.Action = "escalate_on_frustration"
+			response.CurrentModel = nextModel
+			if err := s.db.LogEscalation(currentModel, nextModel, "auto", "frustration_detected"); err != nil {
+				fmt.Printf("error logging frustration escalation: %v\n", err)
+			}
+			if err := updateClaudeSettings(modelToFull(nextModel)); err != nil {
+				fmt.Printf("error updating settings: %v\n", err)
+			}
+		}
+	}
+
+	// Phase 1: Budget Check (if enabled)
+	if s.escCfg.Budgets.DailyUSD > 0 {
+		settings, _ := config.ReadClaudeSettings()
+		currentModel := "haiku"
+		if settings != nil {
+			currentModel = modelShortName(settings.Model)
+		}
+
+		// Estimate cost for this request (rough estimate)
+		estimatedCost := 0.01 // placeholder
+
+		budgetCheck := s.budgetEngine.CheckBudget(currentModel, estimatedCost, "")
+
+		if !budgetCheck.IsAllowed && budgetCheck.RecommendedModel != "" {
+			response.Action = "downgrade_for_budget"
+			response.CurrentModel = budgetCheck.RecommendedModel
+			response.Message = budgetCheck.Message
+			if err := updateClaudeSettings(modelToFull(budgetCheck.RecommendedModel)); err != nil {
+				fmt.Printf("error updating settings: %v\n", err)
+			}
+		}
+	}
 
 	// Check for /escalate commands
 	if isEscalateCommand(prompt) {
@@ -825,6 +922,20 @@ func (s *Service) handleDecisionLearning(w http.ResponseWriter, r *http.Request)
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(resp); err != nil {
 		fmt.Printf("error encoding response: %v\n", err)
+	}
+}
+
+// escalateByOne escalates from current model to next tier
+func escalateByOne(currentModel string) string {
+	switch currentModel {
+	case "haiku":
+		return "sonnet"
+	case "sonnet":
+		return "opus"
+	case "opus":
+		return "opus" // Already at top
+	default:
+		return "sonnet" // Default escalation
 	}
 }
 

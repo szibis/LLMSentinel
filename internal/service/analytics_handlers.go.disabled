@@ -1,0 +1,462 @@
+package service
+
+import (
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"strconv"
+	"time"
+
+	"github.com/szibis/claude-escalate/internal/analytics"
+)
+
+// Analytics endpoints expose 3-phase data: estimation, real-time, validation + learning
+
+// handleAnalyticsPhase1 returns Phase 1 estimation data (pre-response).
+func (s *Service) handleAnalyticsPhase1(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	validationID := r.URL.Query().Get("id")
+	if validationID == "" {
+		http.Error(w, "missing validation ID", http.StatusBadRequest)
+		return
+	}
+
+	// Get analytics store
+	analyticsStore := analytics.NewStore(s.db.GetDB())
+
+	record, err := analyticsStore.GetRecord(validationID)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("record not found: %v", err), http.StatusNotFound)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	response := map[string]interface{}{
+		"phase":           1,
+		"validation_id":   record.ValidationID,
+		"timestamp":       record.Timestamp.Format("2006-01-02T15:04:05Z07:00"),
+		"prompt_analysis": map[string]interface{}{
+			"task_type":           record.Phase1.TaskType,
+			"effort":              record.Phase1.DetectedEffort,
+			"complexity":          record.Phase1.Complexity,
+			"sentiment_baseline":  record.Phase1.SentimentBaseline,
+		},
+		"estimation": map[string]interface{}{
+			"estimated_input_tokens":  record.Phase1.EstimatedInputTokens,
+			"estimated_output_tokens": record.Phase1.EstimatedOutputTokens,
+			"estimated_total_tokens":  record.Phase1.EstimatedTotalTokens,
+			"estimated_cost_usd":      record.Phase1.EstimatedCostUSD,
+		},
+		"budget_check": map[string]interface{}{
+			"within_budget":   record.Phase1.BudgetCheck.WithinBudget,
+			"daily_used":      record.Phase1.BudgetCheck.DailyUsed,
+			"daily_limit":     record.Phase1.BudgetCheck.DailyLimit,
+			"warning":         record.Phase1.BudgetCheck.Warning,
+		},
+		"routing_decision": map[string]interface{}{
+			"routed_model": record.Phase1.RoutedModel,
+			"routing_reason": record.Phase1.RoutingReason,
+			"confidence":   record.Phase1.Confidence,
+		},
+	}
+
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		fmt.Printf("error encoding response: %v\n", err)
+	}
+}
+
+// handleAnalyticsPhase2 returns Phase 2 real-time data (during response).
+func (s *Service) handleAnalyticsPhase2(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	validationID := r.URL.Query().Get("id")
+	if validationID == "" {
+		http.Error(w, "missing validation ID", http.StatusBadRequest)
+		return
+	}
+
+	analyticsStore := analytics.NewStore(s.db.GetDB())
+
+	record, err := analyticsStore.GetRecord(validationID)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("record not found: %v", err), http.StatusNotFound)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	response := map[string]interface{}{
+		"phase":           2,
+		"validation_id":   record.ValidationID,
+		"timestamp":       record.Timestamp.Format("2006-01-02T15:04:05Z07:00"),
+		"tokens_flowing": map[string]interface{}{
+			"input_tokens_used":      record.Phase2.InputTokensUsed,
+			"output_tokens_so_far":   record.Phase2.OutputTokensSoFar,
+			"total_so_far":           record.Phase2.TotalSoFar,
+			"estimated_remaining":    record.Phase2.EstimatedRemaining,
+			"trend":                  record.Phase2.Trend,
+		},
+		"budget_status": map[string]interface{}{
+			"daily_used_so_far":   record.Phase2.BudgetStatus.DailyUsedSoFar,
+			"daily_remaining":     record.Phase2.BudgetStatus.DailyRemaining,
+			"on_track":            record.Phase2.BudgetStatus.OnTrack,
+			"warning":             record.Phase2.BudgetStatus.Warning,
+		},
+		"sentiment_signal": map[string]interface{}{
+			"user_pausing":      record.Phase2.SentimentDuring.UserPausing,
+			"edit_activity":     record.Phase2.SentimentDuring.EditActivity,
+			"frustration_risk":  record.Phase2.SentimentDuring.FrustrationRisk,
+			"current_sentiment": record.Phase2.SentimentDuring.CurrentSentiment,
+		},
+	}
+
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		fmt.Printf("error encoding response: %v\n", err)
+	}
+}
+
+// handleAnalyticsPhase3 returns Phase 3 validation & learning data (post-response).
+func (s *Service) handleAnalyticsPhase3(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	validationID := r.URL.Query().Get("id")
+	if validationID == "" {
+		http.Error(w, "missing validation ID", http.StatusBadRequest)
+		return
+	}
+
+	analyticsStore := analytics.NewStore(s.db.GetDB())
+
+	record, err := analyticsStore.GetRecord(validationID)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("record not found: %v", err), http.StatusNotFound)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	response := map[string]interface{}{
+		"phase":           3,
+		"validation_id":   record.ValidationID,
+		"timestamp":       record.Timestamp.Format("2006-01-02T15:04:05Z07:00"),
+		"actual_tokens": map[string]interface{}{
+			"input_tokens":           record.Phase3.ActualInputTokens,
+			"output_tokens":          record.Phase3.ActualOutputTokens,
+			"cache_hit_tokens":       record.Phase3.ActualCacheHitTokens,
+			"cache_creation_tokens":  record.Phase3.ActualCacheCreationTokens,
+			"total_actual":           record.Phase3.ActualTotalTokens,
+			"cost_usd":               record.Phase3.ActualCostUSD,
+		},
+		"accuracy": map[string]interface{}{
+			"estimated_total": record.Phase3.Accuracy.EstimatedTotal,
+			"actual_total":    record.Phase3.Accuracy.ActualTotal,
+			"error_percent":   record.Phase3.Accuracy.ErrorPercent,
+			"error_message":   record.Phase3.Accuracy.ErrorMessage,
+		},
+		"user_sentiment": map[string]interface{}{
+			"explicit_signal":      record.Phase3.UserSentiment.ExplicitSignal,
+			"explicit_text":        record.Phase3.UserSentiment.ExplicitText,
+			"signal_confidence":    record.Phase3.UserSentiment.SignalConfidence,
+			"implicit_sentiment":   record.Phase3.UserSentiment.ImplicitSentiment,
+			"frustration_detected": record.Phase3.UserSentiment.FrustrationDetected,
+			"time_to_signal_ms":    record.Phase3.UserSentiment.TimeToSignal.Milliseconds(),
+		},
+		"budget_impact": map[string]interface{}{
+			"daily_used_total":      record.Phase3.BudgetImpact.DailyUsedTotal,
+			"daily_remaining":       record.Phase3.BudgetImpact.DailyRemaining,
+			"session_used":          record.Phase3.BudgetImpact.SessionUsed,
+			"session_remaining":     record.Phase3.BudgetImpact.SessionRemaining,
+			"cost_under_estimate":   record.Phase3.BudgetImpact.CostUnderEstimate,
+		},
+		"decision_made": map[string]interface{}{
+			"action":         record.Phase3.DecisionMade.Action,
+			"next_model":     record.Phase3.DecisionMade.NextModel,
+			"rationale":      record.Phase3.DecisionMade.Rationale,
+			"confidence":     record.Phase3.DecisionMade.Confidence,
+			"savings_next":   record.Phase3.DecisionMade.SavingsNext,
+		},
+		"learning": map[string]interface{}{
+			"task_type":                  record.Phase3.Learning.TaskType,
+			"initial_model":              record.Phase3.Learning.InitialModel,
+			"user_sentiment_final":       record.Phase3.Learning.UserSentimentFinal,
+			"tokens_used":                record.Phase3.Learning.TokensUsed,
+			"success":                    record.Phase3.Learning.Success,
+			"duration_seconds":           record.Phase3.Learning.DurationSeconds,
+			"model_satisfaction_rate":    record.Phase3.Learning.ModelSatisfactionRate,
+		},
+	}
+
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		fmt.Printf("error encoding response: %v\n", err)
+	}
+}
+
+// handleSentimentTrends returns sentiment patterns over time.
+func (s *Service) handleSentimentTrends(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	hoursStr := r.URL.Query().Get("hours")
+	hours := 24 // default
+	if hoursStr != "" {
+		if h, err := strconv.Atoi(hoursStr); err == nil {
+			hours = h
+		}
+	}
+
+	analyticsStore := analytics.NewStore(s.db.GetDB())
+
+	trend, err := analyticsStore.GetSentimentTrend(hours)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("error retrieving sentiment trend: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	response := map[string]interface{}{
+		"period":    trend.Period,
+		"timestamp": trend.Timestamp.Format("2006-01-02T15:04:05Z07:00"),
+		"summary": map[string]interface{}{
+			"satisfied":        trend.Summary.Satisfied,
+			"neutral":          trend.Summary.Neutral,
+			"frustrated":       trend.Summary.Frustrated,
+			"confused":         trend.Summary.Confused,
+			"impatient":        trend.Summary.Impatient,
+			"total":            trend.Summary.Total,
+			"satisfaction_rate": trend.Summary.SatisfactionRate,
+		},
+		"events":   trend.Events,
+		"timeline": trend.Timeline,
+	}
+
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		fmt.Printf("error encoding response: %v\n", err)
+	}
+}
+
+// handleBudgetStatus returns current budget usage.
+func (s *Service) handleBudgetStatus(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	analyticsStore := analytics.NewStore(s.db.GetDB())
+
+	status, err := analyticsStore.GetBudgetStatus()
+	if err != nil {
+		http.Error(w, fmt.Sprintf("error retrieving budget status: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	response := map[string]interface{}{
+		"timestamp":     status.Timestamp.Format("2006-01-02T15:04:05Z07:00"),
+		"period":        status.Period,
+		"daily_budget": map[string]interface{}{
+			"limit":       status.DailyBudget.Limit,
+			"used":        status.DailyBudget.Used,
+			"remaining":   status.DailyBudget.Remaining,
+			"percentage":  status.DailyBudget.Percentage,
+			"projected":   status.DailyBudget.Projected,
+			"warning":     status.DailyBudget.Warning,
+		},
+		"monthly_budget": map[string]interface{}{
+			"limit":      status.MonthlyBudget.Limit,
+			"used":       status.MonthlyBudget.Used,
+			"remaining":  status.MonthlyBudget.Remaining,
+			"percentage": status.MonthlyBudget.Percentage,
+			"days_left":  status.MonthlyBudget.DaysLeft,
+			"projected":  status.MonthlyBudget.Projected,
+		},
+		"model_usage": status.ModelUsage,
+	}
+
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		fmt.Printf("error encoding response: %v\n", err)
+	}
+}
+
+// handleModelSatisfaction returns success rates by (task_type, model).
+func (s *Service) handleModelSatisfaction(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	taskType := r.URL.Query().Get("task_type")
+	if taskType == "" {
+		http.Error(w, "missing task_type parameter", http.StatusBadRequest)
+		return
+	}
+
+	analyticsStore := analytics.NewStore(s.db.GetDB())
+
+	satisfactions, err := analyticsStore.GetModelSatisfaction(taskType)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("error retrieving model satisfaction: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	response := map[string]interface{}{
+		"task_type":      taskType,
+		"satisfactions":  satisfactions,
+		"count":          len(satisfactions),
+		"timestamp":      fmt.Sprintf("%d", time.Now().Unix()),
+	}
+
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		fmt.Printf("error encoding response: %v\n", err)
+	}
+}
+
+// handleFrustrationEvents returns frustration events and escalation outcomes.
+func (s *Service) handleFrustrationEvents(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	hoursStr := r.URL.Query().Get("hours")
+	hours := 24 // default
+	if hoursStr != "" {
+		if h, err := strconv.Atoi(hoursStr); err == nil {
+			hours = h
+		}
+	}
+
+	analyticsStore := analytics.NewStore(s.db.GetDB())
+
+	// Get frustration events through sentiment trend (includes events)
+	trend, err := analyticsStore.GetSentimentTrend(hours)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("error retrieving frustration events: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	response := map[string]interface{}{
+		"period":    trend.Period,
+		"events":    trend.Events,
+		"count":     len(trend.Events),
+		"timestamp": trend.Timestamp.Format("2006-01-02T15:04:05Z07:00"),
+	}
+
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		fmt.Printf("error encoding response: %v\n", err)
+	}
+}
+
+// handleCostOptimization returns recommendations for cost savings.
+func (s *Service) handleCostOptimization(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// This endpoint analyzes all validations to find optimization opportunities
+	validations, err := s.db.GetAllValidationMetrics()
+	if err != nil {
+		http.Error(w, fmt.Sprintf("error retrieving validations: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	// Build task_type → model satisfaction map
+	taskTypeModels := make(map[string]map[string]float64) // task -> model -> satisfaction
+
+	for _, v := range validations {
+		if !v.Validated {
+			continue
+		}
+
+		taskType := v.DetectedTaskType
+		if taskType == "" {
+			continue
+		}
+
+		if _, exists := taskTypeModels[taskType]; !exists {
+			taskTypeModels[taskType] = make(map[string]float64)
+		}
+
+		// Calculate satisfaction for this validation (actual vs estimate)
+		// If actual < estimate by significant margin, it was efficient
+		tokenError := float64(v.ActualTotalTokens-v.EstimatedTotalTokens) / float64(v.EstimatedTotalTokens)
+
+		// Add satisfaction (higher is better)
+		// Success + under estimate = good satisfaction
+		satisfaction := 1.0
+		if v.Validated {
+			if tokenError > 0.2 { // Over estimate by >20%
+				satisfaction = 0.6
+			}
+		}
+		taskTypeModels[taskType][v.RoutedModel] = satisfaction
+	}
+
+	// Build recommendations
+	var recommendations []map[string]interface{}
+
+	for taskType, models := range taskTypeModels {
+		if len(models) > 1 {
+			// Find cheapest and most expensive models
+			var cheapest, mostExpensive string
+			var cheapestScore, maxScore float64
+
+			modelCosts := map[string]float64{
+				"haiku":  1.0,
+				"sonnet": 5.0,
+				"opus":   15.0,
+			}
+
+			for model, satisfaction := range models {
+				cost := modelCosts[model]
+				if cheapest == "" || cost < modelCosts[cheapest] {
+					cheapest = model
+					cheapestScore = satisfaction
+				}
+				if model != cheapest && (satisfaction > maxScore || mostExpensive == "") {
+					mostExpensive = model
+					maxScore = satisfaction
+				}
+			}
+
+			// If expensive model has similar satisfaction to cheaper, recommend downgrade
+			if mostExpensive != "" && cheapestScore > 0.7 && maxScore < 0.85 {
+				costRatio := modelCosts[mostExpensive] / modelCosts[cheapest]
+				savings := (costRatio - 1.0) / costRatio * 100
+
+				rec := map[string]interface{}{
+					"task_type":            taskType,
+					"current_model":        mostExpensive,
+					"current_satisfaction": maxScore,
+					"recommended_model":    cheapest,
+					"recommended_satisfaction": cheapestScore,
+					"estimated_savings_percent": savings,
+				}
+				recommendations = append(recommendations, rec)
+			}
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	response := map[string]interface{}{
+		"recommendations": recommendations,
+		"count":           len(recommendations),
+		"timestamp":       fmt.Sprintf("%d", time.Now().Unix()),
+	}
+
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		fmt.Printf("error encoding response: %v\n", err)
+	}
+}
