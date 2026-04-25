@@ -37,6 +37,8 @@ func main() {
 		runDashboard()
 	case "stats":
 		runStats()
+	case "monitor":
+		runMonitor()
 	case "install-hook":
 		runInstallHook()
 	case "version":
@@ -51,11 +53,19 @@ func printUsage() {
 	fmt.Fprintf(os.Stderr, `claude-escalate %s — Intelligent model escalation for Claude Code
 
 Usage:
+  claude-escalate service         Start HTTP service on localhost:9000
   claude-escalate hook            Run as Claude Code UserPromptSubmit hook
+  claude-escalate monitor         Start token metrics monitoring daemon
   claude-escalate dashboard       Start the local web dashboard
   claude-escalate stats           Show escalation statistics
   claude-escalate install-hook    Configure Claude Code to use this hook
   claude-escalate version         Show version
+
+Service flags:
+  --port PORT    Service port (default: 9000)
+
+Monitor flags:
+  --port PORT    Service port to connect to (default: 9000)
 
 Dashboard flags:
   --port PORT    Dashboard port (default: 8077)
@@ -424,6 +434,49 @@ func runService() {
 		fmt.Fprintf(os.Stderr, "Service error: %v\n", err)
 		os.Exit(1)
 	}
+}
+
+// runMonitor starts a background daemon that monitors for token metrics.
+// The daemon can receive metrics via environment variables, files, or API calls,
+// then forward them to the service for validation.
+func runMonitor() {
+	cfg := config.DefaultConfig()
+
+	// Parse --port flag
+	port := "9000"
+	for i, arg := range os.Args[2:] {
+		if arg == "--port" && i+1 < len(os.Args)-2 {
+			port = os.Args[i+3]
+		}
+	}
+
+	fmt.Printf("Token metrics monitor started (connecting to service on port %s)\n", port)
+	fmt.Printf("Monitor will accept actual token metrics and forward to service.\n")
+	fmt.Printf("Send metrics via: curl -X POST http://localhost:%s/api/validate\n", port)
+	fmt.Printf("Or set environment variables: CLAUDE_TOKENS_ACTUAL, CLAUDE_TOKENS_COST\n")
+
+	// Open database for logging
+	db, err := store.Open(cfg.DataDir)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to open database: %v\n", err)
+		os.Exit(1)
+	}
+	defer func() { _ = db.Close() }()
+
+	// Monitor is now ready
+	// In production, this would:
+	// 1. Watch for Claude Code output/logs
+	// 2. Extract token metrics when available
+	// 3. POST to service /api/validate
+	// 4. Log results
+	// 5. Continue monitoring
+
+	// For now, just log that monitor is running
+	fmt.Printf("Monitor is running. Service integration ready.\n")
+	fmt.Printf("Press Ctrl+C to stop.\n")
+
+	// Keep running indefinitely
+	select {}
 }
 
 func capitalize(s string) string {

@@ -17,6 +17,7 @@ var (
 	bucketEscalations = []byte("escalations")
 	bucketTurns       = []byte("turns")
 	bucketSessions    = []byte("sessions")
+	bucketValidation  = []byte("validation_metrics")
 )
 
 // Store manages the bbolt database for escalation data.
@@ -49,6 +50,27 @@ type TaskTypeStats struct {
 	SuccessRate float64 `json:"SuccessRate"`
 }
 
+// ValidationMetric tracks estimated vs actual token usage.
+type ValidationMetric struct {
+	ID                    int64     `json:"id"`
+	Timestamp             time.Time `json:"timestamp"`
+	Prompt                string    `json:"prompt"`
+	DetectedTaskType      string    `json:"detected_task_type"`
+	DetectedEffort        string    `json:"detected_effort"`
+	RoutedModel           string    `json:"routed_model"`
+	EstimatedInputTokens  int       `json:"estimated_input_tokens"`
+	EstimatedOutputTokens int       `json:"estimated_output_tokens"`
+	EstimatedTotalTokens  int       `json:"estimated_total_tokens"`
+	EstimatedCost         float64   `json:"estimated_cost"`
+	ActualInputTokens     int       `json:"actual_input_tokens"`
+	ActualOutputTokens    int       `json:"actual_output_tokens"`
+	ActualTotalTokens     int       `json:"actual_total_tokens"`
+	ActualCost            float64   `json:"actual_cost"`
+	TokenError            float64   `json:"token_error_percent"`
+	CostError             float64   `json:"cost_error_percent"`
+	Validated             bool      `json:"validated"`
+}
+
 // Open creates or opens the bbolt database at the given directory.
 func Open(dataDir string) (*Store, error) {
 	if err := os.MkdirAll(dataDir, 0750); err != nil {
@@ -62,7 +84,7 @@ func Open(dataDir string) (*Store, error) {
 	}
 
 	err = db.Update(func(tx *bolt.Tx) error {
-		for _, name := range [][]byte{bucketEscalations, bucketTurns, bucketSessions} {
+		for _, name := range [][]byte{bucketEscalations, bucketTurns, bucketSessions, bucketValidation} {
 			if _, err := tx.CreateBucketIfNotExists(name); err != nil {
 				return err
 			}
@@ -301,4 +323,127 @@ func (s *Store) DeleteSession(key string) error {
 	return s.db.Update(func(tx *bolt.Tx) error {
 		return tx.Bucket(bucketSessions).Delete([]byte(key))
 	})
+}
+
+// LogValidationMetric records estimated vs actual token usage for validation.
+func (s *Store) LogValidationMetric(metric ValidationMetric) error {
+	metric.Timestamp = time.Now()
+	return s.db.Update(func(tx *bolt.Tx) error {
+		b := tx.Bucket(bucketValidation)
+		id, _ := b.NextSequence()
+		metric.ID = int64(id) //nolint:gosec
+		data, err := json.Marshal(metric)
+		if err != nil {
+			return err
+		}
+		return b.Put(itob(id), data)
+	})
+}
+
+// GetValidationMetrics retrieves the last N validation metrics.
+func (s *Store) GetValidationMetrics(limit int) ([]ValidationMetric, error) {
+	var metrics []ValidationMetric
+	err := s.db.View(func(tx *bolt.Tx) error {
+		b := tx.Bucket(bucketValidation)
+		c := b.Cursor()
+		count := 0
+		for k, v := c.Last(); k != nil && count < limit; k, v = c.Prev() {
+			var m ValidationMetric
+			if err := json.Unmarshal(v, &m); err != nil {
+				continue
+			}
+			metrics = append(metrics, m)
+			count++
+		}
+		return nil
+	})
+	return metrics, err
+}
+
+// GetValidationStats returns summary statistics for validation metrics.
+func (s *Store) GetValidationStats() (map[string]interface{}, error) {
+	stats := map[string]interface{}{
+		"total_metrics":        0,
+		"validated":            0,
+		"avg_token_error":      0.0,
+		"avg_cost_error":       0.0,
+		"estimated_total":      0,
+		"actual_total":         0,
+		"estimated_cost_total": 0.0,
+		"actual_cost_total":    0.0,
+	}
+
+	err := s.db.View(func(tx *bolt.Tx) error {
+		b := tx.Bucket(bucketValidation)
+		c := b.Cursor()
+
+		var totalMetrics, validated int
+		var sumTokenError, sumCostError float64
+		var totalEstTokens, totalActTokens int
+		var totalEstCost, totalActCost float64
+
+		for k, v := c.First(); k != nil; k, v = c.Next() {
+			var m ValidationMetric
+			if err := json.Unmarshal(v, &m); err != nil {
+				continue
+			}
+			totalMetrics++
+			if m.Validated {
+				validated++
+				sumTokenError += m.TokenError
+				sumCostError += m.CostError
+			}
+			totalEstTokens += m.EstimatedTotalTokens
+			totalActTokens += m.ActualTotalTokens
+			totalEstCost += m.EstimatedCost
+			totalActCost += m.ActualCost
+		}
+
+		if totalMetrics > 0 {
+			stats["total_metrics"] = totalMetrics
+			stats["validated"] = validated
+			if validated > 0 {
+				stats["avg_token_error"] = sumTokenError / float64(validated)
+				stats["avg_cost_error"] = sumCostError / float64(validated)
+			}
+			stats["estimated_total"] = totalEstTokens
+			stats["actual_total"] = totalActTokens
+			stats["estimated_cost_total"] = totalEstCost
+			stats["actual_cost_total"] = totalActCost
+		}
+		return nil
+	})
+	return stats, err
+}
+
+// GetValidationMetric retrieves a single validation metric by ID.
+func (s *Store) GetValidationMetric(id string) (ValidationMetric, error) {
+	var metric ValidationMetric
+	err := s.db.View(func(tx *bolt.Tx) error {
+		b := tx.Bucket(bucketValidation)
+		v := b.Get([]byte(id))
+		if v == nil {
+			return fmt.Errorf("validation metric not found: %s", id)
+		}
+		return json.Unmarshal(v, &metric)
+	})
+	return metric, err
+}
+
+// GetAllValidationMetrics retrieves all validation metrics.
+func (s *Store) GetAllValidationMetrics() ([]ValidationMetric, error) {
+	var metrics []ValidationMetric
+	err := s.db.View(func(tx *bolt.Tx) error {
+		b := tx.Bucket(bucketValidation)
+		c := b.Cursor()
+		for k, v := c.First(); k != nil; k, v = c.Next() {
+			var m ValidationMetric
+			if err := json.Unmarshal(v, &m); err != nil {
+				continue
+			}
+			metrics = append(metrics, m)
+		}
+		return nil
+	})
+	return metrics, err
 }
