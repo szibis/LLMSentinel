@@ -51,7 +51,7 @@ type TaskTypeStats struct {
 
 // Open creates or opens the bbolt database at the given directory.
 func Open(dataDir string) (*Store, error) {
-	if err := os.MkdirAll(dataDir, 0755); err != nil {
+	if err := os.MkdirAll(dataDir, 0750); err != nil {
 		return nil, fmt.Errorf("creating data dir: %w", err)
 	}
 
@@ -61,10 +61,9 @@ func Open(dataDir string) (*Store, error) {
 		return nil, fmt.Errorf("opening database: %w", err)
 	}
 
-	// Create buckets
 	err = db.Update(func(tx *bolt.Tx) error {
-		for _, b := range [][]byte{bucketEscalations, bucketTurns, bucketSessions} {
-			if _, err := tx.CreateBucketIfNotExists(b); err != nil {
+		for _, name := range [][]byte{bucketEscalations, bucketTurns, bucketSessions} {
+			if _, err := tx.CreateBucketIfNotExists(name); err != nil {
 				return err
 			}
 		}
@@ -83,16 +82,10 @@ func (s *Store) Close() error {
 	return s.db.Close()
 }
 
-// itob encodes a uint64 as big-endian bytes (sortable key).
 func itob(v uint64) []byte {
 	b := make([]byte, 8)
 	binary.BigEndian.PutUint64(b, v)
 	return b
-}
-
-// btoi decodes big-endian bytes to uint64.
-func btoi(b []byte) uint64 {
-	return binary.BigEndian.Uint64(b)
 }
 
 // LogEscalation records an escalation or de-escalation event.
@@ -135,16 +128,14 @@ func (s *Store) LogTurn(model, concepts string) error {
 		}
 
 		// Prune: keep last 100 turns
-		count := 0
-		c := b.Cursor()
-		for k, _ := c.Last(); k != nil; k, _ = c.Prev() {
-			count++
-		}
+		count := b.Stats().KeyN
 		if count > 100 {
 			toDelete := count - 100
-			c2 := b.Cursor()
-			for k, _ := c2.First(); k != nil && toDelete > 0; k, _ = c2.Next() {
-				b.Delete(k)
+			c := b.Cursor()
+			for k, _ := c.First(); k != nil && toDelete > 0; k, _ = c.Next() {
+				if err := b.Delete(k); err != nil {
+					return err
+				}
 				toDelete--
 			}
 		}
@@ -155,9 +146,8 @@ func (s *Store) LogTurn(model, concepts string) error {
 // RecentTurns returns the last N turns (newest first).
 func (s *Store) RecentTurns(n int) ([]Turn, error) {
 	var turns []Turn
-	s.db.View(func(tx *bolt.Tx) error {
-		b := tx.Bucket(bucketTurns)
-		c := b.Cursor()
+	err := s.db.View(func(tx *bolt.Tx) error {
+		c := tx.Bucket(bucketTurns).Cursor()
 		count := 0
 		for k, v := c.Last(); k != nil && count < n; k, v = c.Prev() {
 			var t Turn
@@ -168,28 +158,25 @@ func (s *Store) RecentTurns(n int) ([]Turn, error) {
 		}
 		return nil
 	})
-	return turns, nil
+	return turns, err
 }
 
 // CountRecentAttempts counts recent turns on a specific model (in the last N turns).
 func (s *Store) CountRecentAttempts(model string, last int) (int, error) {
 	count := 0
-	s.db.View(func(tx *bolt.Tx) error {
-		b := tx.Bucket(bucketTurns)
-		c := b.Cursor()
+	err := s.db.View(func(tx *bolt.Tx) error {
+		c := tx.Bucket(bucketTurns).Cursor()
 		seen := 0
 		for k, v := c.Last(); k != nil && seen < last; k, v = c.Prev() {
 			var t Turn
-			if err := json.Unmarshal(v, &t); err == nil {
-				if t.Model == model {
-					count++
-				}
+			if err := json.Unmarshal(v, &t); err == nil && t.Model == model {
+				count++
 			}
 			seen++
 		}
 		return nil
 	})
-	return count, nil
+	return count, err
 }
 
 // TaskTypeStatsAll returns escalation statistics grouped by task type.
@@ -197,12 +184,11 @@ func (s *Store) TaskTypeStatsAll() ([]TaskTypeStats, error) {
 	escByType := make(map[string]int)
 	succByType := make(map[string]int)
 
-	s.db.View(func(tx *bolt.Tx) error {
-		b := tx.Bucket(bucketEscalations)
-		return b.ForEach(func(k, v []byte) error {
+	err := s.db.View(func(tx *bolt.Tx) error {
+		return tx.Bucket(bucketEscalations).ForEach(func(k, v []byte) error {
 			var e EscalationEvent
 			if err := json.Unmarshal(v, &e); err != nil {
-				return nil
+				return nil // skip malformed
 			}
 			if e.Reason == "success" {
 				succByType[e.TaskType]++
@@ -212,6 +198,9 @@ func (s *Store) TaskTypeStatsAll() ([]TaskTypeStats, error) {
 			return nil
 		})
 	})
+	if err != nil {
+		return nil, err
+	}
 
 	var stats []TaskTypeStats
 	for taskType, esc := range escByType {
@@ -228,12 +217,11 @@ func (s *Store) TaskTypeStatsAll() ([]TaskTypeStats, error) {
 	return stats, nil
 }
 
-// EscalationCountForType returns how many times a task type has been escalated (excluding successes).
+// EscalationCountForType returns how many times a task type has been escalated.
 func (s *Store) EscalationCountForType(taskType string) (int, error) {
 	count := 0
-	s.db.View(func(tx *bolt.Tx) error {
-		b := tx.Bucket(bucketEscalations)
-		return b.ForEach(func(k, v []byte) error {
+	err := s.db.View(func(tx *bolt.Tx) error {
+		return tx.Bucket(bucketEscalations).ForEach(func(k, v []byte) error {
 			var e EscalationEvent
 			if err := json.Unmarshal(v, &e); err != nil {
 				return nil
@@ -244,13 +232,13 @@ func (s *Store) EscalationCountForType(taskType string) (int, error) {
 			return nil
 		})
 	})
-	return count, nil
+	return count, err
 }
 
 // TotalStats returns aggregate statistics.
 func (s *Store) TotalStats() (escalations int, deescalations int, turns int, err error) {
-	s.db.View(func(tx *bolt.Tx) error {
-		tx.Bucket(bucketEscalations).ForEach(func(k, v []byte) error {
+	err = s.db.View(func(tx *bolt.Tx) error {
+		if ferr := tx.Bucket(bucketEscalations).ForEach(func(k, v []byte) error {
 			var e EscalationEvent
 			if err := json.Unmarshal(v, &e); err != nil {
 				return nil
@@ -261,7 +249,9 @@ func (s *Store) TotalStats() (escalations int, deescalations int, turns int, err
 				escalations++
 			}
 			return nil
-		})
+		}); ferr != nil {
+			return ferr
+		}
 		turns = tx.Bucket(bucketTurns).Stats().KeyN
 		return nil
 	})
@@ -271,9 +261,8 @@ func (s *Store) TotalStats() (escalations int, deescalations int, turns int, err
 // RecentEscalations returns the last N escalation events (newest first).
 func (s *Store) RecentEscalations(n int) ([]EscalationEvent, error) {
 	var events []EscalationEvent
-	s.db.View(func(tx *bolt.Tx) error {
-		b := tx.Bucket(bucketEscalations)
-		c := b.Cursor()
+	err := s.db.View(func(tx *bolt.Tx) error {
+		c := tx.Bucket(bucketEscalations).Cursor()
 		count := 0
 		for k, v := c.Last(); k != nil && count < n; k, v = c.Prev() {
 			var e EscalationEvent
@@ -284,7 +273,7 @@ func (s *Store) RecentEscalations(n int) ([]EscalationEvent, error) {
 		}
 		return nil
 	})
-	return events, nil
+	return events, err
 }
 
 // SetSession stores a key-value pair for session state.
@@ -297,14 +286,14 @@ func (s *Store) SetSession(key, value string) error {
 // GetSession retrieves a session value. Returns empty string if not found.
 func (s *Store) GetSession(key string) (string, error) {
 	var value string
-	s.db.View(func(tx *bolt.Tx) error {
+	err := s.db.View(func(tx *bolt.Tx) error {
 		v := tx.Bucket(bucketSessions).Get([]byte(key))
 		if v != nil {
 			value = string(v)
 		}
 		return nil
 	})
-	return value, nil
+	return value, err
 }
 
 // DeleteSession removes a session key.

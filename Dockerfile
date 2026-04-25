@@ -1,5 +1,5 @@
 # Build stage — pure Go, no CGO needed
-FROM golang:1.23-alpine AS builder
+FROM golang:1.25-alpine AS builder
 
 WORKDIR /app
 

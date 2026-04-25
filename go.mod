@@ -1,6 +1,6 @@
 module github.com/szibis/claude-escalate
 
-go 1.23.0
+go 1.25.0
 
 require go.etcd.io/bbolt v1.4.0
 

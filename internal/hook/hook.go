@@ -16,9 +16,9 @@ type Input struct {
 
 // Output is the JSON structure returned to Claude Code on stdout.
 type Output struct {
-	Continue        bool                   `json:"continue"`
-	SuppressOutput  bool                   `json:"suppressOutput"`
-	HookOutput      map[string]interface{} `json:"hookSpecificOutput,omitempty"`
+	Continue       bool                   `json:"continue"`
+	SuppressOutput bool                   `json:"suppressOutput"`
+	HookOutput     map[string]interface{} `json:"hookSpecificOutput,omitempty"`
 }
 
 // ReadInput reads and parses the hook input from stdin.

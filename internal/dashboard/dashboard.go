@@ -34,13 +34,13 @@ func Serve(cfg *config.Config) error {
 		handlePredictions(w, r, db, cfg)
 	})
 	mux.HandleFunc("/api/health", func(w http.ResponseWriter, r *http.Request) {
-		json.NewEncoder(w).Encode(map[string]string{"status": "ok", "version": config.Version})
+		writeJSON(w, map[string]string{"status": "ok", "version": config.Version})
 	})
 
 	// Serve embedded dashboard UI
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/html")
-		w.Write([]byte(dashboardHTML))
+		_, _ = w.Write([]byte(dashboardHTML))
 	})
 
 	addr := fmt.Sprintf("127.0.0.1:%d", cfg.DashboardPort)
@@ -48,7 +48,12 @@ func Serve(cfg *config.Config) error {
 	return http.ListenAndServe(addr, mux)
 }
 
-func handleStats(w http.ResponseWriter, r *http.Request, db *store.Store) {
+func writeJSON(w http.ResponseWriter, v interface{}) {
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(v)
+}
+
+func handleStats(w http.ResponseWriter, _ *http.Request, db *store.Store) {
 	esc, deesc, turns, _ := db.TotalStats()
 	settings, _ := config.ReadClaudeSettings()
 	currentModel := "unknown"
@@ -56,8 +61,7 @@ func handleStats(w http.ResponseWriter, r *http.Request, db *store.Store) {
 		currentModel = config.ModelShortName(settings.Model)
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	writeJSON(w, map[string]interface{}{
 		"escalations":    esc,
 		"de_escalations": deesc,
 		"turns":          turns,
@@ -66,19 +70,17 @@ func handleStats(w http.ResponseWriter, r *http.Request, db *store.Store) {
 	})
 }
 
-func handleTypes(w http.ResponseWriter, r *http.Request, db *store.Store) {
+func handleTypes(w http.ResponseWriter, _ *http.Request, db *store.Store) {
 	stats, _ := db.TaskTypeStatsAll()
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(stats)
+	writeJSON(w, stats)
 }
 
-func handleHistory(w http.ResponseWriter, r *http.Request, db *store.Store) {
+func handleHistory(w http.ResponseWriter, _ *http.Request, db *store.Store) {
 	events, _ := db.RecentEscalations(50)
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(events)
+	writeJSON(w, events)
 }
 
-func handlePredictions(w http.ResponseWriter, r *http.Request, db *store.Store, cfg *config.Config) {
+func handlePredictions(w http.ResponseWriter, _ *http.Request, db *store.Store, cfg *config.Config) {
 	type prediction struct {
 		TaskType    string `json:"task_type"`
 		Escalations int    `json:"escalations"`
@@ -99,8 +101,7 @@ func handlePredictions(w http.ResponseWriter, r *http.Request, db *store.Store, 
 		}
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(predictions)
+	writeJSON(w, predictions)
 }
 
 // dashboardHTML is the embedded single-page dashboard.
