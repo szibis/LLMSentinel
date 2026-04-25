@@ -71,11 +71,11 @@ type HookRequest struct {
 
 // HookResponse is returned after processing a hook.
 type HookResponse struct {
-	Continue        bool   `json:"continue"`
-	SuppressOutput  bool   `json:"suppressOutput"`
-	Action          string `json:"action,omitempty"`
-	Message         string `json:"message,omitempty"`
-	CurrentModel    string `json:"currentModel,omitempty"`
+	Continue       bool   `json:"continue"`
+	SuppressOutput bool   `json:"suppressOutput"`
+	Action         string `json:"action,omitempty"`
+	Message        string `json:"message,omitempty"`
+	CurrentModel   string `json:"currentModel,omitempty"`
 }
 
 // handleHook processes user prompts for /escalate commands, success signals, and task detection.
@@ -158,9 +158,9 @@ func (s *Service) handleEscalate(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"success":       true,
-		"model":         target,
-		"timestamp":     time.Now().UTC().Format(time.RFC3339),
+		"success":   true,
+		"model":     target,
+		"timestamp": time.Now().UTC().Format(time.RFC3339),
 	})
 }
 
@@ -280,11 +280,11 @@ func (s *Service) handleValidate(w http.ResponseWriter, r *http.Request) {
 
 	// Create validation metric record
 	metric := store.ValidationMetric{
-		ActualInputTokens:    req.ActualInputTokens,
-		ActualOutputTokens:   req.ActualOutputTokens,
-		ActualTotalTokens:    req.ActualTotalTokens,
-		ActualCost:           req.ActualCost,
-		Validated:            true,
+		ActualInputTokens:  req.ActualInputTokens,
+		ActualOutputTokens: req.ActualOutputTokens,
+		ActualTotalTokens:  req.ActualTotalTokens,
+		ActualCost:         req.ActualCost,
+		Validated:          true,
 	}
 
 	if err := s.db.LogValidationMetric(metric); err != nil {
@@ -316,8 +316,8 @@ func (s *Service) handleValidationMetrics(w http.ResponseWriter, r *http.Request
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"metrics": metrics,
-		"count":   len(metrics),
+		"metrics":   metrics,
+		"count":     len(metrics),
 		"timestamp": time.Now().UTC().Format(time.RFC3339),
 	})
 }
@@ -387,14 +387,14 @@ func (s *Service) handleStatusline(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		// Current state
-		"model":           currentModel,
-		"effort":          effortLevel,
-		"timestamp":       time.Now().UTC().Format(time.RFC3339),
+		"model":     currentModel,
+		"effort":    effortLevel,
+		"timestamp": time.Now().UTC().Format(time.RFC3339),
 
 		// Escalation metrics
-		"escalations":     esc,
-		"de_escalations":  deesc,
-		"turns":           turns,
+		"escalations":    esc,
+		"de_escalations": deesc,
+		"turns":          turns,
 
 		// Validation metrics
 		"validations":     totalValidations,
@@ -427,28 +427,28 @@ func (s *Service) handleHookMetrics(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req struct {
-		Prompt                    string `json:"prompt"`
-		DetectedTaskType          string `json:"detected_task_type"`
-		DetectedEffort            string `json:"detected_effort"`
-		RoutedModel               string `json:"routed_model"`
-		EstimatedInputTokens      int    `json:"estimated_input_tokens"`
-		EstimatedOutputTokens     int    `json:"estimated_output_tokens"`
-		EstimatedTotalTokens      int    `json:"estimated_total_tokens"`
-		EstimatedCost             float64 `json:"estimated_cost"`
+		Prompt                string  `json:"prompt"`
+		DetectedTaskType      string  `json:"detected_task_type"`
+		DetectedEffort        string  `json:"detected_effort"`
+		RoutedModel           string  `json:"routed_model"`
+		EstimatedInputTokens  int     `json:"estimated_input_tokens"`
+		EstimatedOutputTokens int     `json:"estimated_output_tokens"`
+		EstimatedTotalTokens  int     `json:"estimated_total_tokens"`
+		EstimatedCost         float64 `json:"estimated_cost"`
 	}
 	json.NewDecoder(r.Body).Decode(&req)
 
 	// Create validation metric record with estimates
 	metric := store.ValidationMetric{
-		Prompt:                   req.Prompt,
-		DetectedTaskType:         req.DetectedTaskType,
-		DetectedEffort:           req.DetectedEffort,
-		RoutedModel:              req.RoutedModel,
-		EstimatedInputTokens:     req.EstimatedInputTokens,
-		EstimatedOutputTokens:    req.EstimatedOutputTokens,
-		EstimatedTotalTokens:     req.EstimatedTotalTokens,
-		EstimatedCost:            req.EstimatedCost,
-		Validated:                false, // Not validated yet (waiting for barista)
+		Prompt:                req.Prompt,
+		DetectedTaskType:      req.DetectedTaskType,
+		DetectedEffort:        req.DetectedEffort,
+		RoutedModel:           req.RoutedModel,
+		EstimatedInputTokens:  req.EstimatedInputTokens,
+		EstimatedOutputTokens: req.EstimatedOutputTokens,
+		EstimatedTotalTokens:  req.EstimatedTotalTokens,
+		EstimatedCost:         req.EstimatedCost,
+		Validated:             false, // Not validated yet (waiting for barista)
 	}
 
 	if err := s.db.LogValidationMetric(metric); err != nil {
@@ -458,12 +458,12 @@ func (s *Service) handleHookMetrics(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"success":        true,
-		"validation_id":  metric.ID,
-		"estimated":      metric.EstimatedTotalTokens,
-		"effort":         metric.DetectedEffort,
-		"model":          metric.RoutedModel,
-		"timestamp":      time.Now().UTC().Format(time.RFC3339),
+		"success":       true,
+		"validation_id": metric.ID,
+		"estimated":     metric.EstimatedTotalTokens,
+		"effort":        metric.DetectedEffort,
+		"model":         metric.RoutedModel,
+		"timestamp":     time.Now().UTC().Format(time.RFC3339),
 	})
 }
 
