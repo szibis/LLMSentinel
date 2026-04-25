@@ -82,7 +82,7 @@ func runHook() {
 		_ = hook.WriteOutput(hook.PassThrough())
 		return
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	settings, err := config.ReadClaudeSettings()
 	if err != nil {
@@ -274,7 +274,7 @@ func runStats() {
 		fmt.Fprintf(os.Stderr, "Error opening database: %v\n", err)
 		os.Exit(1)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	switch subcmd {
 	case "summary":

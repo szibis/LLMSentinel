@@ -1,47 +1,36 @@
+version: "2"
+
 run:
   timeout: 5m
-  modules-download-mode: readonly
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
 
 linters:
   enable:
     - errcheck
-    - gosimple
     - govet
     - ineffassign
     - staticcheck
     - unused
     - bodyclose
     - copyloopvar
-    - gofmt
-    - goimports
     - goprintffuncname
     - gosec
     - misspell
     - nolintlint
-    - stylecheck
-    - typecheck
     - unparam
     - whitespace
-
-linters-settings:
-  misspell:
-    locale: US
-  staticcheck:
-    checks: ["all"]
-  stylecheck:
-    checks: ["all", "-ST1000", "-ST1003", "-ST1016", "-ST1005"]
-  gosec:
-    excludes:
-      - G104
-      - G304
+  settings:
+    misspell:
+      locale: US
+    gosec:
+      excludes:
+        - G104
+        - G304
 
 issues:
-  exclude-rules:
-    - path: _test\.go
-      linters:
-        - bodyclose
-        - errcheck
-        - gosec
-        - unparam
   max-issues-per-linter: 50
   max-same-issues: 10

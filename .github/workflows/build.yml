@@ -68,14 +68,12 @@ jobs:
           cache: true
 
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@v6
+        uses: golangci/golangci-lint-action@v7
         with:
           version: latest
 
   security:
     runs-on: ubuntu-latest
-    # Informational — stdlib CVEs in older Go versions are expected
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
 
