@@ -1,0 +1,596 @@
+#!/bin/bash
+# =============================================================================
+# Escalation Manager - Consolidated Binary
+# Single source of truth for all escalation/de-escalation/auto-effort logic
+#
+# Hook Types: on-prompt (UserPromptSubmit), pre-tool, post-tool
+# Pass HOOK_TYPE env var to dispatch to correct handler
+#
+# Usage:
+#   HOOK_TYPE=on-prompt escalation-manager < hook_input.json
+#   HOOK_TYPE=pre-tool escalation-manager < hook_input.json
+#   HOOK_TYPE=post-tool escalation-manager < hook_input.json
+# =============================================================================
+
+set -o pipefail
+
+# Configuration
+SETTINGS_FILE="${HOME}/.claude/settings.json"
+SESSION_DIR="/tmp/.escalation_$(id -u)"
+DATA_DIR="${HOME}/.claude/data/escalation"
+mkdir -p "$SESSION_DIR" "$DATA_DIR"
+
+# Input from hook
+INPUT=$(cat)
+PROMPT=$(echo "$INPUT" | jq -r '.prompt // ""' 2>/dev/null)
+HOOK_TYPE="${HOOK_TYPE:-on-prompt}"
+
+# =============================================================================
+# Utilities
+# =============================================================================
+
+log_to_file() {
+    local file="$1"
+    local message="$2"
+    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+    echo "[$timestamp] $message" >> "$file"
+}
+
+atomic_json_update() {
+    local file="$1"
+    shift  # remaining args are jq filters
+    local tmpfile=$(mktemp)
+
+    if jq "$@" "$file" > "$tmpfile" 2>/dev/null && [ -s "$tmpfile" ]; then
+        mv "$tmpfile" "$file"
+        return 0
+    else
+        rm -f "$tmpfile"
+        return 1
+    fi
+}
+
+get_current_model() {
+    jq -r '.model // "claude-sonnet-4-6"' "$SETTINGS_FILE" 2>/dev/null
+}
+
+get_current_effort() {
+    jq -r '.effortLevel // "medium"' "$SETTINGS_FILE" 2>/dev/null
+}
+
+# =============================================================================
+# Core Handler: on-prompt (UserPromptSubmit hook)
+# This is the main orchestrator that handles:
+#   1. /escalate commands (escalate-model.sh)
+#   2. Auto-effort classification (auto-effort.sh)
+#   3. De-escalation on success signals (de-escalate-model.sh)
+#   4. Stats tracking (track-escalation-patterns.sh)
+# =============================================================================
+
+handle_on_prompt() {
+    [ -z "$PROMPT" ] || [ "$PROMPT" = "null" ] && \
+        echo '{"continue":true,"suppressOutput":true}' && return 0
+
+    local output_messages=()
+    local current_model=$(get_current_model)
+    local current_effort=$(get_current_effort)
+
+    # --- Step 1: Check for /escalate command ---
+    if echo "$PROMPT" | grep -qiE "^/escalate"; then
+        handle_escalate_command && return 0
+    fi
+
+    # --- Step 2: De-escalation (if applicable) ---
+    local deescal_output=$(handle_de_escalation)
+    if [ -n "$deescal_output" ] && [ "$deescal_output" != '{"continue":true,"suppressOutput":true}' ]; then
+        echo "$deescal_output"
+        return 0
+    fi
+
+    # --- Step 3: Auto-effort classification ---
+    local autoeffort_output=$(handle_auto_effort)
+    if [ -n "$autoeffort_output" ] && [ "$autoeffort_output" != '{"continue":true,"suppressOutput":true}' ]; then
+        echo "$autoeffort_output"
+        return 0
+    fi
+
+    # --- Step 4: Stats tracking ---
+    handle_stats_tracking > /dev/null
+
+    # Default: pass through
+    echo '{"continue":true,"suppressOutput":true}'
+}
+
+# =============================================================================
+# Handler: /escalate command
+# Maps target model and creates escalation session
+# =============================================================================
+
+handle_escalate_command() {
+    local target=$(echo "$PROMPT" | grep -oiE "(sonnet|opus|haiku)" | head -1 | tr '[:upper:]' '[:lower:]')
+    [ -z "$target" ] && target="sonnet"
+
+    local model="" label="" effort=""
+    case "$target" in
+        opus)
+            model="claude-opus-4-6"
+            label="Opus (deep reasoning & complex logic)"
+            effort="high"
+            ;;
+        sonnet)
+            model="claude-sonnet-4-6"
+            label="Sonnet (precision code & balanced reasoning)"
+            effort="high"
+            ;;
+        haiku)
+            model="claude-haiku-4-5-20251001"
+            label="Haiku (cost-optimized)"
+            effort="low"
+            ;;
+        *)
+            model="claude-sonnet-4-6"
+            label="Sonnet (default)"
+            effort="high"
+            ;;
+    esac
+
+    # Update settings atomically
+    if ! atomic_json_update "$SETTINGS_FILE" \
+        --arg model "$model" --arg effort "$effort" \
+        '.model = $model | .effortLevel = $effort'; then
+        echo '{"continue":true,"suppressOutput":true}'
+        return 1
+    fi
+
+    # Create escalation session for de-escalation tracking
+    date +%s > "$SESSION_DIR/escalation_session"
+
+    # Log stats
+    local task_type=$(cat "$DATA_DIR/last_task_context" 2>/dev/null || echo "unknown")
+    log_to_file "$DATA_DIR/escalations.log" "Escalated to $label (task: $task_type)"
+
+    echo "{\"continue\":true,\"suppressOutput\":true,\"hookSpecificOutput\":{\"hookEventName\":\"UserPromptSubmit\",\"additionalContext\":\"🚀 Escalated: $label\"}}"
+}
+
+# =============================================================================
+# Handler: De-escalation (success signal detection)
+# Detects success phrases and cascades down models
+# =============================================================================
+
+detect_success_signal() {
+    local prompt_lower=$(echo "$1" | tr '[:upper:]' '[:lower:]')
+
+    # Multi-word phrases (more specific)
+    for phrase in "works great" "works perfectly" "working now" "got it working" \
+                  "that fixed it" "that works" "that solved" "issue resolved" \
+                  "problem solved" "thank you" "thanks for" "thanks a lot" \
+                  "that's it" "that's exactly" "no longer broken" "no longer failing" \
+                  "all good" "looks good" "ship it" \
+                  "exactly what i needed" "works like a charm" "problem solved for good" \
+                  "no more errors" "successfully implemented"; do
+        echo "$prompt_lower" | grep -q "$phrase" && return 0
+    done
+
+    # Single-word signals with context guards
+    # "perfect" alone is strong
+    echo "$prompt_lower" | grep -qw "perfect" && return 0
+
+    # "solved" alone is strong
+    echo "$prompt_lower" | grep -qw "solved" && return 0
+
+    # "fixed" with context
+    echo "$prompt_lower" | grep -qE "(that |it |is |it's |got )fixed" && return 0
+
+    # "works" as confirmation
+    echo "$prompt_lower" | grep -qE "(it|that|this) works" && return 0
+
+    # "appreciate"
+    echo "$prompt_lower" | grep -qE "appreciat(e|ed)" && return 0
+
+    # "thanks" without negation
+    if echo "$prompt_lower" | grep -qw "thanks"; then
+        echo "$prompt_lower" | grep -qE "thanks.*(but|however|although|yet|still)" || return 0
+    fi
+
+    return 1
+}
+
+has_escalation_context() {
+    local session_file="$SESSION_DIR/escalation_session"
+
+    if [ -f "$session_file" ]; then
+        local escalated_time=$(cat "$session_file" 2>/dev/null)
+
+        # Verify timestamp validity
+        if ! [[ "$escalated_time" =~ ^[0-9]+$ ]]; then
+            rm -f "$session_file"
+            return 1
+        fi
+
+        local elapsed=$(( $(date +%s) - escalated_time ))
+
+        # Within 30-minute window
+        if [ "$elapsed" -lt 1800 ]; then
+            return 0
+        else
+            rm -f "$session_file"
+            return 1
+        fi
+    fi
+
+    return 1
+}
+
+step_down_model() {
+    local current_model=$(get_current_model)
+    local session_file="$SESSION_DIR/escalation_session"
+    local cascade_timeout_file="$SESSION_DIR/last_cascade_time"
+
+    if [[ "$current_model" == *"opus"* ]]; then
+        echo "claude-sonnet-4-6"
+        date +%s > "$session_file"  # Refresh for cascade
+        date +%s > "$cascade_timeout_file"  # Track cascade timestamp
+        return 0
+    fi
+
+    if [[ "$current_model" == *"sonnet"* ]]; then
+        echo "claude-haiku-4-5-20251001"
+        rm -f "$session_file"  # End cascade at final step
+        date +%s > "$cascade_timeout_file"  # Track final cascade
+        return 0
+    fi
+
+    echo "$current_model"
+    return 1
+}
+
+has_cascade_timeout() {
+    local cascade_timeout_file="$SESSION_DIR/last_cascade_time"
+
+    if [ -f "$cascade_timeout_file" ]; then
+        local last_cascade=$(cat "$cascade_timeout_file" 2>/dev/null)
+
+        if [[ "$last_cascade" =~ ^[0-9]+$ ]]; then
+            local elapsed=$(( $(date +%s) - last_cascade ))
+            # Minimum 5 minutes between cascades
+            if [ "$elapsed" -lt 300 ]; then
+                return 0  # Still in timeout
+            fi
+        fi
+    fi
+
+    return 1  # No timeout active
+}
+
+handle_de_escalation() {
+    # Skip meta-commands
+    echo "$PROMPT" | grep -qE "^/(escalate|effort|model)" && \
+        echo '{"continue":true,"suppressOutput":true}' && return 0
+
+    local current_model=$(get_current_model)
+
+    # Only act on expensive models with escalation context
+    if ! [[ "$current_model" == *"opus"* || "$current_model" == *"sonnet"* ]]; then
+        echo '{"continue":true,"suppressOutput":true}'
+        return 0
+    fi
+
+    if ! detect_success_signal "$PROMPT"; then
+        echo '{"continue":true,"suppressOutput":true}'
+        return 0
+    fi
+
+    if ! has_escalation_context; then
+        echo '{"continue":true,"suppressOutput":true}'
+        return 0
+    fi
+
+    # Check cascade timeout (prevent multiple cascades within 5 minutes)
+    if has_cascade_timeout; then
+        echo '{"continue":true,"suppressOutput":true}'
+        return 0
+    fi
+
+    # De-escalate!
+    local target_model=$(step_down_model)
+
+    if [ "$target_model" != "$current_model" ]; then
+        local new_effort=""
+        local label=""
+        local cascade_status=""
+
+        if [[ "$current_model" == *"opus"* ]]; then
+            cascade_status=" (continuing cascade)"
+        elif [[ "$current_model" == *"sonnet"* ]]; then
+            cascade_status=" (cascade complete)"
+        fi
+
+        if [[ "$target_model" == *"haiku"* ]]; then
+            new_effort="low"
+            label="Haiku (cost-optimized)$cascade_status"
+        elif [[ "$target_model" == *"sonnet"* ]]; then
+            new_effort="medium"
+            label="Sonnet (balanced)$cascade_status"
+        else
+            new_effort="high"
+            label="$target_model$cascade_status"
+        fi
+
+        # Update atomically
+        if atomic_json_update "$SETTINGS_FILE" \
+            --arg model "$target_model" --arg effort "$new_effort" \
+            '.model = $model | .effortLevel = $effort'; then
+
+            # Signal auto-effort to skip override
+            date +%s > "$SESSION_DIR/deescalation_just_ran"
+
+            # Log
+            log_to_file "$DATA_DIR/deescalations.log" "De-escalated to $label"
+
+            echo "{\"continue\":true,\"suppressOutput\":true,\"hookSpecificOutput\":{\"hookEventName\":\"UserPromptSubmit\",\"additionalContext\":\"⬇️ Auto-downgrade: $label (problem solved, saving cost)\"}}"
+            return 0
+        fi
+    fi
+
+    echo '{"continue":true,"suppressOutput":true}'
+}
+
+# =============================================================================
+# Handler: Auto-effort classification
+# Routes based on task type + complexity heuristics
+# =============================================================================
+
+classify_task_type_effort() {
+    local prompt_lower=$(echo "$1" | tr '[:upper:]' '[:lower:]')
+    local prompt_len=${#1}
+
+    local task_type=""
+    local new_effort=""
+    local new_model=""
+
+    # Task type classification (order matters - most specific first)
+    if echo "$prompt_lower" | grep -qE "\b(debug|troubleshoot|diagnose)\b|fix.*issue|broken|not working" || \
+       (echo "$prompt_lower" | grep -qE "\b(fix|investigate)\b" && echo "$prompt_lower" | grep -qE "\b(error|bug|issue|problem)\b"); then
+        task_type="debugging"
+        new_effort="high"
+        new_model="opusplan"
+    elif echo "$prompt_lower" | grep -qE "\b(plan|design|architect|strategy|structure)\b|system.*design"; then
+        task_type="planning"
+        new_effort="high"
+        new_model="opusplan"
+    elif echo "$prompt_lower" | grep -qE "\b(implement|generate|write|add|refactor|build|setup|configure)\b|set.*up|create.*function|add.*feature|code.*up"; then
+        task_type="code_gen"
+        new_effort="high"
+        new_model="opusplan"
+    elif echo "$prompt_lower" | grep -qE "\b(document|explain|tutorial|readme)\b|write.*guide|api.*doc" && \
+         ! echo "$prompt_lower" | grep -qE "\b(research|find|look|search|investigate|explore)\b"; then
+        task_type="docs"
+        new_effort="high"
+        new_model="opusplan"
+    elif echo "$prompt_lower" | grep -qE "\b(research|find|search|investigate|explore|lookup)\b|look.*up|search for"; then
+        task_type="search"
+        new_effort="low"
+        new_model="claude-haiku-4-5-20251001"
+    elif echo "$prompt_lower" | grep -qE "\b(improve|optimize|enhance|speed|performance)\b|speed.*up|performance.*boost|make.*faster"; then
+        task_type="optimization"
+        new_effort="medium"
+        new_model="opusplan"
+    elif echo "$prompt_lower" | grep -qE "\b(review|audit|check)\b|check.*quality|quality.*check"; then
+        task_type="review"
+        new_effort="medium"
+        new_model="opusplan"
+    else
+        # Score-based fallback
+        local score=0
+
+        # Length scoring
+        [ "$prompt_len" -gt 500 ] && score=$((score + 3)) || \
+        [ "$prompt_len" -gt 200 ] && score=$((score + 2)) || \
+        [ "$prompt_len" -gt 80 ] && score=$((score + 1))
+
+        # High-complexity keywords
+        for kw in "implement.*system" "build.*from scratch" "create.*framework" \
+                  "build.*system" "create.*system" "debug.*complex" "complex.*bug" \
+                  "performance.*optim" "performance.*boost" "multi-file" "across.*files" \
+                  "across.*modules" "entire codebase" "full implementation" "comprehensive" \
+                  "end-to-end" "design pattern" "trade-off" "parallel.*agent" "scale" "scalable"; do
+            echo "$prompt_lower" | grep -qE "$kw" && score=$((score + 3))
+        done
+
+        # Medium-complexity keywords
+        for kw in "test" "explain.*how" "modify" "change" "integrate" "hook" "configure" \
+                  "setup" "improve" "optimize" "enhance" "deploy" "docker" "ci/cd" "database" \
+                  "api endpoint" "build"; do
+            echo "$prompt_lower" | grep -qE "$kw" && score=$((score + 1))
+        done
+
+        # Low-complexity indicators
+        for kw in "^what is" "^how do i" "^show me" "^list " "^read " "^check " \
+                  "^status" "^version" "^help" "^where" "quick" "simple" "just" \
+                  "one line" "typo"; do
+            echo "$prompt_lower" | grep -qE "$kw" && score=$((score - 2))
+        done
+
+        # Slash commands
+        echo "$PROMPT" | grep -qE "^/" && score=-5
+
+        [ "$score" -lt 0 ] && score=0
+
+        # Map score to effort
+        if [ "$score" -ge 6 ]; then
+            new_effort="high"
+            new_model="opusplan"
+        elif [ "$score" -ge 2 ]; then
+            new_effort="medium"
+            new_model="opusplan"
+        else
+            new_effort="low"
+            new_model="claude-haiku-4-5-20251001"
+        fi
+
+        task_type="score_based"
+    fi
+
+    echo "$task_type|$new_effort|$new_model"
+}
+
+handle_auto_effort() {
+    [ -z "$PROMPT" ] || [ "$PROMPT" = "null" ] && \
+        echo '{"continue":true,"suppressOutput":true}' && return 0
+
+    # Skip meta-commands (user directives override auto-effort)
+    if echo "$PROMPT" | grep -qE "^/(escalate|effort|model)"; then
+        echo '{"continue":true,"suppressOutput":true}'
+        return 0
+    fi
+
+    # Skip if de-escalation just ran (prevent override)
+    local deescal_marker="$SESSION_DIR/deescalation_just_ran"
+    if [ -f "$deescal_marker" ]; then
+        local age=$(( $(date +%s) - $(cat "$deescal_marker" 2>/dev/null || echo 0) ))
+        if [ "$age" -lt 3 ]; then
+            rm -f "$deescal_marker"
+            echo '{"continue":true,"suppressOutput":true}'
+            return 0
+        fi
+        rm -f "$deescal_marker"
+    fi
+
+    local current_effort=$(get_current_effort)
+    local current_model=$(get_current_model)
+
+    # Classify and get routing
+    local classification=$(classify_task_type_effort "$PROMPT")
+    local task_type=$(echo "$classification" | cut -d'|' -f1)
+    local new_effort=$(echo "$classification" | cut -d'|' -f2)
+    local new_model=$(echo "$classification" | cut -d'|' -f3)
+
+    # Only update if changed
+    if [ "$new_effort" != "$current_effort" ] || [ "$new_model" != "$current_model" ]; then
+        if atomic_json_update "$SETTINGS_FILE" \
+            --arg effort "$new_effort" --arg model "$new_model" \
+            '.effortLevel = $effort | .model = $model'; then
+
+            # Build output message
+            local emoji=""
+            case "$new_effort" in
+                low)    emoji="⚡" ;;
+                medium) emoji="⚙" ;;
+                high)   emoji="🔥" ;;
+            esac
+
+            local model_label=""
+            if [ "$new_model" = "claude-haiku-4-5-20251001" ]; then
+                model_label="Haiku (~8x cheaper)"
+            else
+                model_label="opusplan"
+            fi
+
+            local route_source=""
+            if [ "$task_type" != "score_based" ]; then
+                route_source="task-type ($task_type)"
+            else
+                route_source="score-based"
+            fi
+
+            echo "{\"continue\":true,\"suppressOutput\":true,\"hookSpecificOutput\":{\"hookEventName\":\"UserPromptSubmit\",\"additionalContext\":\"${emoji} Auto-effort: ${new_effort} → ${model_label} (${route_source}). Use /effort or /model to override.\"}}"
+            return 0
+        fi
+    fi
+
+    echo '{"continue":true,"suppressOutput":true}'
+}
+
+# =============================================================================
+# Handler: Stats tracking
+# Logs escalation/de-escalation patterns for analytics + phase 4 predictions
+# =============================================================================
+
+classify_task_type_stats() {
+    local prompt_lower=$(echo "$1" | tr '[:upper:]' '[:lower:]')
+
+    # More granular task classification for stats
+    if echo "$prompt_lower" | grep -qE "\b(race|concurren|thread|deadlock|atomic|mutex|lock|semaphore|goroutine)\b"; then
+        echo "concurrency"
+    elif echo "$prompt_lower" | grep -qE "\b(regex|parse|grammar|tokeniz|lexer|ast|syntax)\b"; then
+        echo "parsing"
+    elif echo "$prompt_lower" | grep -qE "\b(optimi[zs]|perform|speed|latency|throughput|benchmark|profil)\b"; then
+        echo "optimization"
+    elif echo "$prompt_lower" | grep -qE "\b(debug|traceback|segfault|panic|stack.trace|core.dump)\b"; then
+        echo "debugging"
+    elif echo "$prompt_lower" | grep -qE "\b(architec|design|structur|microservice|monolith|event.driven|system.design)\b"; then
+        echo "architecture"
+    elif echo "$prompt_lower" | grep -qE "\b(crypto|security|encrypt|auth|tls|ssl|oauth|jwt|certificate)\b"; then
+        echo "security"
+    elif echo "$prompt_lower" | grep -qE "\b(database|sql|query|migration|schema|index|transaction)\b"; then
+        echo "database"
+    elif echo "$prompt_lower" | grep -qE "\b(network|socket|tcp|udp|http|dns|proxy|websocket)\b"; then
+        echo "networking"
+    elif echo "$prompt_lower" | grep -qE "\b(error|bug|crash|exception|broken|not.work|fail)\b"; then
+        echo "bugfix"
+    elif echo "$prompt_lower" | grep -qE "\b(test|spec|assert|mock|stub|fixture|coverage)\b"; then
+        echo "testing"
+    elif echo "$prompt_lower" | grep -qE "\b(deploy|docker|ci|cd|pipeline|kubernetes|helm|terraform)\b"; then
+        echo "devops"
+    else
+        echo "general"
+    fi
+}
+
+handle_stats_tracking() {
+    [ -z "$PROMPT" ] || [ "$PROMPT" = "null" ] && return 0
+
+    # Save task context for /escalate logging
+    if ! echo "$PROMPT" | grep -qE "^/(escalate|effort|model)"; then
+        local task_type=$(classify_task_type_stats "$PROMPT")
+        echo "$task_type" > "$DATA_DIR/last_task_context"
+    fi
+
+    # Log rotation helper
+    rotate_log() {
+        local file="$1"
+        local max_lines="${2:-200}"
+        if [ -f "$file" ] && [ "$(wc -l < "$file" 2>/dev/null)" -gt "$max_lines" ]; then
+            tail -"$max_lines" "$file" > "$file.tmp" && mv "$file.tmp" "$file"
+        fi
+    }
+
+    rotate_log "$DATA_DIR/escalations.log" 200
+    rotate_log "$DATA_DIR/deescalations.log" 200
+}
+
+# =============================================================================
+# Handler: pre-tool (called before tool execution)
+# Future: Block web tools if disabled, run RTK optimization
+# =============================================================================
+
+handle_pre_tool() {
+    # Placeholder for future pre-tool optimizations
+    # Currently delegated to block-webtools.sh hook
+    echo '{"continue":true,"suppressOutput":true}'
+}
+
+# =============================================================================
+# Handler: post-tool (called after tool execution)
+# Future: Track scrapling stats, update performance metrics
+# =============================================================================
+
+handle_post_tool() {
+    # Placeholder for future post-tool tracking
+    # Currently delegated to track.sh hook
+    echo '{"continue":true,"suppressOutput":true}'
+}
+
+# =============================================================================
+# Main Dispatch
+# =============================================================================
+
+case "${HOOK_TYPE}" in
+    on-prompt)   handle_on_prompt ;;
+    pre-tool)    handle_pre_tool ;;
+    post-tool)   handle_post_tool ;;
+    *)
+        echo '{"continue":true,"suppressOutput":true}'
+        exit 1
+        ;;
+esac
