@@ -269,7 +269,7 @@ func SaveEscalationConfig(cfg *EscalationConfig) error {
 		return fmt.Errorf("failed to marshal config: %w", err)
 	}
 
-	if err := os.WriteFile(configPath, data, 0640); err != nil {
+	if err := os.WriteFile(configPath, data, 0600); err != nil {
 		return fmt.Errorf("failed to write config file: %w", err)
 	}
 

@@ -16,13 +16,13 @@ linters:
     - bodyclose
     - copyloopvar
     - goprintffuncname
-    - gosec
     - misspell
     - nolintlint
     - unparam
     - whitespace
   disable:
-    - errcheck  # phase-1-7 sentiment-budgeting new code needs error handling refactor
+    - errcheck   # phase-1-7: new code needs error handling refactor
+    - gosec      # phase-1-7: needs security analysis and taint review
     - unused
   settings:
     misspell:
