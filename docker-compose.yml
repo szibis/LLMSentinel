@@ -1,0 +1,32 @@
+services:
+  claude-escalate:
+    build: .
+    ports:
+      - "8077:8077"
+    volumes:
+      - escalation-data:/data
+    environment:
+      - ESCALATE_DATA_DIR=/data
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8077/api/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  test-hook:
+    build: .
+    entrypoint: sh
+    command:
+      - -c
+      - |
+        echo '{"prompt":"test prompt"}' | /app/claude-escalate hook
+        echo '---'
+        /app/claude-escalate version
+        echo '---'
+        /app/claude-escalate stats summary
+    depends_on:
+      claude-escalate:
+        condition: service_healthy
+
+volumes:
+  escalation-data:

@@ -1,0 +1,66 @@
+name: Bug Report
+description: Report a bug or unexpected behavior
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for reporting a bug! Please fill out the form below.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: A clear description of the bug
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to Reproduce
+      description: Steps to reproduce the behavior
+      placeholder: |
+        1. Configure hook in settings.json
+        2. Send prompt "..."
+        3. Observe incorrect behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      description: What you expected to happen
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual Behavior
+      description: What actually happened
+
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Output of `claude-escalate version`
+      placeholder: "v0.1.0"
+
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating System
+      options:
+        - macOS (Apple Silicon)
+        - macOS (Intel)
+        - Linux (amd64)
+        - Linux (arm64)
+        - Other
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant Logs
+      description: Any error output or logs
+      render: shell
