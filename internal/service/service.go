@@ -107,7 +107,9 @@ func (s *Service) handleHook(w http.ResponseWriter, r *http.Request) {
 		response.Action = "escalate"
 		response.CurrentModel = target
 		// Log escalation to database
-		s.db.LogEscalation("haiku", target, "manual", "user_command")
+		if err := s.db.LogEscalation("haiku", target, "manual", "user_command"); err != nil {
+			fmt.Printf("error logging escalation: %v\n", err)
+		}
 		updateClaudeSettings(target)
 	}
 
@@ -119,7 +121,9 @@ func (s *Service) handleHook(w http.ResponseWriter, r *http.Request) {
 		if settings != nil && settings.Model != "" {
 			nextModel := cascadeDown(settings.Model)
 			response.CurrentModel = nextModel
-			s.db.LogEscalation(settings.Model, nextModel, "success", "success_signal")
+			if err := s.db.LogEscalation(settings.Model, nextModel, "success", "success_signal"); err != nil {
+				fmt.Printf("error logging deescalation: %v\n", err)
+			}
 			updateClaudeSettings(nextModel)
 		}
 	}
@@ -129,12 +133,16 @@ func (s *Service) handleHook(w http.ResponseWriter, r *http.Request) {
 	if effort != "" {
 		model := effortToModel(effort)
 		response.CurrentModel = model
-		s.db.LogEscalation("haiku", model, "auto", effort)
+		if err := s.db.LogEscalation("haiku", model, "auto", effort); err != nil {
+			fmt.Printf("error logging effort detection: %v\n", err)
+		}
 		updateClaudeSettings(model)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		fmt.Printf("error encoding response: %v\n", err)
+	}
 }
 
 // handleEscalate manually escalates to a target model.
@@ -147,7 +155,10 @@ func (s *Service) handleEscalate(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Target string `json:"target"`
 	}
-	json.NewDecoder(r.Body).Decode(&req)
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid request", http.StatusBadRequest)
+		return
+	}
 
 	target := req.Target
 	if target == "" {
@@ -160,15 +171,19 @@ func (s *Service) handleEscalate(w http.ResponseWriter, r *http.Request) {
 		from = modelShortName(settings.Model)
 	}
 
-	s.db.LogEscalation(from, target, "manual", "user_command")
+	if err := s.db.LogEscalation(from, target, "manual", "user_command"); err != nil {
+		fmt.Printf("error logging escalation: %v\n", err)
+	}
 	updateClaudeSettings(modelToFull(target))
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	if err := json.NewEncoder(w).Encode(map[string]interface{}{
 		"success":   true,
 		"model":     target,
 		"timestamp": time.Now().UTC().Format(time.RFC3339),
-	})
+	}); err != nil {
+		fmt.Printf("error encoding response: %v\n", err)
+	}
 }
 
 // handleDeescalate cascades down one model tier.
@@ -181,28 +196,37 @@ func (s *Service) handleDeescalate(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Reason string `json:"reason"`
 	}
-	json.NewDecoder(r.Body).Decode(&req)
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid request", http.StatusBadRequest)
+		return
+	}
 
 	settings, _ := config.ReadClaudeSettings()
 	if settings == nil || settings.Model == "" {
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]interface{}{"error": "no current model"})
+		if err := json.NewEncoder(w).Encode(map[string]interface{}{"error": "no current model"}); err != nil {
+			fmt.Printf("error encoding response: %v\n", err)
+		}
 		return
 	}
 
 	from := settings.Model
 	to := cascadeDown(from)
 
-	s.db.LogEscalation(modelShortName(from), to, "cascade", req.Reason)
+	if err := s.db.LogEscalation(modelShortName(from), to, "cascade", req.Reason); err != nil {
+		fmt.Printf("error logging deescalation: %v\n", err)
+	}
 	updateClaudeSettings(modelToFull(to))
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	if err := json.NewEncoder(w).Encode(map[string]interface{}{
 		"success":   true,
 		"model":     to,
 		"cascaded":  true,
 		"timestamp": time.Now().UTC().Format(time.RFC3339),
-	})
+	}); err != nil {
+		fmt.Printf("error encoding response: %v\n", err)
+	}
 }
 
 // handleEffort sets effort level and routes to appropriate model.
@@ -215,17 +239,22 @@ func (s *Service) handleEffort(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Level string `json:"level"`
 	}
-	json.NewDecoder(r.Body).Decode(&req)
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid request", http.StatusBadRequest)
+		return
+	}
 
 	model := effortToModel(req.Level)
 	updateClaudeSettings(modelToFull(model))
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	if err := json.NewEncoder(w).Encode(map[string]interface{}{
 		"success": true,
 		"level":   req.Level,
 		"model":   model,
-	})
+	}); err != nil {
+		fmt.Printf("error encoding response: %v\n", err)
+	}
 }
 
 // handleStats returns current statistics.
@@ -238,22 +267,26 @@ func (s *Service) handleStats(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	if err := json.NewEncoder(w).Encode(map[string]interface{}{
 		"escalations":    esc,
 		"de_escalations": deesc,
 		"turns":          turns,
 		"current_model":  currentModel,
 		"timestamp":      time.Now().UTC().Format(time.RFC3339),
-	})
+	}); err != nil {
+		fmt.Printf("error encoding response: %v\n", err)
+	}
 }
 
 // handleHealth returns service health status.
 func (s *Service) handleHealth(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{
+	if err := json.NewEncoder(w).Encode(map[string]string{
 		"status":    "healthy",
 		"timestamp": time.Now().UTC().Format(time.RFC3339),
-	})
+	}); err != nil {
+		fmt.Printf("error encoding response: %v\n", err)
+	}
 }
 
 // handleDashboard serves the dashboard UI.
@@ -264,7 +297,9 @@ func (s *Service) handleDashboard(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "text/html")
 	// Dashboard HTML would be served here (same as dashboard package)
-	w.Write([]byte(dashboardHTML))
+	if _, err := w.Write([]byte(dashboardHTML)); err != nil {
+		fmt.Printf("error writing response: %v\n", err)
+	}
 }
 
 // handleValidate accepts actual token metrics and compares with estimates.
@@ -283,7 +318,10 @@ func (s *Service) handleValidate(w http.ResponseWriter, r *http.Request) {
 		ActualCost                float64 `json:"actual_cost"`
 		ValidationID              int64   `json:"validation_id"`
 	}
-	json.NewDecoder(r.Body).Decode(&req)
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid request", http.StatusBadRequest)
+		return
+	}
 
 	// Create validation metric record
 	metric := store.ValidationMetric{
@@ -300,12 +338,14 @@ func (s *Service) handleValidate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	if err := json.NewEncoder(w).Encode(map[string]interface{}{
 		"success":         true,
 		"validation_id":   metric.ID,
 		"tokens_recorded": metric.ActualTotalTokens,
 		"timestamp":       time.Now().UTC().Format(time.RFC3339),
-	})
+	}); err != nil {
+		fmt.Printf("error encoding response: %v\n", err)
+	}
 }
 
 // handleValidationMetrics returns recent validation metrics.
@@ -322,11 +362,13 @@ func (s *Service) handleValidationMetrics(w http.ResponseWriter, r *http.Request
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	if err := json.NewEncoder(w).Encode(map[string]interface{}{
 		"metrics":   metrics,
 		"count":     len(metrics),
 		"timestamp": time.Now().UTC().Format(time.RFC3339),
-	})
+	}); err != nil {
+		fmt.Printf("error encoding response: %v\n", err)
+	}
 }
 
 // handleValidationStats returns validation statistics summary.
@@ -343,7 +385,9 @@ func (s *Service) handleValidationStats(w http.ResponseWriter, r *http.Request) 
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(stats)
+	if err := json.NewEncoder(w).Encode(stats); err != nil {
+		fmt.Printf("error encoding response: %v\n", err)
+	}
 }
 
 // handleStatusline returns current metrics in statusline-friendly JSON format.
@@ -392,7 +436,7 @@ func (s *Service) handleStatusline(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	if err := json.NewEncoder(w).Encode(map[string]interface{}{
 		// Current state
 		"model":     currentModel,
 		"effort":    effortLevel,
@@ -422,7 +466,9 @@ func (s *Service) handleStatusline(w http.ResponseWriter, r *http.Request) {
 		// Integration info
 		"service": "escalation-manager",
 		"version": "2.0",
-	})
+	}); err != nil {
+		fmt.Printf("error encoding response: %v\n", err)
+	}
 }
 
 // handleHookMetrics records estimated metrics from the hook (pre-response).
@@ -443,7 +489,10 @@ func (s *Service) handleHookMetrics(w http.ResponseWriter, r *http.Request) {
 		EstimatedTotalTokens  int     `json:"estimated_total_tokens"`
 		EstimatedCost         float64 `json:"estimated_cost"`
 	}
-	json.NewDecoder(r.Body).Decode(&req)
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid request", http.StatusBadRequest)
+		return
+	}
 
 	// Create validation metric record with estimates
 	metric := store.ValidationMetric{
@@ -464,14 +513,16 @@ func (s *Service) handleHookMetrics(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	if err := json.NewEncoder(w).Encode(map[string]interface{}{
 		"success":       true,
 		"validation_id": metric.ID,
 		"estimated":     metric.EstimatedTotalTokens,
 		"effort":        metric.DetectedEffort,
 		"model":         metric.RoutedModel,
 		"timestamp":     time.Now().UTC().Format(time.RFC3339),
-	})
+	}); err != nil {
+		fmt.Printf("error encoding response: %v\n", err)
+	}
 }
 
 // Helper functions
@@ -661,7 +712,9 @@ func (s *Service) handleDetectSignal(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(resp)
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
+		fmt.Printf("error encoding response: %v\n", err)
+	}
 }
 
 // Decision request/response types
@@ -723,7 +776,9 @@ func (s *Service) handleMakeDecision(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(resp)
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
+		fmt.Printf("error encoding response: %v\n", err)
+	}
 }
 
 // Learning analysis request/response
@@ -756,7 +811,9 @@ func (s *Service) handleDecisionLearning(w http.ResponseWriter, r *http.Request)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(resp)
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
+		fmt.Printf("error encoding response: %v\n", err)
+	}
 }
 
 const dashboardHTML = `<!-- Dashboard HTML would be embedded here -->`
