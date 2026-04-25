@@ -70,7 +70,7 @@ func Open(dataDir string) (*Store, error) {
 		return nil
 	})
 	if err != nil {
-		db.Close()
+		_ = db.Close()
 		return nil, fmt.Errorf("creating buckets: %w", err)
 	}
 
