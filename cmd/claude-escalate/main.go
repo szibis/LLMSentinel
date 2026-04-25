@@ -71,7 +71,7 @@ Stats subcommands:
 func runHook() {
 	input, err := hook.ReadInput()
 	if err != nil || input.Prompt == "" {
-		hook.WriteOutput(hook.PassThrough())
+		_ = hook.WriteOutput(hook.PassThrough())
 		return
 	}
 
@@ -79,14 +79,14 @@ func runHook() {
 
 	db, err := store.Open(cfg.DataDir)
 	if err != nil {
-		hook.WriteOutput(hook.PassThrough())
+		_ = hook.WriteOutput(hook.PassThrough())
 		return
 	}
 	defer db.Close()
 
 	settings, err := config.ReadClaudeSettings()
 	if err != nil {
-		hook.WriteOutput(hook.PassThrough())
+		_ = hook.WriteOutput(hook.PassThrough())
 		return
 	}
 
@@ -98,10 +98,10 @@ func runHook() {
 	if detect.IsMetaCommand(prompt) {
 		// Handle /escalate
 		if isEsc, target := detect.IsEscalateCommand(prompt); isEsc {
-			handleEscalate(db, currentModel, target, cfg)
+			handleEscalate(db, currentModel, target)
 			return
 		}
-		hook.WriteOutput(hook.PassThrough())
+		_ = hook.WriteOutput(hook.PassThrough())
 		return
 	}
 
@@ -110,13 +110,13 @@ func runHook() {
 
 	// Log turn for circular reasoning detection
 	concepts := detect.ExtractConcepts(prompt)
-	db.LogTurn(modelShort, strings.Join(concepts, ","))
+	_ = db.LogTurn(modelShort, strings.Join(concepts, ","))
 
 	// Phase 5: Predictive escalation (only on Haiku)
 	if config.ModelTierOf(currentModel) == config.TierHaiku && taskType != classify.TaskGeneral {
 		count, _ := db.EscalationCountForType(string(taskType))
 		if count >= cfg.PredictThreshold {
-			hook.WriteOutput(hook.WithHint(
+			_ = hook.WriteOutput(hook.WithHint(
 				fmt.Sprintf("📊 Predictive: %s tasks historically need escalation (%d prior). Consider: /escalate to sonnet", taskType, count),
 			))
 			return
@@ -132,7 +132,7 @@ func runHook() {
 				suggestTarget = "opus"
 			}
 			if modelShort != "opus" {
-				hook.WriteOutput(hook.WithHint(
+				_ = hook.WriteOutput(hook.WithHint(
 					fmt.Sprintf("💡 %s seems stuck (%d attempts). Try: /escalate to %s",
 						capitalize(modelShort), attempts, suggestTarget),
 				))
@@ -156,7 +156,7 @@ func runHook() {
 				}
 			}
 			if haikuCount >= 3 && detect.DetectCircularPattern(recentConcepts, cfg.CircularTurns) {
-				hook.WriteOutput(hook.WithHint(
+				_ = hook.WriteOutput(hook.WithHint(
 					"🔄 Circular pattern detected (same concepts repeating). Consider: /escalate to sonnet",
 				))
 				return
@@ -170,10 +170,10 @@ func runHook() {
 		return
 	}
 
-	hook.WriteOutput(hook.PassThrough())
+	_ = hook.WriteOutput(hook.PassThrough())
 }
 
-func handleEscalate(db *store.Store, currentModel, target string, cfg *config.Config) {
+func handleEscalate(db *store.Store, currentModel, target string) {
 	var modelID, label, effort string
 	switch target {
 	case "opus":
@@ -195,15 +195,14 @@ func handleEscalate(db *store.Store, currentModel, target string, cfg *config.Co
 	}
 
 	if err := config.WriteClaudeSettings(modelID, effort); err != nil {
-		hook.WriteOutput(hook.PassThrough())
+		_ = hook.WriteOutput(hook.PassThrough())
 		return
 	}
 
-	// Log escalation
-	db.LogEscalation(config.ModelShortName(currentModel), target, "general", "user_command")
-	db.SetSession("escalation_active", "true")
+	_ = db.LogEscalation(config.ModelShortName(currentModel), target, "general", "user_command")
+	_ = db.SetSession("escalation_active", "true")
 
-	hook.WriteOutput(hook.WithHint(fmt.Sprintf("🚀 Escalated: %s", label)))
+	_ = hook.WriteOutput(hook.WithHint(fmt.Sprintf("🚀 Escalated: %s", label)))
 }
 
 func handleDeEscalate(db *store.Store, currentModel, taskType string) {
@@ -213,7 +212,7 @@ func handleDeEscalate(db *store.Store, currentModel, taskType string) {
 		// Check if we've been on expensive model for 2+ turns
 		attempts, _ := db.CountRecentAttempts(config.ModelShortName(currentModel), 3)
 		if attempts < 2 {
-			hook.WriteOutput(hook.PassThrough())
+			_ = hook.WriteOutput(hook.PassThrough())
 			return
 		}
 	}
@@ -226,31 +225,31 @@ func handleDeEscalate(db *store.Store, currentModel, taskType string) {
 		label = "Sonnet (balanced)"
 		effort = "medium"
 		// Keep session for cascade
-		db.SetSession("escalation_active", "true")
+		_ = db.SetSession("escalation_active", "true")
 	case strings.Contains(currentModel, "sonnet"):
 		targetModel = config.ModelHaiku
 		label = "Haiku (cost-optimized)"
 		effort = "low"
-		db.DeleteSession("escalation_active")
+		_ = db.DeleteSession("escalation_active")
 	default:
-		hook.WriteOutput(hook.PassThrough())
+		_ = hook.WriteOutput(hook.PassThrough())
 		return
 	}
 
 	if err := config.WriteClaudeSettings(targetModel, effort); err != nil {
-		hook.WriteOutput(hook.PassThrough())
+		_ = hook.WriteOutput(hook.PassThrough())
 		return
 	}
 
-	db.LogEscalation(config.ModelShortName(currentModel), config.ModelShortName(targetModel), taskType, "success")
-	hook.WriteOutput(hook.WithHint(fmt.Sprintf("⬇️ Auto-downgrade: %s (problem solved, saving cost)", label)))
+	_ = db.LogEscalation(config.ModelShortName(currentModel), config.ModelShortName(targetModel), taskType, "success")
+	_ = hook.WriteOutput(hook.WithHint(fmt.Sprintf("⬇️ Auto-downgrade: %s (problem solved, saving cost)", label)))
 }
 
 func runDashboard() {
 	port := 8077
 	for i, arg := range os.Args {
 		if arg == "--port" && i+1 < len(os.Args) {
-			fmt.Sscanf(os.Args[i+1], "%d", &port)
+			_, _ = fmt.Sscanf(os.Args[i+1], "%d", &port)
 		}
 	}
 

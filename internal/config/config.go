@@ -99,7 +99,7 @@ func WriteClaudeSettings(model, effort string) error {
 	}
 
 	tmpFile := path + ".tmp"
-	if err := os.WriteFile(tmpFile, out, 0644); err != nil {
+	if err := os.WriteFile(tmpFile, out, 0600); err != nil {
 		return err
 	}
 	return os.Rename(tmpFile, path)
