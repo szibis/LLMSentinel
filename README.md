@@ -173,30 +173,110 @@ claude-escalate stats history
 
 ## How It Works
 
-### Escalation Flow
+### Decision Pipeline
 
+Every prompt flows through a priority-ordered decision pipeline in under 5ms:
+
+```mermaid
+flowchart TD
+    A[User sends prompt] --> B{/escalate command?}
+    B -->|Yes| C[Switch model + log event]
+    B -->|No| D{Known-hard task type?}
+    D -->|Yes, 5+ prior escalations| E["Suggest: Predictive escalation"]
+    D -->|No| F{Frustration detected?}
+    F -->|Yes + 2+ retries| G["Suggest: /escalate to sonnet"]
+    F -->|No| H{Circular reasoning?}
+    H -->|Yes, concepts repeat 3+ turns| I["Suggest: /escalate to sonnet"]
+    H -->|No| J{Success signal?}
+    J -->|Yes + expensive model| K["Auto-downgrade to cheaper model"]
+    J -->|No| L[Pass through silently]
+
+    style C fill:#3fb950,color:#000
+    style E fill:#d29922,color:#000
+    style G fill:#d29922,color:#000
+    style I fill:#d29922,color:#000
+    style K fill:#58a6ff,color:#000
+    style L fill:#30363d,color:#fff
 ```
-User sends prompt to Claude Code
-                |
-                v
-claude-escalate hook (single binary, <5ms)
 
-  1. Is this /escalate command?
-     YES -> Switch model, log event, respond
+### Model Cascade
 
-  2. Predictive check: known-hard task type?
-     YES -> Suggest escalation proactively
+Escalation moves up the chain. De-escalation moves down. One step at a time for cascade support:
 
-  3. Frustration detected? (keywords + retry count)
-     YES -> Suggest: "Haiku stuck. Try /escalate"
+```mermaid
+graph LR
+    H["Haiku ($)<br/>Simple tasks, search, lookup"] -->|"/escalate to sonnet"| S
+    S["Sonnet ($$)<br/>Precision code, debugging"] -->|"/escalate to opus"| O
+    O["Opus ($$$)<br/>Deep reasoning, architecture"] -->|"Success signal"| S
+    S -->|"Success signal"| H
 
-  4. Circular reasoning? (repeated concepts across turns)
-     YES -> Suggest: "Pattern detected. Consider /escalate"
+    style H fill:#58a6ff,color:#000
+    style S fill:#bc8cff,color:#000
+    style O fill:#3fb950,color:#000
+```
 
-  5. Success signal? (on expensive model)
-     YES -> Auto-downgrade to cheaper model
+### Escalation Lifecycle
 
-  6. None of the above -> pass through silently
+A complete escalation session from detection through resolution:
+
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant CE as claude-escalate
+    participant CC as Claude Code
+    participant S as Settings
+
+    U->>CC: "fix the race condition"
+    CC->>CE: hook (prompt)
+    CE->>CE: Classify: concurrency
+    CE->>CE: Log turn, check patterns
+    CE-->>CC: pass through
+    CC->>U: Haiku attempts fix
+
+    U->>CC: "that didn't work, same error"
+    CC->>CE: hook (prompt)
+    CE->>CE: Detect frustration + 2 retries
+    CE-->>CC: "Haiku seems stuck. Try /escalate"
+
+    U->>CC: "/escalate to sonnet"
+    CC->>CE: hook (command)
+    CE->>S: model = sonnet, effort = high
+    CE->>CE: Log escalation, start session
+    CE-->>CC: "Escalated: Sonnet"
+    CC->>U: Sonnet solves it
+
+    U->>CC: "Perfect, that works!"
+    CC->>CE: hook (prompt)
+    CE->>CE: Detect success + active session
+    CE->>S: model = haiku, effort = low
+    CE->>CE: Log de-escalation, clear session
+    CE-->>CC: "Auto-downgrade: Haiku"
+```
+
+### Predictive Learning
+
+The system builds confidence scores per task type over time:
+
+```mermaid
+graph TD
+    subgraph History["Escalation History (bbolt)"]
+        E1["concurrency: 7 escalations, 6 successes"]
+        E2["parsing: 2 escalations, 2 successes"]
+        E3["debugging: 4 escalations, 3 successes"]
+    end
+
+    subgraph Prediction["Predictive Engine"]
+        P1{">= 5 escalations?"}
+        P1 -->|Yes| P2["Proactive suggestion"]
+        P1 -->|No| P3["Wait for frustration signal"]
+    end
+
+    E1 --> P1
+    E2 --> P1
+    E3 --> P1
+
+    style P2 fill:#3fb950,color:#000
+    style P3 fill:#30363d,color:#fff
 ```
 
 ### Cost Optimization
@@ -207,14 +287,46 @@ claude-escalate hook (single binary, <5ms)
 | Haiku then escalate to Sonnet | ~1,300 | Lower | **Problem solved** |
 | Escalate then solve then downgrade | ~1,500 | Optimal | **Solved + ready for cheap tasks** |
 
-### Model Cascade
+### Architecture Overview
 
-```
-Opus ($$$)  <-  For deep reasoning, architecture
-  ^ escalate / v de-escalate
-Sonnet ($$) <-  For precision code, debugging
-  ^ escalate / v de-escalate
-Haiku ($)   <-  For simple tasks, search, lookup
+```mermaid
+graph TB
+    subgraph "Claude Code"
+        Hook["UserPromptSubmit Hook"]
+    end
+
+    subgraph "claude-escalate binary"
+        Parse["Parse stdin JSON"]
+        Classify["Task Classifier<br/>11 domains"]
+        Detect["Detection Engine<br/>Frustration + Circular"]
+        Predict["Predictive Router<br/>History-based"]
+        Escalate["Escalation Manager<br/>Model switching"]
+        DeEsc["De-escalation<br/>Success detection"]
+        Store["bbolt Storage<br/>Events + Turns + Sessions"]
+        Dash["Dashboard Server<br/>:8077"]
+    end
+
+    subgraph "Claude Code Settings"
+        Settings["~/.claude/settings.json<br/>model + effortLevel"]
+    end
+
+    Hook --> Parse
+    Parse --> Classify
+    Classify --> Detect
+    Classify --> Predict
+    Detect --> Escalate
+    Predict --> Escalate
+    Escalate --> Settings
+    DeEsc --> Settings
+    Escalate --> Store
+    DeEsc --> Store
+    Detect --> Store
+    Store --> Dash
+
+    style Hook fill:#58a6ff,color:#000
+    style Store fill:#d29922,color:#000
+    style Settings fill:#3fb950,color:#000
+    style Dash fill:#bc8cff,color:#000
 ```
 
 ---
