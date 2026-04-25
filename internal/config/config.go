@@ -29,6 +29,7 @@ const (
 type Config struct {
 	DataDir            string  `json:"data_dir"`
 	DashboardPort      int     `json:"dashboard_port"`
+	DashboardBind      string  `json:"dashboard_bind"`      // Bind address (default 127.0.0.1)
 	FrustrationRetries int     `json:"frustration_retries"` // Min retries before suggesting escalation
 	SessionTimeout     int     `json:"session_timeout"`     // Escalation session timeout in seconds
 	PredictThreshold   int     `json:"predict_threshold"`   // Min escalations to enable prediction
