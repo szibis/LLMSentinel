@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   escalation-service:
-    image: szibis/claude-escalate:2.0.0
+    image: szibis/claude-escalate:latest
     container_name: claude-escalation-service
     ports:
       - "8077:8077"  # Dashboard
