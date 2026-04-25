@@ -157,8 +157,8 @@ func (s *Store) GetSentimentTrend(hours int) (SentimentTrend, error) {
 // GetBudgetStatus returns current budget usage.
 func (s *Store) GetBudgetStatus() (BudgetStatus, error) {
 	status := BudgetStatus{
-		Timestamp:  time.Now(),
-		ModelUsage: make(map[string]struct{
+		Timestamp: time.Now(),
+		ModelUsage: make(map[string]struct {
 			Limit      float64
 			Used       float64
 			Percentage float64

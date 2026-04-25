@@ -17,11 +17,11 @@ import (
 
 // Service handles all escalation logic via HTTP.
 type Service struct {
-	db                 *store.Store
-	cfg                *config.Config
-	escCfg             *config.EscalationConfig
-	sentimentDetector  *sentiment.Detector
-	budgetEngine       *budgets.Engine
+	db                *store.Store
+	cfg               *config.Config
+	escCfg            *config.EscalationConfig
+	sentimentDetector *sentiment.Detector
+	budgetEngine      *budgets.Engine
 }
 
 // New creates a new service instance.
@@ -43,15 +43,15 @@ func New(cfg *config.Config) (*Service, error) {
 
 	// Initialize budget engine
 	budgetCfg := budgets.BudgetConfig{
-		DailyBudgetUSD:       escCfg.Budgets.DailyUSD,
-		MonthlyBudgetUSD:     escCfg.Budgets.MonthlyUSD,
-		SessionBudgetTokens:  escCfg.Budgets.SessionTokens,
-		ModelDailyLimits:     escCfg.Budgets.ModelDailyLimits,
-		TaskTypeBudgets:      escCfg.Budgets.TaskTypeBudgets,
-		HardLimit:            escCfg.Budgets.HardLimit,
-		SoftLimit:            escCfg.Budgets.SoftLimit,
+		DailyBudgetUSD:         escCfg.Budgets.DailyUSD,
+		MonthlyBudgetUSD:       escCfg.Budgets.MonthlyUSD,
+		SessionBudgetTokens:    escCfg.Budgets.SessionTokens,
+		ModelDailyLimits:       escCfg.Budgets.ModelDailyLimits,
+		TaskTypeBudgets:        escCfg.Budgets.TaskTypeBudgets,
+		HardLimit:              escCfg.Budgets.HardLimit,
+		SoftLimit:              escCfg.Budgets.SoftLimit,
 		AutoDowngradeAtPercent: escCfg.Budgets.AutoDowngradeAt,
-		AlertThresholds:      escCfg.Budgets.AlertThresholds,
+		AlertThresholds:        escCfg.Budgets.AlertThresholds,
 	}
 	budgetEngine := budgets.NewEngine(budgetCfg)
 

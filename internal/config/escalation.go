@@ -36,60 +36,60 @@ type StatuslineConfig struct {
 
 // StatuslineSourceConfig defines a single statusline source.
 type StatuslineSourceConfig struct {
-	Type    string `yaml:"type"`    // barista, claude-native, webhook, file, envvar
+	Type    string `yaml:"type"` // barista, claude-native, webhook, file, envvar
 	Enabled bool   `yaml:"enabled"`
-	Path    string `yaml:"path"`        // For file sources
-	URL     string `yaml:"url"`         // For webhook sources
-	Token   string `yaml:"token"`       // For webhook auth
+	Path    string `yaml:"path"`       // For file sources
+	URL     string `yaml:"url"`        // For webhook sources
+	Token   string `yaml:"token"`      // For webhook auth
 	Timeout int    `yaml:"timeout_ms"` // Timeout in milliseconds (default: 2000)
 }
 
 // BudgetConfig defines token budget parameters.
 type BudgetConfig struct {
-	DailyUSD            float64                  `yaml:"daily_usd"`
-	MonthlyUSD          float64                  `yaml:"monthly_usd"`
-	SessionTokens       int                      `yaml:"session_tokens"`
-	HardLimit           bool                     `yaml:"hard_limit"`
-	SoftLimit           bool                     `yaml:"soft_limit"`
-	AutoDowngradeAt     float64                  `yaml:"auto_downgrade_at"` // e.g., 0.80 = 80%
-	ModelDailyLimits    map[string]float64       `yaml:"model_daily_limits"`
-	TaskTypeBudgets     map[string]int           `yaml:"task_type_budgets"`
-	AlertThresholds     map[string]float64       `yaml:"alert_thresholds"`
+	DailyUSD         float64            `yaml:"daily_usd"`
+	MonthlyUSD       float64            `yaml:"monthly_usd"`
+	SessionTokens    int                `yaml:"session_tokens"`
+	HardLimit        bool               `yaml:"hard_limit"`
+	SoftLimit        bool               `yaml:"soft_limit"`
+	AutoDowngradeAt  float64            `yaml:"auto_downgrade_at"` // e.g., 0.80 = 80%
+	ModelDailyLimits map[string]float64 `yaml:"model_daily_limits"`
+	TaskTypeBudgets  map[string]int     `yaml:"task_type_budgets"`
+	AlertThresholds  map[string]float64 `yaml:"alert_thresholds"`
 }
 
 // SentimentConfig defines sentiment detection parameters.
 type SentimentConfig struct {
-	Enabled                      bool   `yaml:"enabled"`
-	FrustrationTriggerEscalate   bool   `yaml:"frustration_trigger_escalate"`
-	FrustrationRiskThreshold     float64 `yaml:"frustration_risk_threshold"` // 0.0-1.0
-	LearningEnabled              bool   `yaml:"learning_enabled"`
-	TrackSatisfaction            bool   `yaml:"track_satisfaction"`
+	Enabled                    bool    `yaml:"enabled"`
+	FrustrationTriggerEscalate bool    `yaml:"frustration_trigger_escalate"`
+	FrustrationRiskThreshold   float64 `yaml:"frustration_risk_threshold"` // 0.0-1.0
+	LearningEnabled            bool    `yaml:"learning_enabled"`
+	TrackSatisfaction          bool    `yaml:"track_satisfaction"`
 }
 
 // DecisionConfig defines the decision engine parameters.
 type DecisionConfig struct {
-	SuccessSignalThreshold       float64 `yaml:"success_signal_threshold"`
-	FailureSignalThreshold       float64 `yaml:"failure_signal_threshold"`
-	TokenErrorThreshold          float64 `yaml:"token_error_threshold"` // percent
-	AutoEscalateOnFrustration    bool    `yaml:"auto_escalate_on_frustration"`
-	MaxAttemptsBeforeOpus        int     `yaml:"max_attempts_before_opus"`
+	SuccessSignalThreshold    float64 `yaml:"success_signal_threshold"`
+	FailureSignalThreshold    float64 `yaml:"failure_signal_threshold"`
+	TokenErrorThreshold       float64 `yaml:"token_error_threshold"` // percent
+	AutoEscalateOnFrustration bool    `yaml:"auto_escalate_on_frustration"`
+	MaxAttemptsBeforeOpus     int     `yaml:"max_attempts_before_opus"`
 }
 
 // DisplayConfig defines statusline display options.
 type DisplayConfig struct {
-	DisplayModel              bool `yaml:"display_model"`
-	DisplayEffort             bool `yaml:"display_effort"`
-	DisplayTokens             bool `yaml:"display_tokens"`
-	DisplaySentiment          bool `yaml:"display_sentiment"`
-	DisplayBudgetRemaining    bool `yaml:"display_budget_remaining"`
-	RefreshIntervalMs         int  `yaml:"refresh_interval_ms"`
+	DisplayModel           bool `yaml:"display_model"`
+	DisplayEffort          bool `yaml:"display_effort"`
+	DisplayTokens          bool `yaml:"display_tokens"`
+	DisplaySentiment       bool `yaml:"display_sentiment"`
+	DisplayBudgetRemaining bool `yaml:"display_budget_remaining"`
+	RefreshIntervalMs      int  `yaml:"refresh_interval_ms"`
 }
 
 // LoggingConfig defines logging parameters.
 type LoggingConfig struct {
-	Level          string `yaml:"level"`  // debug, info, warn, error
-	File           string `yaml:"file"`
-	RetentionDays  int    `yaml:"retention_days"`
+	Level         string `yaml:"level"` // debug, info, warn, error
+	File          string `yaml:"file"`
+	RetentionDays int    `yaml:"retention_days"`
 }
 
 // LoadEscalationConfig loads configuration from ~/.claude/escalation/config.yaml
@@ -155,13 +155,13 @@ func DefaultEscalationConfig() *EscalationConfig {
 				"haiku":  0, // unlimited
 			},
 			TaskTypeBudgets: map[string]int{
-				"concurrency":    5000,
-				"parsing":        3000,
-				"debugging":      4000,
-				"architecture":   6000,
-				"optimization":   5000,
-				"testing":        4000,
-				"security":       5000,
+				"concurrency":  5000,
+				"parsing":      3000,
+				"debugging":    4000,
+				"architecture": 6000,
+				"optimization": 5000,
+				"testing":      4000,
+				"security":     5000,
 			},
 			AlertThresholds: map[string]float64{
 				"warn_low":  0.50,

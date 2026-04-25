@@ -77,15 +77,15 @@ func (bs *BaristaSource) Poll() (StatuslineData, error) {
 	defer file.Close()
 
 	var baristaMetrics struct {
-		InputTokens        int     `json:"input_tokens"`
-		OutputTokens       int     `json:"output_tokens"`
-		CacheHitTokens     int     `json:"cache_hit_tokens"`
+		InputTokens         int     `json:"input_tokens"`
+		OutputTokens        int     `json:"output_tokens"`
+		CacheHitTokens      int     `json:"cache_hit_tokens"`
 		CacheCreationTokens int     `json:"cache_creation_tokens"`
-		ContextUsage       int     `json:"context_usage_percent"`
-		Model              string  `json:"model"`
-		IsCaching          bool    `json:"is_caching"`
-		CachePercent       float64 `json:"cache_fill_percent"`
-		UpdatedAt          string  `json:"updated_at"`
+		ContextUsage        int     `json:"context_usage_percent"`
+		Model               string  `json:"model"`
+		IsCaching           bool    `json:"is_caching"`
+		CachePercent        float64 `json:"cache_fill_percent"`
+		UpdatedAt           string  `json:"updated_at"`
 	}
 
 	if err := json.NewDecoder(file).Decode(&baristaMetrics); err != nil {

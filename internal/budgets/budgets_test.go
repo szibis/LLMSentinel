@@ -125,14 +125,14 @@ func TestWarningLevels(t *testing.T) {
 	}
 
 	tests := []struct {
-		dailyUsed        float64
-		requestCost      float64
-		expectedWarning  int
+		dailyUsed       float64
+		requestCost     float64
+		expectedWarning int
 	}{
-		{2.0, 1.0, 0},    // 30% - no warning
-		{5.0, 0.5, 1},    // 55% - low warning
-		{7.5, 0.5, 2},    // 80% - medium warning
-		{9.0, 0.5, 3},    // 95% - high warning
+		{2.0, 1.0, 0}, // 30% - no warning
+		{5.0, 0.5, 1}, // 55% - low warning
+		{7.5, 0.5, 2}, // 80% - medium warning
+		{9.0, 0.5, 3}, // 95% - high warning
 	}
 
 	for _, tt := range tests {

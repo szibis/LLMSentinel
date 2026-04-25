@@ -21,10 +21,10 @@ type AnalyticsRecord struct {
 
 // Phase1Data captures pre-response estimation.
 type Phase1Data struct {
-	Prompt           string
-	TaskType         string
-	DetectedEffort   string // low, medium, high
-	Complexity       float64
+	Prompt            string
+	TaskType          string
+	DetectedEffort    string // low, medium, high
+	Complexity        float64
 	SentimentBaseline string
 
 	EstimatedInputTokens  int
@@ -32,9 +32,9 @@ type Phase1Data struct {
 	EstimatedTotalTokens  int
 	EstimatedCostUSD      float64
 
-	RoutedModel    string
-	RoutingReason  string
-	Confidence     float64
+	RoutedModel   string
+	RoutingReason string
+	Confidence    float64
 
 	BudgetCheck struct {
 		WithinBudget bool
@@ -46,11 +46,11 @@ type Phase1Data struct {
 
 // Phase2Data captures real-time metrics during generation.
 type Phase2Data struct {
-	InputTokensUsed  int
-	OutputTokensSoFar int
-	TotalSoFar       int
+	InputTokensUsed    int
+	OutputTokensSoFar  int
+	TotalSoFar         int
 	EstimatedRemaining int
-	Trend            string // ON_TRACK, TRENDING_OVER, TRENDING_UNDER
+	Trend              string // ON_TRACK, TRENDING_OVER, TRENDING_UNDER
 
 	SentimentDuring struct {
 		UserPausing      bool
@@ -69,12 +69,12 @@ type Phase2Data struct {
 
 // Phase3Data captures post-response validation and learning.
 type Phase3Data struct {
-	ActualInputTokens   int
-	ActualOutputTokens  int
-	ActualCacheHitTokens int
+	ActualInputTokens         int
+	ActualOutputTokens        int
+	ActualCacheHitTokens      int
 	ActualCacheCreationTokens int
-	ActualTotalTokens   int
-	ActualCostUSD       float64
+	ActualTotalTokens         int
+	ActualCostUSD             float64
 
 	Accuracy struct {
 		EstimatedTotal int
@@ -84,19 +84,19 @@ type Phase3Data struct {
 	}
 
 	UserSentiment struct {
-		ExplicitSignal string // success, failure, none
-		ExplicitText   string
-		SignalConfidence float64
-		ImplicitSentiment string
+		ExplicitSignal      string // success, failure, none
+		ExplicitText        string
+		SignalConfidence    float64
+		ImplicitSentiment   string
 		FrustrationDetected bool
-		TimeToSignal   time.Duration
+		TimeToSignal        time.Duration
 	}
 
 	BudgetImpact struct {
-		DailyUsedTotal float64
-		DailyRemaining float64
-		SessionUsed    int
-		SessionRemaining int
+		DailyUsedTotal    float64
+		DailyRemaining    float64
+		SessionUsed       int
+		SessionRemaining  int
 		CostUnderEstimate float64
 	}
 
@@ -109,8 +109,8 @@ type Phase3Data struct {
 	}
 
 	Learning struct {
-		TaskType               string
-		InitialModel           string
+		TaskType              string
+		InitialModel          string
 		UserSentimentFinal    string
 		TokensUsed            int
 		Success               bool
@@ -121,32 +121,32 @@ type Phase3Data struct {
 
 // SentimentTrend tracks sentiment patterns over time.
 type SentimentTrend struct {
-	Period     string    // "24h", "7d", "30d"
-	Timestamp  time.Time
-	Summary    SentimentSummary
-	Events     []FrustrationEvent
-	Timeline   []SentimentTimeslot
+	Period    string // "24h", "7d", "30d"
+	Timestamp time.Time
+	Summary   SentimentSummary
+	Events    []FrustrationEvent
+	Timeline  []SentimentTimeslot
 }
 
 // SentimentSummary aggregates sentiment counts.
 type SentimentSummary struct {
-	Satisfied     int
-	Neutral       int
-	Frustrated    int
-	Confused      int
-	Impatient     int
-	Total         int
+	Satisfied        int
+	Neutral          int
+	Frustrated       int
+	Confused         int
+	Impatient        int
+	Total            int
 	SatisfactionRate float64
 }
 
 // FrustrationEvent records when frustration was detected.
 type FrustrationEvent struct {
-	Timestamp    time.Time
-	Sentiment    string
-	TaskType     string
-	InitialModel string
-	EscalatedTo  string
-	Resolved     bool
+	Timestamp      time.Time
+	Sentiment      string
+	TaskType       string
+	InitialModel   string
+	EscalatedTo    string
+	Resolved       bool
 	ResolutionTime time.Duration
 }
 
@@ -162,25 +162,25 @@ type SentimentTimeslot struct {
 
 // BudgetStatus tracks spending against limits.
 type BudgetStatus struct {
-	Timestamp      time.Time
-	Period         string // "daily", "monthly"
+	Timestamp time.Time
+	Period    string // "daily", "monthly"
 
 	DailyBudget struct {
-		Limit       float64
-		Used        float64
-		Remaining   float64
-		Percentage  float64
-		Projected   float64
-		Warning     string
+		Limit      float64
+		Used       float64
+		Remaining  float64
+		Percentage float64
+		Projected  float64
+		Warning    string
 	}
 
 	MonthlyBudget struct {
-		Limit       float64
-		Used        float64
-		Remaining   float64
-		Percentage  float64
-		DaysLeft    int
-		Projected   float64
+		Limit      float64
+		Used       float64
+		Remaining  float64
+		Percentage float64
+		DaysLeft   int
+		Projected  float64
 	}
 
 	ModelUsage map[string]struct {
@@ -201,11 +201,11 @@ type ModelSatisfaction struct {
 
 // CostOptimization suggests ways to reduce spending.
 type CostOptimization struct {
-	TaskType         string
-	CurrentModel     string
-	CurrentSatisfaction float64
-	RecommendedModel string
+	TaskType                string
+	CurrentModel            string
+	CurrentSatisfaction     float64
+	RecommendedModel        string
 	RecommendedSatisfaction float64
-	EstimatedSavings float64
-	SavingsPercent   float64
+	EstimatedSavings        float64
+	SavingsPercent          float64
 }

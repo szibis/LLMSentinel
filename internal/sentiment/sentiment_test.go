@@ -9,44 +9,44 @@ func TestDetectFrustration(t *testing.T) {
 	detector := NewDetector()
 
 	tests := []struct {
-		name            string
-		prompt          string
-		isFollowUp      bool
-		timeSincePrompt time.Duration
+		name               string
+		prompt             string
+		isFollowUp         bool
+		timeSincePrompt    time.Duration
 		shouldBeFrustrated bool
-		minRisk         float64
+		minRisk            float64
 	}{
 		{
-			name:            "Clear frustration keyword",
-			prompt:          "still broken, why isn't this working?",
-			isFollowUp:      false,
-			timeSincePrompt: 0,
+			name:               "Clear frustration keyword",
+			prompt:             "still broken, why isn't this working?",
+			isFollowUp:         false,
+			timeSincePrompt:    0,
 			shouldBeFrustrated: true,
-			minRisk:         0.25,
+			minRisk:            0.25,
 		},
 		{
-			name:            "Frustration with broken keyword",
-			prompt:          "this is broken",
-			isFollowUp:      false,
-			timeSincePrompt: 0,
+			name:               "Frustration with broken keyword",
+			prompt:             "this is broken",
+			isFollowUp:         false,
+			timeSincePrompt:    0,
 			shouldBeFrustrated: true,
-			minRisk:         0.25,
+			minRisk:            0.25,
 		},
 		{
-			name:            "Neutral prompt",
-			prompt:          "explain how context works",
-			isFollowUp:      false,
-			timeSincePrompt: 0,
+			name:               "Neutral prompt",
+			prompt:             "explain how context works",
+			isFollowUp:         false,
+			timeSincePrompt:    0,
 			shouldBeFrustrated: false,
-			minRisk:         0.0,
+			minRisk:            0.0,
 		},
 		{
-			name:            "Success signal",
-			prompt:          "perfect! this works exactly",
-			isFollowUp:      false,
-			timeSincePrompt: 0,
+			name:               "Success signal",
+			prompt:             "perfect! this works exactly",
+			isFollowUp:         false,
+			timeSincePrompt:    0,
 			shouldBeFrustrated: false,
-			minRisk:         0.0,
+			minRisk:            0.0,
 		},
 	}
 
@@ -73,10 +73,10 @@ func TestDetectSentiments(t *testing.T) {
 	detector := NewDetector()
 
 	tests := []struct {
-		name           string
-		prompt         string
-		expectedType   Sentiment
-		shouldDetect   bool
+		name         string
+		prompt       string
+		expectedType Sentiment
+		shouldDetect bool
 	}{
 		{
 			name:         "Satisfied sentiment",

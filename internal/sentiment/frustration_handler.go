@@ -6,18 +6,18 @@ import (
 
 // Decision represents a routing decision based on sentiment.
 type Decision struct {
-	Action          string  // "escalate", "de-escalate", "adjust_effort", "continue"
-	NextModel       string  // haiku, sonnet, opus
-	NextEffort      string  // low, medium, high
+	Action          string // "escalate", "de-escalate", "adjust_effort", "continue"
+	NextModel       string // haiku, sonnet, opus
+	NextEffort      string // low, medium, high
 	Rationale       string
 	Confidence      float64
-	Warning         string  // Optional warning to user
-	ShouldInterrupt bool    // If true, stop current operation
+	Warning         string // Optional warning to user
+	ShouldInterrupt bool   // If true, stop current operation
 }
 
 // FrustrationHandler makes escalation decisions based on sentiment.
 type FrustrationHandler struct {
-	sentimentDetector *Detector
+	sentimentDetector     *Detector
 	maxAttemptsBeforeOpus int
 }
 
@@ -36,7 +36,6 @@ func (fh *FrustrationHandler) HandleFrustration(
 	attemptCount int,
 	taskType string,
 ) *Decision {
-
 	// If frustration risk is high, escalate immediately
 	if sentiment.FrustrationRisk > 0.70 {
 		return fh.escalateOnFrustration(sentiment, currentModel, attemptCount, taskType)
@@ -76,7 +75,6 @@ func (fh *FrustrationHandler) escalateOnFrustration(
 	attemptCount int,
 	taskType string,
 ) *Decision {
-
 	// Already on Opus? No further escalation possible
 	if currentModel == "opus" {
 		return nil
@@ -143,7 +141,6 @@ func (fh *FrustrationHandler) ShouldDeEscalate(
 	currentModel string,
 	budgetPercentageUsed float64,
 ) *Decision {
-
 	// Must be successful and have positive sentiment
 	if !taskWasSuccess || sentiment.Primary != SentimentSatisfied {
 		return nil

@@ -10,22 +10,22 @@ import (
 type Sentiment string
 
 const (
-	SentimentSatisfied  Sentiment = "satisfied"   // Success + happy
-	SentimentFrustrated Sentiment = "frustrated"  // Failure + angry
-	SentimentConfused   Sentiment = "confused"    // Questions, clarity needed
-	SentimentImpatient  Sentiment = "impatient"   // Time pressure, repeated requests
-	SentimentCautious   Sentiment = "cautious"    // Careful, slow approach
-	SentimentNeutral    Sentiment = "neutral"     // No emotion signal
+	SentimentSatisfied  Sentiment = "satisfied"  // Success + happy
+	SentimentFrustrated Sentiment = "frustrated" // Failure + angry
+	SentimentConfused   Sentiment = "confused"   // Questions, clarity needed
+	SentimentImpatient  Sentiment = "impatient"  // Time pressure, repeated requests
+	SentimentCautious   Sentiment = "cautious"   // Careful, slow approach
+	SentimentNeutral    Sentiment = "neutral"    // No emotion signal
 )
 
 // Score represents sentiment analysis result.
 type Score struct {
-	Primary          Sentiment
-	Confidence       float64 // 0.0-1.0
-	FrustrationRisk  float64 // 0.0-1.0 (separate dimension)
-	Sources          []string
-	Details          string
-	Timestamp        time.Time
+	Primary         Sentiment
+	Confidence      float64 // 0.0-1.0
+	FrustrationRisk float64 // 0.0-1.0 (separate dimension)
+	Sources         []string
+	Details         string
+	Timestamp       time.Time
 }
 
 // Detector analyzes prompts for sentiment signals.
@@ -80,9 +80,9 @@ func NewDetector() *Detector {
 // Detect analyzes prompt for sentiment signals.
 func (d *Detector) Detect(prompt string, isFollowUp bool, timeSinceLastPrompt time.Duration) Score {
 	score := Score{
-		Primary:   SentimentNeutral,
+		Primary:    SentimentNeutral,
 		Confidence: 0.5,
-		Timestamp: time.Now(),
+		Timestamp:  time.Now(),
 	}
 
 	promptLower := strings.ToLower(prompt)
@@ -93,7 +93,7 @@ func (d *Detector) Detect(prompt string, isFollowUp bool, timeSinceLastPrompt ti
 	for sentiment, patternList := range d.patterns {
 		for _, pattern := range patternList {
 			if pattern.MatchString(prompt) {
-				sentimentScores[sentiment] += 0.5  // Simple weight
+				sentimentScores[sentiment] += 0.5 // Simple weight
 				if sentiment == SentimentFrustrated || sentiment == SentimentConfused {
 					score.FrustrationRisk += 0.25
 				}
@@ -166,7 +166,7 @@ func (d *Detector) IsEscalateCommand(prompt string) (bool, string) {
 	escalatePattern := regexp.MustCompile(`^/escalate(?:\s+to\s+(\w+))?`)
 	matches := escalatePattern.FindStringSubmatch(strings.TrimSpace(prompt))
 	if len(matches) > 0 {
-		target := "sonnet"  // default
+		target := "sonnet" // default
 		if len(matches) > 1 && matches[1] != "" {
 			target = matches[1]
 		}
