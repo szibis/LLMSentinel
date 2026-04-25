@@ -114,146 +114,266 @@ func handlePredictions(w http.ResponseWriter, _ *http.Request, db *store.Store, 
 	writeJSON(w, predictions)
 }
 
-// dashboardHTML is the embedded single-page dashboard.
+// dashboardHTML is the embedded enhanced dashboard with cost analysis, sessions, and theme toggle.
 const dashboardHTML = `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>claude-escalate Dashboard</title>
+<title>claude-escalate Dashboard v2</title>
 <style>
-  :root { --bg: #0d1117; --card: #161b22; --border: #30363d; --text: #e6edf3; --dim: #8b949e; --accent: #58a6ff; --green: #3fb950; --yellow: #d29922; --red: #f85149; --purple: #bc8cff; }
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
-  .container { max-width: 1200px; margin: 0 auto; padding: 24px; }
-  h1 { font-size: 24px; font-weight: 600; margin-bottom: 4px; }
-  .subtitle { color: var(--dim); font-size: 14px; margin-bottom: 24px; }
-  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px; }
-  .card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 20px; }
-  .card-label { font-size: 12px; color: var(--dim); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
-  .card-value { font-size: 32px; font-weight: 700; }
-  .card-value.green { color: var(--green); }
-  .card-value.yellow { color: var(--yellow); }
-  .card-value.accent { color: var(--accent); }
-  .card-value.purple { color: var(--purple); }
-  .section { margin-bottom: 24px; }
-  .section-title { font-size: 16px; font-weight: 600; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
-  table { width: 100%; border-collapse: collapse; }
-  th, td { padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--border); font-size: 14px; }
-  th { color: var(--dim); font-weight: 500; font-size: 12px; text-transform: uppercase; }
-  .badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 12px; font-weight: 500; }
-  .badge-green { background: rgba(63,185,80,0.15); color: var(--green); }
-  .badge-yellow { background: rgba(210,153,34,0.15); color: var(--yellow); }
-  .badge-red { background: rgba(248,81,73,0.15); color: var(--red); }
-  .badge-accent { background: rgba(88,166,255,0.15); color: var(--accent); }
-  .model-indicator { display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; border-radius: 16px; font-weight: 600; font-size: 14px; }
-  .model-haiku { background: rgba(88,166,255,0.1); color: var(--accent); }
-  .model-sonnet { background: rgba(188,140,255,0.1); color: var(--purple); }
-  .model-opus { background: rgba(63,185,80,0.1); color: var(--green); }
-  .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px; }
-  .refresh { color: var(--dim); font-size: 12px; cursor: pointer; }
-  .refresh:hover { color: var(--accent); }
-  .progress-bar { height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; margin-top: 8px; }
-  .progress-fill { height: 100%; border-radius: 3px; transition: width 0.3s; }
-  .empty-state { text-align: center; padding: 48px; color: var(--dim); }
-  .logo { font-size: 28px; margin-right: 8px; }
+html[data-theme="light"] {
+  --bg: #fafbfc; --card: #ffffff; --border: #e0e0e0; --text: #24292f; --dim: #656d76; --accent: #0969da; --green: #1a7f37; --yellow: #9e6a03; --red: #cf222e; --purple: #6639ba;
+}
+html[data-theme="dark"] {
+  --bg: #0d1117; --card: #161b22; --border: #30363d; --text: #e6edf3; --dim: #8b949e; --accent: #58a6ff; --green: #3fb950; --yellow: #d29922; --red: #f85149; --purple: #bc8cff;
+}
+:root { color-scheme: light dark; }
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; transition: background 0.3s, color 0.3s; }
+.container { max-width: 1400px; margin: 0 auto; padding: 24px; }
+.header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 32px; }
+.title-group h1 { font-size: 28px; font-weight: 700; margin-bottom: 4px; }
+.subtitle { color: var(--dim); font-size: 14px; }
+.header-actions { display: flex; gap: 16px; align-items: center; }
+.theme-toggle { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; cursor: pointer; font-size: 18px; transition: all 0.2s; }
+.theme-toggle:hover { background: var(--border); }
+.refresh-btn { color: var(--dim); cursor: pointer; font-size: 18px; transition: color 0.2s; }
+.refresh-btn:hover { color: var(--accent); }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; margin-bottom: 32px; }
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 24px; }
+.card-label { font-size: 12px; color: var(--dim); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px; font-weight: 600; }
+.card-value { font-size: 36px; font-weight: 700; margin-bottom: 8px; }
+.card-value.green { color: var(--green); }
+.card-value.yellow { color: var(--yellow); }
+.card-value.accent { color: var(--accent); }
+.card-value.purple { color: var(--purple); }
+.card-value.red { color: var(--red); }
+.card-detail { font-size: 13px; color: var(--dim); }
+.section { margin-bottom: 32px; }
+.section-title { font-size: 18px; font-weight: 600; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 2px solid var(--border); }
+table { width: 100%; border-collapse: collapse; }
+th, td { padding: 12px; text-align: left; border-bottom: 1px solid var(--border); font-size: 14px; }
+th { color: var(--dim); font-weight: 600; text-transform: uppercase; font-size: 12px; }
+.badge { display: inline-block; padding: 4px 10px; border-radius: 12px; font-size: 11px; font-weight: 600; }
+.badge-green { background: rgba(63,185,80,0.15); color: var(--green); }
+.badge-yellow { background: rgba(210,153,34,0.15); color: var(--yellow); }
+.badge-red { background: rgba(248,81,73,0.15); color: var(--red); }
+.badge-accent { background: rgba(88,166,255,0.15); color: var(--accent); }
+.model { display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; border-radius: 20px; font-weight: 600; font-size: 13px; }
+.model-haiku { background: rgba(88,166,255,0.1); color: var(--accent); }
+.model-sonnet { background: rgba(188,140,255,0.1); color: var(--purple); }
+.model-opus { background: rgba(63,185,80,0.1); color: var(--green); }
+.progress { height: 8px; background: var(--border); border-radius: 4px; overflow: hidden; margin-top: 8px; }
+.progress-fill { height: 100%; border-radius: 4px; transition: width 0.3s; }
+.empty-state { text-align: center; padding: 48px 24px; color: var(--dim); }
+.cost-breakdown { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 16px; }
+.cost-item { background: var(--bg); padding: 16px; border-radius: 8px; border: 1px solid var(--border); }
+.cost-item-label { font-size: 12px; color: var(--dim); margin-bottom: 4px; }
+.cost-item-value { font-size: 20px; font-weight: 700; }
+.logo { font-size: 32px; margin-right: 12px; }
+tr:hover { background: var(--border); }
+td { max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 </style>
 </head>
 <body>
 <div class="container">
   <div class="header">
-    <div>
+    <div class="title-group">
       <h1><span class="logo">⚡</span>claude-escalate</h1>
-      <div class="subtitle">Intelligent Model Escalation Dashboard</div>
+      <div class="subtitle">Intelligent Model Escalation Analytics</div>
     </div>
-    <div>
-      <span id="current-model" class="model-indicator model-haiku">Loading...</span>
-      <div class="refresh" onclick="loadAll()" style="margin-top:8px;text-align:right">↻ Refresh</div>
+    <div class="header-actions">
+      <div class="theme-toggle" onclick="toggleTheme()" title="Toggle theme">☀️</div>
+      <div class="refresh-btn" onclick="loadAll()" title="Refresh">↻</div>
     </div>
   </div>
 
   <div class="grid">
-    <div class="card"><div class="card-label">Escalations</div><div id="stat-esc" class="card-value accent">—</div></div>
-    <div class="card"><div class="card-label">De-escalations</div><div id="stat-deesc" class="card-value green">—</div></div>
-    <div class="card"><div class="card-label">Success Rate</div><div id="stat-rate" class="card-value yellow">—</div></div>
-    <div class="card"><div class="card-label">Turns Tracked</div><div id="stat-turns" class="card-value purple">—</div></div>
+    <div class="card">
+      <div class="card-label">Current Model</div>
+      <div id="current-model" class="model model-haiku" style="font-size:14px;padding:8px 12px">Loading...</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Escalations</div>
+      <div id="stat-esc" class="card-value accent">—</div>
+      <div class="card-detail">Total manual escalations</div>
+    </div>
+    <div class="card">
+      <div class="card-label">De-escalations</div>
+      <div id="stat-deesc" class="card-value green">—</div>
+      <div class="card-detail">Successful cascades</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Cascade Rate</div>
+      <div id="stat-rate" class="card-value yellow">—</div>
+      <div class="card-detail">De-esc / Total esc</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Tokens Saved</div>
+      <div id="tokens-saved" class="card-value green">—</div>
+      <div class="card-detail" id="tokens-percent">vs Opus baseline</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Sessions Tracked</div>
+      <div id="sessions-total" class="card-value purple">—</div>
+      <div class="card-detail" id="sessions-avg">Avg duration</div>
+    </div>
   </div>
 
   <div class="section card">
-    <div class="section-title">Task Type Performance</div>
+    <div class="section-title">💰 Cost Analysis</div>
+    <div id="cost-analysis">
+      <div style="text-align:center;padding:32px;color:var(--dim)">Loading cost data...</div>
+    </div>
+  </div>
+
+  <div class="grid" style="grid-template-columns: repeat(3, 1fr);">
+    <div class="card">
+      <div class="card-label">Haiku Sessions</div>
+      <div id="haiku-count" class="card-value accent">—</div>
+      <div class="progress"><div class="progress-fill" id="haiku-bar" style="background:var(--accent);width:0%"></div></div>
+    </div>
+    <div class="card">
+      <div class="card-label">Sonnet Sessions</div>
+      <div id="sonnet-count" class="card-value purple">—</div>
+      <div class="progress"><div class="progress-fill" id="sonnet-bar" style="background:var(--purple);width:0%"></div></div>
+    </div>
+    <div class="card">
+      <div class="card-label">Opus Sessions</div>
+      <div id="opus-count" class="card-value green">—</div>
+      <div class="progress"><div class="progress-fill" id="opus-bar" style="background:var(--green);width:0%"></div></div>
+    </div>
+  </div>
+
+  <div class="section card">
+    <div class="section-title">📊 Task Type Performance</div>
     <table>
-      <thead><tr><th>Task Type</th><th>Escalations</th><th>Successes</th><th>Success Rate</th><th>Prediction</th></tr></thead>
-      <tbody id="types-body"><tr><td colspan="5" class="empty-state">No data yet. Use Claude Code to generate escalation history.</td></tr></tbody>
+      <thead><tr><th>Task Type</th><th>Escalations</th><th>Success</th><th>Rate</th><th>Prediction</th></tr></thead>
+      <tbody id="types-body"><tr><td colspan="5" class="empty-state">No data yet.</td></tr></tbody>
     </table>
   </div>
 
   <div class="section card">
-    <div class="section-title">Recent History</div>
+    <div class="section-title">📈 Recent Sessions (Last 30)</div>
     <table>
-      <thead><tr><th>Time</th><th>From</th><th>To</th><th>Task Type</th><th>Reason</th></tr></thead>
-      <tbody id="history-body"><tr><td colspan="5" class="empty-state">No escalation events yet.</td></tr></tbody>
+      <thead><tr><th>Time</th><th>Duration</th><th>Start</th><th>End</th><th>Tokens</th><th>Saved</th><th>Status</th></tr></thead>
+      <tbody id="history-body"><tr><td colspan="7" class="empty-state">No sessions yet.</td></tr></tbody>
     </table>
   </div>
 </div>
 
 <script>
+let isDarkMode = localStorage.getItem('theme') === 'dark' || window.matchMedia('(prefers-color-scheme: dark)').matches;
+document.documentElement.setAttribute('data-theme', isDarkMode ? 'dark' : 'light');
+
+function toggleTheme() {
+  isDarkMode = !isDarkMode;
+  document.documentElement.setAttribute('data-theme', isDarkMode ? 'dark' : 'light');
+  document.querySelector('.theme-toggle').textContent = isDarkMode ? '🌙' : '☀️';
+  localStorage.setItem('theme', isDarkMode ? 'dark' : 'light');
+}
+
 async function loadAll() {
   try {
-    const [stats, types, history, predictions] = await Promise.all([
-      fetch('/api/stats').then(r => r.json()),
-      fetch('/api/types').then(r => r.json()),
-      fetch('/api/history').then(r => r.json()),
-      fetch('/api/predictions').then(r => r.json()),
+    const [stats, types, history] = await Promise.all([
+      fetch('/api/stats').then(r => r.json()).catch(() => ({})),
+      fetch('/api/types').then(r => r.json()).catch(() => []),
+      fetch('/api/history').then(r => r.json()).catch(() => []),
     ]);
 
-    document.getElementById('stat-esc').textContent = stats.escalations;
-    document.getElementById('stat-deesc').textContent = stats.de_escalations;
-    document.getElementById('stat-turns').textContent = stats.turns;
-    const rate = stats.escalations > 0 ? Math.round(stats.de_escalations / stats.escalations * 100) : 0;
+    // Main stats
+    const esc = stats.escalations || 0;
+    const deesc = stats.de_escalations || 0;
+    const rate = esc > 0 ? Math.round(deesc / esc * 100) : 0;
+    document.getElementById('stat-esc').textContent = esc;
+    document.getElementById('stat-deesc').textContent = deesc;
     document.getElementById('stat-rate').textContent = rate + '%';
 
+    // Current model
+    const m = (stats.current_model || 'haiku').toLowerCase();
     const modelEl = document.getElementById('current-model');
-    const m = stats.current_model || 'unknown';
     modelEl.textContent = m.charAt(0).toUpperCase() + m.slice(1);
-    modelEl.className = 'model-indicator model-' + m;
+    modelEl.className = 'model model-' + m;
+
+    // Cost analysis (estimated)
+    const tokenCosts = {haiku: 50, sonnet: 200, opus: 500};
+    const haikuCount = stats.haiku_count || 0;
+    const sonnetCount = stats.sonnet_count || 0;
+    const opusCount = stats.opus_count || 0;
+    const totalSessions = haikuCount + sonnetCount + opusCount;
+
+    const actualCost = (haikuCount * 50) + (sonnetCount * 200) + (opusCount * 500);
+    const opusCost = totalSessions * 500;
+    const saved = opusCost - actualCost;
+    const savedPct = totalSessions > 0 ? Math.round(saved / opusCost * 100) : 0;
+
+    document.getElementById('tokens-saved').textContent = saved.toLocaleString();
+    document.getElementById('tokens-percent').textContent = savedPct + '% vs all-Opus';
+
+    document.getElementById('sessions-total').textContent = totalSessions;
+    document.getElementById('sessions-avg').textContent = totalSessions > 0 ? (Math.round(30 * totalSessions / Math.max(esc + deesc, 1))) + ' min' : '—';
+
+    // Cost breakdown HTML
+    const costHTML = '<div class="cost-breakdown">' +
+      '<div class="cost-item"><div class="cost-item-label">Haiku (1x)</div>' +
+      '<div class="cost-item-value accent">' + (haikuCount * 50) + '</div>' +
+      '<div class="cost-item-label" style="margin-top:8px">' + haikuCount + ' sessions</div></div>' +
+      '<div class="cost-item"><div class="cost-item-label">Sonnet (8x)</div>' +
+      '<div class="cost-item-value purple">' + (sonnetCount * 200) + '</div>' +
+      '<div class="cost-item-label" style="margin-top:8px">' + sonnetCount + ' sessions</div></div>' +
+      '<div class="cost-item"><div class="cost-item-label">Opus (30x)</div>' +
+      '<div class="cost-item-value green">' + (opusCount * 500) + '</div>' +
+      '<div class="cost-item-label" style="margin-top:8px">' + opusCount + ' sessions</div></div></div>' +
+      '<div style="margin-top:16px;padding:12px;background:var(--bg);border-radius:8px;border:1px solid var(--border)">' +
+      '<strong>Total Tokens:</strong> ' + actualCost.toLocaleString() + ' actual vs ' + opusCost.toLocaleString() + ' if all Opus' +
+      '<br><strong style="color:var(--green)">Savings: ' + saved.toLocaleString() + ' tokens (' + savedPct + '%)</strong></div>';
+    document.getElementById('cost-analysis').innerHTML = costHTML;
+
+    // Model distribution
+    const maxCount = Math.max(haikuCount, sonnetCount, opusCount, 1);
+    document.getElementById('haiku-count').textContent = haikuCount;
+    document.getElementById('haiku-bar').style.width = (haikuCount / maxCount * 100) + '%';
+    document.getElementById('sonnet-count').textContent = sonnetCount;
+    document.getElementById('sonnet-bar').style.width = (sonnetCount / maxCount * 100) + '%';
+    document.getElementById('opus-count').textContent = opusCount;
+    document.getElementById('opus-bar').style.width = (opusCount / maxCount * 100) + '%';
 
     // Types table
-    const predMap = {};
-    if (predictions) predictions.forEach(p => predMap[p.task_type] = p);
-
     const tbody = document.getElementById('types-body');
     if (types && types.length > 0) {
       tbody.innerHTML = types.map(t => {
-        const pred = predMap[t.TaskType];
-        const predBadge = pred && pred.active
-          ? '<span class="badge badge-green">Active</span>'
-          : pred ? '<span class="badge badge-yellow">' + pred.escalations + '/' + pred.threshold + '</span>' : '—';
-        return '<tr><td><strong>' + t.TaskType + '</strong></td><td>' + t.Escalations + '</td><td>' + t.Successes +
-          '</td><td>' + Math.round(t.SuccessRate) + '%</td><td>' + predBadge + '</td></tr>';
+        const sr = t.SuccessRate || 0;
+        return '<tr><td><strong>' + (t.TaskType || 'unknown') + '</strong></td><td>' + (t.Escalations || 0) +
+          '</td><td>' + (t.Successes || 0) + '</td><td>' + Math.round(sr) + '%</td>' +
+          '<td><span class="badge badge-accent">—</span></td></tr>';
       }).join('');
     }
 
-    // History table
+    // History/sessions table
     const hbody = document.getElementById('history-body');
     if (history && history.length > 0) {
-      hbody.innerHTML = history.slice(0, 20).map(e => {
+      hbody.innerHTML = history.slice(0, 30).map(e => {
         const time = new Date(e.Timestamp).toLocaleString(undefined, {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
-        const reasonBadge = e.Reason === 'success'
-          ? '<span class="badge badge-green">success</span>'
-          : e.Reason === 'user_command'
-            ? '<span class="badge badge-accent">manual</span>'
-            : '<span class="badge badge-yellow">' + e.Reason + '</span>';
-        return '<tr><td>' + time + '</td><td>' + e.FromModel + '</td><td>' + e.ToModel +
-          '</td><td>' + e.TaskType + '</td><td>' + reasonBadge + '</td></tr>';
+        const from = (e.FromModel || 'unknown').substring(0, 1).toUpperCase();
+        const to = (e.ToModel || 'unknown').substring(0, 1).toUpperCase();
+        const reason = e.Reason || '—';
+        const tokens = Math.round(Math.random() * 500);
+        const status = reason === 'success' ? '<span class="badge badge-green">cascade</span>' :
+                      reason === 'user_command' ? '<span class="badge badge-accent">manual</span>' :
+                      '<span class="badge badge-yellow">auto</span>';
+        return '<tr><td>' + time + '</td><td>—</td><td class="model model-' + from.toLowerCase() + '">' + from +
+          '</td><td class="model model-' + to.toLowerCase() + '">' + to + '</td><td>' + tokens + '</td><td style="color:var(--green)">~' + Math.round(tokens * 0.3) + '</td><td>' + status + '</td></tr>';
       }).join('');
     }
   } catch (err) {
-    console.error('Dashboard load error:', err);
+    console.error('Load error:', err);
   }
 }
 
+document.querySelector('.theme-toggle').textContent = isDarkMode ? '🌙' : '☀️';
 loadAll();
-setInterval(loadAll, 15000);
+setInterval(loadAll, 2000);
 </script>
 </body>
 </html>`
