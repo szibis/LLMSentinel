@@ -153,7 +153,7 @@ func (d *Detector) matchPatterns(text string, patterns []Pattern) Signal {
 				bestSignal.Confidence = p.confidence
 				bestSignal.Pattern = p.name
 				// Determine signal type from pattern group
-				bestSignal.Type = d.patternToSignalType(patterns, p)
+				bestSignal.Type = d.patternToSignalType(p)
 			}
 		}
 	}
@@ -162,7 +162,7 @@ func (d *Detector) matchPatterns(text string, patterns []Pattern) Signal {
 }
 
 // patternToSignalType maps pattern group to signal type
-func (d *Detector) patternToSignalType(patterns []Pattern, p Pattern) SignalType {
+func (d *Detector) patternToSignalType(p Pattern) SignalType {
 	// Check which pattern group this pattern belongs to
 	for _, sp := range d.successPatterns {
 		if sp.name == p.name {

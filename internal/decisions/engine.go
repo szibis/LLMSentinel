@@ -67,7 +67,8 @@ func (e *Engine) MakeDecision(
 	// PRIORITY 2: Success signal + tokens are within target
 	if signal.Type == signals.SignalSuccess && signal.Confidence >= e.SuccessSignalThreshold {
 		// User is happy. Can we cascade down?
-		if validation.RoutedModel == "opus" {
+		switch validation.RoutedModel {
+		case "opus":
 			return Decision{
 				Action:           "cascade",
 				NextModel:        "sonnet",
@@ -76,7 +77,7 @@ func (e *Engine) MakeDecision(
 				Confidence:       signal.Confidence,
 				CascadeAvailable: true,
 			}
-		} else if validation.RoutedModel == "sonnet" {
+		case "sonnet":
 			return Decision{
 				Action:           "cascade",
 				NextModel:        "haiku",
@@ -95,7 +96,8 @@ func (e *Engine) MakeDecision(
 
 	// PRIORITY 3: Failure signal + current model insufficient
 	if signal.Type == signals.SignalFailure && signal.Confidence >= e.FailureSignalThreshold {
-		if validation.RoutedModel == "haiku" {
+		switch validation.RoutedModel {
+		case "haiku":
 			return Decision{
 				Action:            "escalate",
 				NextModel:         "sonnet",
@@ -104,7 +106,7 @@ func (e *Engine) MakeDecision(
 				Confidence:        signal.Confidence,
 				EscalateAvailable: true,
 			}
-		} else if validation.RoutedModel == "sonnet" {
+		case "sonnet":
 			return Decision{
 				Action:            "escalate",
 				NextModel:         "opus",
@@ -128,7 +130,8 @@ func (e *Engine) MakeDecision(
 		// If estimate was too low (used more tokens than predicted)
 		if tokenError > e.TokenErrorThreshold {
 			// Model was under-provisioned
-			if validation.RoutedModel == "haiku" {
+			switch validation.RoutedModel {
+			case "haiku":
 				return Decision{
 					Action:            "escalate",
 					NextModel:         "sonnet",
@@ -137,7 +140,7 @@ func (e *Engine) MakeDecision(
 					Confidence:        0.75,
 					EscalateAvailable: true,
 				}
-			} else if validation.RoutedModel == "sonnet" {
+			case "sonnet":
 				return Decision{
 					Action:            "escalate",
 					NextModel:         "opus",
@@ -152,7 +155,8 @@ func (e *Engine) MakeDecision(
 		// If estimate was too high (used fewer tokens than predicted)
 		if tokenError < -(e.TokenErrorThreshold) {
 			// Model was over-provisioned
-			if validation.RoutedModel == "opus" {
+			switch validation.RoutedModel {
+			case "opus":
 				return Decision{
 					Action:           "cascade",
 					NextModel:        "sonnet",
@@ -161,7 +165,7 @@ func (e *Engine) MakeDecision(
 					Confidence:       0.80,
 					CascadeAvailable: true,
 				}
-			} else if validation.RoutedModel == "sonnet" {
+			case "sonnet":
 				return Decision{
 					Action:           "cascade",
 					NextModel:        "haiku",
@@ -208,9 +212,10 @@ func (e *Engine) MakeDecision(
 
 // escalateByEffort returns a more capable model
 func (e *Engine) escalateByEffort(currentModel string) string {
-	if currentModel == "haiku" {
+	switch currentModel {
+	case "haiku":
 		return "sonnet"
-	} else if currentModel == "sonnet" {
+	case "sonnet":
 		return "opus"
 	}
 	return "opus"
@@ -218,9 +223,10 @@ func (e *Engine) escalateByEffort(currentModel string) string {
 
 // deescalateByEffort returns a cheaper model
 func (e *Engine) deescalateByEffort(currentModel string) string {
-	if currentModel == "opus" {
+	switch currentModel {
+	case "opus":
 		return "sonnet"
-	} else if currentModel == "sonnet" {
+	case "sonnet":
 		return "haiku"
 	}
 	return "haiku"
@@ -309,6 +315,6 @@ func roundFloat(value float64, decimals int) float64 {
 }
 
 func roundFloatStr(value float64, decimals int) string {
-	format := "%." + string(rune('0'+decimals)) + "f"
+	format := "%." + string(rune('0'+rune(decimals))) + "f"
 	return fmt.Sprintf(format, value)
 }
