@@ -315,6 +315,6 @@ func roundFloat(value float64, decimals int) float64 {
 }
 
 func roundFloatStr(value float64, decimals int) string {
-	format := "%." + string(rune('0'+rune(decimals))) + "f"
+	format := fmt.Sprintf("%%.%df", decimals)
 	return fmt.Sprintf(format, value)
 }
