@@ -684,8 +684,8 @@ type DetectSignalRequest struct {
 type DetectSignalResponse struct {
 	SignalType SignalType `json:"signal_type"`
 	Confidence float64    `json:"confidence"`
-	Pattern    string      `json:"pattern"`
-	Text       string      `json:"text"`
+	Pattern    string     `json:"pattern"`
+	Text       string     `json:"text"`
 }
 
 type SignalType string
@@ -731,7 +731,7 @@ func (s *Service) handleDetectSignal(w http.ResponseWriter, r *http.Request) {
 
 // Decision request/response types
 type MakeDecisionRequest struct {
-	ValidationID string      `json:"validation_id"`
+	ValidationID string               `json:"validation_id"`
 	Signal       DetectSignalResponse `json:"signal"`
 }
 
