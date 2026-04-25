@@ -21,7 +21,6 @@ linters:
     - misspell
     - nolintlint
     - stylecheck
-    - typecheck
     - unparam
     - whitespace
 
