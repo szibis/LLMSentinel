@@ -1,32 +1,113 @@
+version: '3.8'
+
 services:
+  # Main Claude Escalate service
   claude-escalate:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: claude-escalate
     ports:
-      - "8077:8077"
-    volumes:
-      - escalation-data:/data
+      - "9000:9000"     # Main HTTP service
+      - "9090:9090"     # Prometheus /metrics endpoint
     environment:
-      - ESCALATE_DATA_DIR=/data
+      LOG_LEVEL: info
+      CONFIG_FILE: /app/config/escalate.yaml
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector:4317"
+      OTEL_ENABLED: "true"
+    volumes:
+      - ./config:/app/config
+      - escalate-data:/root/.claude/data/escalation
+    depends_on:
+      - victoriametrics
+      - otel-collector
+    networks:
+      - monitoring
+    restart: unless-stopped
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:8077/api/health"]
-      interval: 10s
-      timeout: 3s
+      test: ["CMD", "curl", "-f", "http://localhost:9000/health"]
+      interval: 30s
+      timeout: 10s
       retries: 3
 
-  test-hook:
-    build: .
-    entrypoint: sh
+  # Lightweight Prometheus-compatible metrics database
+  victoriametrics:
+    image: victoriametrics/victoria-metrics:latest
+    container_name: victoriametrics
+    ports:
+      - "8428:8428"
+    volumes:
+      - vm-data:/storage
     command:
-      - -c
-      - |
-        echo '{"prompt":"test prompt"}' | /app/claude-escalate hook
-        echo '---'
-        /app/claude-escalate version
-        echo '---'
-        /app/claude-escalate stats summary
+      - "--storageDataPath=/storage"
+      - "--httpListenAddr=:8428"
+    networks:
+      - monitoring
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8428/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Grafana for dashboards and alerting
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_SECURITY_ADMIN_USER: admin
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_INSTALL_PLUGINS: "grafana-piechart-panel"
+    volumes:
+      - ./docker/grafana-datasources.yaml:/etc/grafana/provisioning/datasources/default.yaml
+      - ./docker/grafana-dashboards.yaml:/etc/grafana/provisioning/dashboards/default.yaml
+      - ./docker/dashboards:/var/lib/grafana/dashboards
+      - grafana-data:/var/lib/grafana
     depends_on:
-      claude-escalate:
-        condition: service_healthy
+      - victoriametrics
+    networks:
+      - monitoring
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # OpenTelemetry Collector (optional, for advanced routing)
+  otel-collector:
+    image: otel/opentelemetry-collector:latest
+    container_name: otel-collector
+    ports:
+      - "4317:4317"     # OTLP gRPC receiver
+      - "4318:4318"     # OTLP HTTP receiver
+    volumes:
+      - ./docker/otel-collector-config.yaml:/etc/otel-collector-config.yaml
+    command: ["--config=/etc/otel-collector-config.yaml"]
+    environment:
+      GOGC: "80"
+    networks:
+      - monitoring
+    depends_on:
+      - victoriametrics
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:13133/health/status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+networks:
+  monitoring:
+    driver: bridge
 
 volumes:
-  escalation-data:
+  escalate-data:
+    driver: local
+  vm-data:
+    driver: local
+  grafana-data:
+    driver: local
