@@ -20,9 +20,20 @@ func NewStore(db *sql.DB) *Store {
 // SaveRecord persists a complete analytics record.
 func (s *Store) SaveRecord(record AnalyticsRecord) error {
 	// Serialize Phase data as JSON
-	phase1JSON, _ := json.Marshal(record.Phase1)
-	phase2JSON, _ := json.Marshal(record.Phase2)
-	phase3JSON, _ := json.Marshal(record.Phase3)
+	phase1JSON, err := json.Marshal(record.Phase1)
+	if err != nil {
+		return fmt.Errorf("failed to marshal phase1 data: %w", err)
+	}
+
+	phase2JSON, err := json.Marshal(record.Phase2)
+	if err != nil {
+		return fmt.Errorf("failed to marshal phase2 data: %w", err)
+	}
+
+	phase3JSON, err := json.Marshal(record.Phase3)
+	if err != nil {
+		return fmt.Errorf("failed to marshal phase3 data: %w", err)
+	}
 
 	query := `
 		INSERT INTO analytics_records (
@@ -31,7 +42,7 @@ func (s *Store) SaveRecord(record AnalyticsRecord) error {
 		) VALUES (?, ?, ?, ?, ?)
 	`
 
-	_, err := s.db.Exec(query,
+	_, err = s.db.Exec(query,
 		record.ValidationID,
 		record.Timestamp,
 		string(phase1JSON),
@@ -84,9 +95,17 @@ func (s *Store) GetRecord(validationID string) (AnalyticsRecord, error) {
 	}
 
 	// Deserialize JSON
-	json.Unmarshal([]byte(phase1JSON), &record.Phase1)
-	json.Unmarshal([]byte(phase2JSON), &record.Phase2)
-	json.Unmarshal([]byte(phase3JSON), &record.Phase3)
+	if err := json.Unmarshal([]byte(phase1JSON), &record.Phase1); err != nil {
+		return record, fmt.Errorf("failed to unmarshal phase1 data: %w", err)
+	}
+
+	if err := json.Unmarshal([]byte(phase2JSON), &record.Phase2); err != nil {
+		return record, fmt.Errorf("failed to unmarshal phase2 data: %w", err)
+	}
+
+	if err := json.Unmarshal([]byte(phase3JSON), &record.Phase3); err != nil {
+		return record, fmt.Errorf("failed to unmarshal phase3 data: %w", err)
+	}
 
 	return record, nil
 }

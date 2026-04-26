@@ -60,6 +60,12 @@ Older guides (still valid):
 | **[DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md)** | 🌐 Production deployment |
 | **[TROUBLESHOOTING.md](TROUBLESHOOTING.md)** | 🔧 Common issues and fixes |
 
+## 👨‍💻 Developer Requirements
+
+- **Go 1.26.2** (required, enforced in `go.mod`)
+- **Development Guide**: See [CLAUDE.md](CLAUDE.md) for local setup, testing, and contributing guidelines
+- **Security**: See [docs/security/SECURITY.md](docs/security/SECURITY.md) for security considerations and remediation roadmap
+
 ## 🚀 Quick Start (3 minutes)
 
 ```bash

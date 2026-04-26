@@ -6,9 +6,11 @@ Thank you for considering contributing to claude-escalate! This document provide
 
 ### Prerequisites
 
-- Go 1.23+
+- **Go 1.26.2** (required, enforced in `go.mod`)
 - Docker (optional, for container testing)
-- golangci-lint (for linting)
+- golangci-lint (for linting, see [CLAUDE.md](CLAUDE.md) for Go 1.26.2 compatibility notes)
+
+**⚠️ Go Version Requirement**: This project requires Go 1.26.2. Do not use earlier versions. See [CLAUDE.md](CLAUDE.md) for detailed setup instructions and known issues.
 
 ### Getting Started
 
