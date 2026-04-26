@@ -71,10 +71,10 @@ func TestValidateWebhookURL_DNSRebinding(t *testing.T) {
 // the source when the URL fails validation.
 func TestNewWebhookSource_DisabledOnInvalid(t *testing.T) {
 	cases := []string{
-		"http://example.com/m",          // not https
-		"https://127.0.0.1/m",           // loopback
-		"https://169.254.169.254/m",     // metadata
-		"https://10.0.0.1/m",            // private
+		"http://example.com/m",      // not https
+		"https://127.0.0.1/m",       // loopback
+		"https://169.254.169.254/m", // metadata
+		"https://10.0.0.1/m",        // private
 	}
 	for _, u := range cases {
 		ws := NewWebhookSource(u, "")

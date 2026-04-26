@@ -26,7 +26,7 @@ type Service struct {
 
 // New creates a new service instance.
 func New(cfg *config.Config) (*Service, error) {
-	db, err := store.Open(cfg.DataDir)
+	db, err := store.Open(cfg.Gateway.DataDir)
 	if err != nil {
 		return nil, fmt.Errorf("opening database: %w", err)
 	}

@@ -10,7 +10,7 @@ import (
 // Forecast represents a predicted value with confidence interval.
 type Forecast struct {
 	Timestamp  time.Time `json:"timestamp"`
-	Point      float64   `json:"point"`      // Best estimate
+	Point      float64   `json:"point"`       // Best estimate
 	LowerBound float64   `json:"lower_bound"` // 95% CI lower
 	UpperBound float64   `json:"upper_bound"` // 95% CI upper
 }
@@ -173,11 +173,11 @@ func (fm *ForecastModel) DetectTrendChange(threshold float64) bool {
 // GetQuality returns model quality assessment.
 func (fm *ForecastModel) GetQuality() map[string]interface{} {
 	return map[string]interface{}{
-		"metric":    fm.Metric,
-		"rmse":      fm.RMSE,
-		"r_squared": fm.RSquared,
-		"slope":     fm.Slope,
-		"intercept": fm.Intercept,
+		"metric":          fm.Metric,
+		"rmse":            fm.RMSE,
+		"r_squared":       fm.RSquared,
+		"slope":           fm.Slope,
+		"intercept":       fm.Intercept,
 		"training_points": len(fm.DataPoints),
 	}
 }

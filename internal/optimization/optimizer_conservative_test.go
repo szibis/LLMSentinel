@@ -143,17 +143,17 @@ func TestConservative_RealDistributionPattern(t *testing.T) {
 	}
 
 	questions := []Question{
-		{"How do I authenticate?", 240},      // 24% of requests
-		{"How do I set up database?", 210},   // 21% of requests
-		{"How do I deploy?", 140},            // 14% of requests
+		{"How do I authenticate?", 240},        // 24% of requests
+		{"How do I set up database?", 210},     // 21% of requests
+		{"How do I deploy?", 140},              // 14% of requests
 		{"How do I optimize performance?", 95}, // 9.5%
-		{"How do I handle errors?", 65},      // 6.5%
-		{"How do I test my code?", 50},       // 5%
-		{"Unique question 1", 30},            // 3%
-		{"Unique question 2", 30},            // 3%
-		{"Unique question 3", 25},            // 2.5%
-		{"Unique question 4", 25},            // 2.5%
-		{"Random requests", 90},              // 9% (various unique)
+		{"How do I handle errors?", 65},        // 6.5%
+		{"How do I test my code?", 50},         // 5%
+		{"Unique question 1", 30},              // 3%
+		{"Unique question 2", 30},              // 3%
+		{"Unique question 3", 25},              // 2.5%
+		{"Unique question 4", 25},              // 2.5%
+		{"Random requests", 90},                // 9% (various unique)
 	}
 
 	totalRequests := 0
@@ -270,10 +270,10 @@ func TestConservative_MultiWeekCacheDegradation(t *testing.T) {
 	}
 
 	weeks := []WeekScenario{
-		{"Week 1 (Warmup)", 100, 0.05},      // Very low hit rate, building cache
-		{"Week 2 (Growth)", 100, 0.20},      // Cache warming up
-		{"Week 3 (Plateau)", 100, 0.25},     // Peak cache effectiveness
-		{"Week 4 (Expiry)", 100, 0.18},      // Some entries expiring
+		{"Week 1 (Warmup)", 100, 0.05},  // Very low hit rate, building cache
+		{"Week 2 (Growth)", 100, 0.20},  // Cache warming up
+		{"Week 3 (Plateau)", 100, 0.25}, // Peak cache effectiveness
+		{"Week 4 (Expiry)", 100, 0.18},  // Some entries expiring
 	}
 
 	weeklyBreakdown := make([]map[string]interface{}, 0)
@@ -322,14 +322,14 @@ func TestConservative_MultiWeekCacheDegradation(t *testing.T) {
 		weekSavingsPercent := (weekSavings / weekTotal) * 100
 
 		weeklyBreakdown = append(weeklyBreakdown, map[string]interface{}{
-			"week":                scenario.name,
-			"total_requests":      scenario.dailyRequests * 7,
-			"estimated_cost":      weekTotal,
-			"actual_cost":         weekActual,
-			"savings":             weekSavings,
-			"savings_percent":     weekSavingsPercent,
-			"cache_hit_rate":      actualHitRate,
-			"expected_hit_rate":   scenario.expectedHits * 100,
+			"week":              scenario.name,
+			"total_requests":    scenario.dailyRequests * 7,
+			"estimated_cost":    weekTotal,
+			"actual_cost":       weekActual,
+			"savings":           weekSavings,
+			"savings_percent":   weekSavingsPercent,
+			"cache_hit_rate":    actualHitRate,
+			"expected_hit_rate": scenario.expectedHits * 100,
 		})
 
 		t.Logf("Week %d (%s):\n", weekIdx+1, scenario.name)
@@ -375,10 +375,10 @@ func TestConservative_BudgetVariance(t *testing.T) {
 	// Expectation: System maintains service while respecting budget
 
 	type DayScenario struct {
-		budget            float64
-		targetRequests    int
-		expectedServed    int
-		expectedExceeded  bool
+		budget           float64
+		targetRequests   int
+		expectedServed   int
+		expectedExceeded bool
 	}
 
 	var days []DayScenario
@@ -744,26 +744,26 @@ func TestConservative_RealWorldBenchmark(t *testing.T) {
 		directReqs := totalRequests - cacheableReqs - batchableReqs
 
 		// Simulate
-		totalActual += float64(cacheableReqs) * 0.00015  // Cache hits
-		totalActual += float64(batchableReqs) * 0.008    // Batch (50% discount)
-		totalActual += float64(directReqs) * 0.016       // Direct
+		totalActual += float64(cacheableReqs) * 0.00015 // Cache hits
+		totalActual += float64(batchableReqs) * 0.008   // Batch (50% discount)
+		totalActual += float64(directReqs) * 0.016      // Direct
 
 		savings := totalEstimated - totalActual
 		savingsPercent := (savings / totalEstimated) * 100
 
 		result := map[string]interface{}{
-			"scenario":          scenario.name,
-			"description":       scenario.description,
-			"daily_requests":    scenario.dailyReqs,
-			"period_days":       scenario.days,
-			"total_requests":    totalRequests,
-			"cacheable_pct":     scenario.cacheable * 100,
-			"batchable_pct":     scenario.batchable * 100,
-			"estimated_cost":    totalEstimated,
-			"actual_cost":       totalActual,
-			"savings":           savings,
-			"savings_percent":   savingsPercent,
-			"monthly_savings":   savings / float64(scenario.days) * 30,
+			"scenario":        scenario.name,
+			"description":     scenario.description,
+			"daily_requests":  scenario.dailyReqs,
+			"period_days":     scenario.days,
+			"total_requests":  totalRequests,
+			"cacheable_pct":   scenario.cacheable * 100,
+			"batchable_pct":   scenario.batchable * 100,
+			"estimated_cost":  totalEstimated,
+			"actual_cost":     totalActual,
+			"savings":         savings,
+			"savings_percent": savingsPercent,
+			"monthly_savings": savings / float64(scenario.days) * 30,
 		}
 		results = append(results, result)
 	}

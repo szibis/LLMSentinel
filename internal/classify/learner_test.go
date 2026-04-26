@@ -94,11 +94,11 @@ func TestGetTaskAccuracy(t *testing.T) {
 
 	for i, o := range outcomes {
 		learner.RecordOutcome(LearningEvent{
-			ID:             "test-" + string(rune(i)),
-			PredictedTask:  o.predicted,
-			ActualTask:     o.task,
-			Succeeded:      o.success,
-			TokenError:     o.error,
+			ID:              "test-" + string(rune(i)),
+			PredictedTask:   o.predicted,
+			ActualTask:      o.task,
+			Succeeded:       o.success,
+			TokenError:      o.error,
 			ConfidenceScore: 0.8,
 		})
 	}
@@ -133,10 +133,10 @@ func TestUpdateFromBatch(t *testing.T) {
 	// Record some misclassified events
 	for i := 0; i < 5; i++ {
 		learner.RecordOutcome(LearningEvent{
-			ID:             "test-" + string(rune(i)),
-			PredictedTask:  TaskConcurrency,
-			ActualTask:     TaskConcurrency,
-			Succeeded:      true,
+			ID:            "test-" + string(rune(i)),
+			PredictedTask: TaskConcurrency,
+			ActualTask:    TaskConcurrency,
+			Succeeded:     true,
 		})
 	}
 
@@ -224,10 +224,10 @@ func TestGetAccuracyStats(t *testing.T) {
 
 	for i := 0; i < 10; i++ {
 		learner.RecordOutcome(LearningEvent{
-			ID:            "test-" + string(rune(i)),
-			ActualTask:    TaskConcurrency,
-			Succeeded:     i < 7, // 7 successes, 3 failures
-			TokenError:    0.05,
+			ID:         "test-" + string(rune(i)),
+			ActualTask: TaskConcurrency,
+			Succeeded:  i < 7, // 7 successes, 3 failures
+			TokenError: 0.05,
 		})
 	}
 

@@ -14,34 +14,34 @@ import (
 // OptimizationDecision represents the full optimization analysis
 type OptimizationDecision struct {
 	// Layer results
-	CacheHit               bool
-	CachedResponseHash     string
-	UseBatch               bool
-	SwitchModel            string
-	Direction              string // "cache_hit" | "batch" | "model_switch" | "direct"
+	CacheHit           bool
+	CachedResponseHash string
+	UseBatch           bool
+	SwitchModel        string
+	Direction          string // "cache_hit" | "batch" | "model_switch" | "direct"
 
 	// Cost breakdown
-	DirectCost             float64
-	OptimizedCost          float64
-	TotalSavings           float64
-	SavingsPercent         float64
+	DirectCost     float64
+	OptimizedCost  float64
+	TotalSavings   float64
+	SavingsPercent float64
 
 	// Recommendations
-	Rationale              string
-	EstimatedWaitTime      time.Duration
+	Rationale         string
+	EstimatedWaitTime time.Duration
 
 	// Metadata for logging
-	CacheAge               time.Duration
-	BatchQueueSize         int
+	CacheAge       time.Duration
+	BatchQueueSize int
 }
 
 // Optimizer coordinates cache, batch, and model optimization decisions
 type Optimizer struct {
-	cache                *batch.CacheManager
-	router               *batch.Router
-	calculator           *costs.Calculator
-	metrics              *Metrics
-	mu                   sync.RWMutex
+	cache      *batch.CacheManager
+	router     *batch.Router
+	calculator *costs.Calculator
+	metrics    *Metrics
+	mu         sync.RWMutex
 }
 
 // NewOptimizer creates a new optimization engine

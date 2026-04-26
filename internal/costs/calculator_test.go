@@ -40,7 +40,7 @@ func TestCalculateCost_WithCache(t *testing.T) {
 	tokens := TokenCosts{
 		InputTokens:     1000,
 		OutputTokens:    500,
-		CacheReadTokens: 200,  // 10% of input cost
+		CacheReadTokens: 200, // 10% of input cost
 		IsBatchAPI:      false,
 		IsCached:        true,
 	}

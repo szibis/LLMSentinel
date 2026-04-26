@@ -97,9 +97,9 @@ func TestInputValidation_PromptLength(t *testing.T) {
 		shouldBOK bool
 	}{
 		{"valid prompt", true},
-		{"", false}, // Empty prompt
+		{"", false},                         // Empty prompt
 		{strings.Repeat("a", 10000), false}, // Very long prompt
-		{strings.Repeat("x", 100), true},   // Reasonable length
+		{strings.Repeat("x", 100), true},    // Reasonable length
 	}
 
 	for _, test := range tests {
@@ -209,9 +209,9 @@ func TestTLSEnforcement_URLValidation(t *testing.T) {
 		{"https://example.com/webhook", true},
 		{"https://api.example.com:443/webhook", true},
 		{"http://localhost:8000/webhook", true}, // localhost allowed for dev
-		{"http://example.com/webhook", false},  // http not allowed
-		{"ftp://example.com/webhook", false},   // non-http protocol
-		{"file:///etc/passwd", false},          // file:// not allowed
+		{"http://example.com/webhook", false},   // http not allowed
+		{"ftp://example.com/webhook", false},    // non-http protocol
+		{"file:///etc/passwd", false},           // file:// not allowed
 	}
 
 	for _, test := range validURLs {
@@ -321,10 +321,10 @@ func TestUnicodeNormalization(t *testing.T) {
 
 	unicodeTests := []string{
 		"hello",
-		"你好",           // Chinese
-		"مرحبا",          // Arabic
+		"你好",         // Chinese
+		"مرحبا",      // Arabic
 		"🔒 secure 🔒", // Emoji
-		"café",           // Accented characters
+		"café",       // Accented characters
 	}
 
 	for _, prompt := range unicodeTests {

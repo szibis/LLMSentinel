@@ -12,18 +12,18 @@ type PrometheusMetrics struct {
 	mu sync.RWMutex
 
 	// Counters
-	TotalRequests     int64
-	CacheHits         int64
-	CacheMisses       int64
-	BatchQueued       int64
-	ModelSwitches     int64
-	DirectRequests    int64
+	TotalRequests  int64
+	CacheHits      int64
+	CacheMisses    int64
+	BatchQueued    int64
+	ModelSwitches  int64
+	DirectRequests int64
 
 	// Gauges
-	CacheSize         int64
-	QueueSize         int64
-	CostThisMonth     float64
-	ActiveSessions    int64
+	CacheSize      int64
+	QueueSize      int64
+	CostThisMonth  float64
+	ActiveSessions int64
 
 	// Histogram buckets (latency in milliseconds)
 	LatencyBuckets map[float64]int64 // key is bucket upper bound (10, 50, 100, 500, 1000)
@@ -32,7 +32,7 @@ type PrometheusMetrics struct {
 	TokenErrorBuckets map[float64]int64 // key is bucket upper bound (0.05, 0.10, 0.15, 0.20, 0.50, 1.0)
 
 	// Cost per request tracking
-	CostPerRequestSum float64
+	CostPerRequestSum   float64
 	CostPerRequestCount int64
 
 	// Model usage breakdown
@@ -282,20 +282,20 @@ func (pm *PrometheusMetrics) GetMetricsSnapshot() map[string]interface{} {
 	}
 
 	return map[string]interface{}{
-		"total_requests":       pm.TotalRequests,
-		"cache_hits":           pm.CacheHits,
-		"cache_hit_rate":       hitRate,
-		"batch_queued":         pm.BatchQueued,
-		"model_switches":       pm.ModelSwitches,
-		"cache_size":           pm.CacheSize,
-		"queue_size":           pm.QueueSize,
-		"cost_this_month":      pm.CostThisMonth,
-		"cost_per_request":     avgCost,
-		"active_sessions":      pm.ActiveSessions,
-		"model_usage":          pm.ModelUsage,
-		"task_type_usage":      pm.TaskTypeUsage,
-		"latency_p50":          pm.LatencyP50,
-		"latency_p95":          pm.LatencyP95,
-		"latency_p99":          pm.LatencyP99,
+		"total_requests":   pm.TotalRequests,
+		"cache_hits":       pm.CacheHits,
+		"cache_hit_rate":   hitRate,
+		"batch_queued":     pm.BatchQueued,
+		"model_switches":   pm.ModelSwitches,
+		"cache_size":       pm.CacheSize,
+		"queue_size":       pm.QueueSize,
+		"cost_this_month":  pm.CostThisMonth,
+		"cost_per_request": avgCost,
+		"active_sessions":  pm.ActiveSessions,
+		"model_usage":      pm.ModelUsage,
+		"task_type_usage":  pm.TaskTypeUsage,
+		"latency_p50":      pm.LatencyP50,
+		"latency_p95":      pm.LatencyP95,
+		"latency_p99":      pm.LatencyP99,
 	}
 }

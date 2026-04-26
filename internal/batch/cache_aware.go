@@ -12,15 +12,15 @@ import (
 
 // CacheEntry represents a cached prompt or response
 type CacheEntry struct {
-	Hash              string // MD5 hash of content
-	Content           string // Original content (for matching)
-	ContentLength     int
-	Model             string
-	CreatedAt         time.Time
-	LastAccessedAt    time.Time
-	AccessCount       int
-	EstimatedTokens   int
-	CacheFillPercent  float64 // 0.0-1.0
+	Hash             string // MD5 hash of content
+	Content          string // Original content (for matching)
+	ContentLength    int
+	Model            string
+	CreatedAt        time.Time
+	LastAccessedAt   time.Time
+	AccessCount      int
+	EstimatedTokens  int
+	CacheFillPercent float64 // 0.0-1.0
 }
 
 // CacheOptimization suggests cache-based optimizations
@@ -161,10 +161,10 @@ func (cm *CacheManager) GetCacheOptimizations(prompt string, estimatedOutput int
 			// Calculate savings from cache
 			// Cached prompts cost 10% of normal input cost
 			tokens := costs.TokenCosts{
-				InputTokens:      len(prompt),
-				OutputTokens:     estimatedOutput,
-				CacheReadTokens:  len(prompt),
-				IsCached:         true,
+				InputTokens:     len(prompt),
+				OutputTokens:    estimatedOutput,
+				CacheReadTokens: len(prompt),
+				IsCached:        true,
 			}
 			cachedBreakdown, _ := cm.calculator.CalculateCost(model, tokens)
 			normalBreakdown, _ := cm.calculator.CalculateCost(model, costs.TokenCosts{

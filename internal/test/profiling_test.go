@@ -168,12 +168,12 @@ func TestAllocationProfile(t *testing.T) {
 	learner := classify.NewLearner(100, 1*time.Hour)
 	for i := 0; i < 1000; i++ {
 		event := classify.LearningEvent{
-			ID:             string(rune(i)),
-			Prompt:         "test prompt for allocation profiling",
-			PredictedTask:  classify.TaskConcurrency,
-			ActualTask:     classify.TaskConcurrency,
-			Succeeded:      i%2 == 0,
-			TokenError:     0.05,
+			ID:            string(rune(i)),
+			Prompt:        "test prompt for allocation profiling",
+			PredictedTask: classify.TaskConcurrency,
+			ActualTask:    classify.TaskConcurrency,
+			Succeeded:     i%2 == 0,
+			TokenError:    0.05,
 		}
 		learner.RecordOutcome(event)
 	}
@@ -283,12 +283,12 @@ func BenchmarkLearnerRecording(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		event := classify.LearningEvent{
-			ID:             string(rune(i % 100)),
-			Prompt:         "test prompt",
-			PredictedTask:  classify.TaskConcurrency,
-			ActualTask:     classify.TaskConcurrency,
-			Succeeded:      i%2 == 0,
-			TokenError:     0.05,
+			ID:            string(rune(i % 100)),
+			Prompt:        "test prompt",
+			PredictedTask: classify.TaskConcurrency,
+			ActualTask:    classify.TaskConcurrency,
+			Succeeded:     i%2 == 0,
+			TokenError:    0.05,
 		}
 		learner.RecordOutcome(event)
 	}

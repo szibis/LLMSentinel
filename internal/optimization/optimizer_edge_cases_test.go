@@ -486,10 +486,10 @@ func TestCostEstimation_ValidCosts(t *testing.T) {
 	opt := NewOptimizer()
 
 	testCases := []struct {
-		prompt  string
-		model   string
-		output  int
-		name    string
+		prompt string
+		model  string
+		output int
+		name   string
 	}{
 		{"test", "haiku", 10, "haiku_small"},
 		{"test", "sonnet", 100, "sonnet_medium"},

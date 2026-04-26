@@ -90,7 +90,7 @@ func runHook() {
 
 	cfg := config.DefaultConfig()
 
-	db, err := store.Open(cfg.DataDir)
+	db, err := store.Open(cfg.Gateway.DataDir)
 	if err != nil {
 		_ = hook.WriteOutput(hook.PassThrough())
 		return
@@ -126,9 +126,10 @@ func runHook() {
 	_ = db.LogTurn(modelShort, strings.Join(concepts, ","))
 
 	// Phase 5: Predictive escalation (only on Haiku)
+	predictThreshold := 5 // Min escalations to enable prediction
 	if config.ModelTierOf(currentModel) == config.TierHaiku && taskType != classify.TaskGeneral {
 		count, _ := db.EscalationCountForType(string(taskType))
-		if count >= cfg.PredictThreshold {
+		if count >= predictThreshold {
 			_ = hook.WriteOutput(hook.WithHint(
 				fmt.Sprintf("📊 Predictive: %s tasks historically need escalation (%d prior). Consider: /escalate to sonnet", taskType, count),
 			))
@@ -137,9 +138,10 @@ func runHook() {
 	}
 
 	// Phase 2: Frustration detection
+	frustrationRetries := 2 // Min retries before suggesting escalation
 	if detect.DetectFrustration(prompt) {
 		attempts, _ := db.CountRecentAttempts(modelShort, 5)
-		if attempts >= cfg.FrustrationRetries {
+		if attempts >= frustrationRetries {
 			suggestTarget := "sonnet"
 			if modelShort == "sonnet" {
 				suggestTarget = "opus"
@@ -155,9 +157,10 @@ func runHook() {
 	}
 
 	// Phase 4: Circular reasoning detection (only on Haiku)
+	circularTurns := 4 // Min turns to detect circular reasoning
 	if config.ModelTierOf(currentModel) == config.TierHaiku {
 		turns, _ := db.RecentTurns(6)
-		if len(turns) >= cfg.CircularTurns {
+		if len(turns) >= circularTurns {
 			var recentConcepts [][]string
 			haikuCount := 0
 			for _, t := range turns {
@@ -168,7 +171,7 @@ func runHook() {
 					recentConcepts = append(recentConcepts, strings.Split(t.Concepts, ","))
 				}
 			}
-			if haikuCount >= 3 && detect.DetectCircularPattern(recentConcepts, cfg.CircularTurns) {
+			if haikuCount >= 3 && detect.DetectCircularPattern(recentConcepts, circularTurns) {
 				_ = hook.WriteOutput(hook.WithHint(
 					"🔄 Circular pattern detected (same concepts repeating). Consider: /escalate to sonnet",
 				))
@@ -260,7 +263,7 @@ func handleDeEscalate(db *store.Store, currentModel, taskType string) {
 
 func runDashboard() {
 	port := 8077
-	bind := ""
+	bind := "127.0.0.1"
 	for i, arg := range os.Args {
 		if arg == "--port" && i+1 < len(os.Args) {
 			_, _ = fmt.Sscanf(os.Args[i+1], "%d", &port)
@@ -273,19 +276,16 @@ func runDashboard() {
 	if v := os.Getenv("ESCALATE_BIND"); v != "" {
 		bind = v
 	}
-	if v := os.Getenv("ESCALATE_DATA_DIR"); v != "" {
-		// handled below via cfg
-		_ = v
-	}
 
 	cfg := config.DefaultConfig()
-	cfg.DashboardPort = port
-	cfg.DashboardBind = bind
 	if v := os.Getenv("ESCALATE_DATA_DIR"); v != "" {
-		cfg.DataDir = v
+		cfg.Gateway.DataDir = v
 	}
 
-	if err := dashboard.Serve(cfg); err != nil {
+	// Create and start dashboard server
+	loader := config.NewLoader("")
+	dashServer := dashboard.NewServer(bind, port, loader, nil, nil)
+	if err := dashServer.Start(); err != nil {
 		fmt.Fprintf(os.Stderr, "Dashboard error: %v\n", err)
 		os.Exit(1)
 	}
@@ -298,7 +298,7 @@ func runStats() {
 	}
 
 	cfg := config.DefaultConfig()
-	db, err := store.Open(cfg.DataDir)
+	db, err := store.Open(cfg.Gateway.DataDir)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error opening database: %v\n", err)
 		os.Exit(1)
@@ -350,24 +350,25 @@ func printStatsTypes(db *store.Store) {
 	fmt.Println()
 }
 
-func printStatsPredictions(db *store.Store, cfg *config.Config) {
+func printStatsPredictions(db *store.Store, _ *config.Config) {
 	fmt.Println("═══════════════════════════════════════════")
 	fmt.Println("  Predictive Escalation Status")
 	fmt.Println("═══════════════════════════════════════════")
 	fmt.Println()
+	predictThreshold := 5 // Default threshold
 	found := false
 	for _, tt := range classify.AllTaskTypes() {
 		count, _ := db.EscalationCountForType(string(tt))
-		if count >= cfg.PredictThreshold {
+		if count >= predictThreshold {
 			fmt.Printf("  ⚡ %s — %d escalations → will suggest proactively\n", tt, count)
 			found = true
 		} else if count >= 3 {
-			fmt.Printf("  📊 %s — %d escalations → approaching threshold (%d)\n", tt, count, cfg.PredictThreshold)
+			fmt.Printf("  📊 %s — %d escalations → approaching threshold (%d)\n", tt, count, predictThreshold)
 			found = true
 		}
 	}
 	if !found {
-		fmt.Printf("  No task types have enough data yet (threshold: %d)\n", cfg.PredictThreshold)
+		fmt.Printf("  No task types have enough data yet (threshold: %d)\n", predictThreshold)
 	}
 	fmt.Println()
 }
@@ -456,7 +457,7 @@ func runMonitor() {
 	fmt.Printf("Or set environment variables: CLAUDE_TOKENS_ACTUAL, CLAUDE_TOKENS_COST\n")
 
 	// Open database for logging
-	db, err := store.Open(cfg.DataDir)
+	db, err := store.Open(cfg.Gateway.DataDir)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to open database: %v\n", err)
 		os.Exit(1)

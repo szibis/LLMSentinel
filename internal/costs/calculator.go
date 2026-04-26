@@ -5,56 +5,56 @@ import "fmt"
 // ModelCosts defines token costs for each Claude model (USD per 1M tokens).
 // Based on current Claude pricing (as of early 2026).
 type ModelCosts struct {
-	HaikuInput      float64
-	HaikuOutput     float64
-	SonnetInput     float64
-	SonnetOutput    float64
-	OpusInput       float64
-	OpusOutput      float64
-	BatchDiscount   float64 // 0.5 = 50% discount for batch API
-	CacheReadCost   float64 // Cost per 1M cache read tokens (typically 10% of input)
-	CacheWriteCost  float64 // Cost per 1M cache write tokens (typically 25% of input)
+	HaikuInput     float64
+	HaikuOutput    float64
+	SonnetInput    float64
+	SonnetOutput   float64
+	OpusInput      float64
+	OpusOutput     float64
+	BatchDiscount  float64 // 0.5 = 50% discount for batch API
+	CacheReadCost  float64 // Cost per 1M cache read tokens (typically 10% of input)
+	CacheWriteCost float64 // Cost per 1M cache write tokens (typically 25% of input)
 }
 
 // DefaultModelCosts returns the default pricing as of early 2026.
 func DefaultModelCosts() ModelCosts {
 	return ModelCosts{
-		HaikuInput:    0.80,   // $0.80 per 1M input tokens
-		HaikuOutput:   4.00,   // $4.00 per 1M output tokens
-		SonnetInput:   3.00,   // $3.00 per 1M input tokens
-		SonnetOutput:  15.00,  // $15.00 per 1M output tokens
-		OpusInput:     15.00,  // $15.00 per 1M input tokens
-		OpusOutput:    75.00,  // $75.00 per 1M output tokens
-		BatchDiscount: 0.5,    // 50% reduction for batch API
-		CacheReadCost: 0.30,   // 10% of input cost for cached reads
+		HaikuInput:     0.80,  // $0.80 per 1M input tokens
+		HaikuOutput:    4.00,  // $4.00 per 1M output tokens
+		SonnetInput:    3.00,  // $3.00 per 1M input tokens
+		SonnetOutput:   15.00, // $15.00 per 1M output tokens
+		OpusInput:      15.00, // $15.00 per 1M input tokens
+		OpusOutput:     75.00, // $75.00 per 1M output tokens
+		BatchDiscount:  0.5,   // 50% reduction for batch API
+		CacheReadCost:  0.30,  // 10% of input cost for cached reads
 		CacheWriteCost: 1.20,  // 25% of input cost for cache writes
 	}
 }
 
 // TokenCosts stores actual token usage
 type TokenCosts struct {
-	InputTokens        int
-	OutputTokens       int
-	CacheReadTokens    int  // Tokens read from prompt cache
-	CacheWriteTokens   int  // Tokens written to prompt cache
-	CacheHitPercent    float64 // 0.0-1.0, percentage of reads that were cache hits
-	IsBatchAPI         bool
-	IsCached           bool
+	InputTokens      int
+	OutputTokens     int
+	CacheReadTokens  int     // Tokens read from prompt cache
+	CacheWriteTokens int     // Tokens written to prompt cache
+	CacheHitPercent  float64 // 0.0-1.0, percentage of reads that were cache hits
+	IsBatchAPI       bool
+	IsCached         bool
 }
 
 // CostBreakdown provides detailed cost analysis
 type CostBreakdown struct {
-	Model               string
-	InputCost           float64
-	OutputCost          float64
-	CacheReadCost       float64
-	CacheWriteCost      float64
-	TotalCost           float64
+	Model                 string
+	InputCost             float64
+	OutputCost            float64
+	CacheReadCost         float64
+	CacheWriteCost        float64
+	TotalCost             float64
 	EffectiveCostPerToken float64
-	SavingsVsOpus       float64
-	CacheSavings        float64
-	BatchSavings        float64
-	EstimatedAccuracy   float64 // How close estimate was to actual
+	SavingsVsOpus         float64
+	CacheSavings          float64
+	BatchSavings          float64
+	EstimatedAccuracy     float64 // How close estimate was to actual
 }
 
 // Calculator performs detailed cost calculations
@@ -166,8 +166,8 @@ func (c *Calculator) EstimateCost(model string, promptLength int, estimatedOutpu
 		return CostBreakdown{}, fmt.Errorf("estimatedOutputLength cannot be negative: %d", estimatedOutputLength)
 	}
 
-	const maxPromptLength = 10_000_000   // 10M characters
-	const maxOutputLength = 1_000_000    // 1M characters
+	const maxPromptLength = 10_000_000 // 10M characters
+	const maxOutputLength = 1_000_000  // 1M characters
 	if promptLength > maxPromptLength {
 		return CostBreakdown{}, fmt.Errorf("promptLength too large: %d > %d", promptLength, maxPromptLength)
 	}
@@ -228,12 +228,12 @@ func NewROICalculator() *ROICalculator {
 
 // ROI represents return on investment metrics
 type ROI struct {
-	TotalUsageCost       float64 // Total cost across all requests
-	TotalSavings         float64 // Total saved vs all-Opus baseline
-	OptimizationRate     float64 // Percentage saved
-	AverageModel         string  // Most frequently used model
-	CascadeROI           float64 // ROI from cascade optimizations
-	ModelDistribution    map[string]int // Number of requests per model
+	TotalUsageCost    float64        // Total cost across all requests
+	TotalSavings      float64        // Total saved vs all-Opus baseline
+	OptimizationRate  float64        // Percentage saved
+	AverageModel      string         // Most frequently used model
+	CascadeROI        float64        // ROI from cascade optimizations
+	ModelDistribution map[string]int // Number of requests per model
 }
 
 // CalculateROI computes ROI metrics for a series of transactions

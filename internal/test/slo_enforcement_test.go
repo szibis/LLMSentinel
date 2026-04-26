@@ -173,12 +173,12 @@ func TestSLO_LearnerAccuracy(t *testing.T) {
 	// Record 100 events with 80% accuracy
 	for i := 0; i < 100; i++ {
 		event := classify.LearningEvent{
-			ID:             string(rune(i % 100)),
-			Prompt:         "test prompt",
-			PredictedTask:  classify.TaskConcurrency,
-			ActualTask:     classify.TaskConcurrency,
-			Succeeded:      i < 80, // 80% success rate
-			TokenError:     0.05,
+			ID:            string(rune(i % 100)),
+			Prompt:        "test prompt",
+			PredictedTask: classify.TaskConcurrency,
+			ActualTask:    classify.TaskConcurrency,
+			Succeeded:     i < 80, // 80% success rate
+			TokenError:    0.05,
 		}
 		learner.RecordOutcome(event)
 	}
