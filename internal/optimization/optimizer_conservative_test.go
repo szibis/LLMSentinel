@@ -28,7 +28,9 @@ func TestConservative_LargeScaleWeeklyWorkload(t *testing.T) {
 	totalEstimatedCost := 0.0
 	totalActualCost := 0.0
 
+	// #nosec G404 - math/rand acceptable for test data generation; cryptographic randomness not needed
 	seed := rand.NewSource(time.Now().UnixNano())
+	// #nosec G404 - math/rand acceptable for test randomization
 	rng := rand.New(seed)
 
 	// Simulate 7 days
@@ -285,6 +287,7 @@ func TestConservative_MultiWeekCacheDegradation(t *testing.T) {
 			for req := 0; req < scenario.dailyRequests; req++ {
 				// 60% chance of repeating previous pattern
 				// 40% chance of new pattern
+				// #nosec G404 - math/rand acceptable for test randomization
 				isRepeat := rand.Float64() < 0.60
 
 				var prompt string
@@ -298,6 +301,7 @@ func TestConservative_MultiWeekCacheDegradation(t *testing.T) {
 				estimatedCost := 0.016
 				weekTotal += estimatedCost
 
+				// #nosec G404 - math/rand acceptable for test randomization
 				if decision.CacheHit && rand.Float64() < scenario.expectedHits {
 					weekActual += 0.00015
 					weekHits++

@@ -1,0 +1,95 @@
+name: Security & Performance Verification
+
+on:
+  push:
+    branches: [main, develop, feature/security-hardening-testing]
+  pull_request:
+    branches: [main, develop]
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: golangci-lint with gosec
+        run: go run github.com/golangci/golangci-lint/cmd/golangci-lint@latest run ./... --enable gosec --timeout 10m
+
+      - name: Build
+        run: make build
+
+  memory-and-profiling:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Memory Leak Detection
+        run: go test -v -run TestMemoryLeak ./internal/test/... -timeout 30s
+
+      - name: SLO Tests
+        run: go test -v -run "TestSLO" ./internal/test/... -timeout 30s
+
+      - name: Profiling Tests
+        run: go test -v -run "TestCPU|TestHeap|TestGoroutine|TestAllocation|TestLatency" ./internal/test/... -timeout 60s
+
+      - name: Generate CPU profile
+        run: |
+          mkdir -p profiles
+          go test -bench=. -cpuprofile=profiles/cpu.prof ./... 2>&1 | tee profiles/bench.txt || true
+
+      - name: Generate Memory profile
+        run: go test -bench=. -memprofile=profiles/mem.prof ./... || true
+
+      - name: Security Test Suite
+        run: go test -v ./internal/security/... -timeout 30s
+
+      - name: Upload profiles
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: profiling-results
+          path: profiles/
+          retention-days: 30
+
+  fuzzing:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Fuzz Testing
+        run: |
+          go test -fuzz=FuzzClassifyPrompt ./internal/fuzz/... -fuzztime=30s -timeout=60s || true
+          go test -fuzz=FuzzPromptProcessing ./internal/fuzz/... -fuzztime=30s -timeout=60s || true
+          go test -fuzz=FuzzWebhookURLValidation ./internal/fuzz/... -fuzztime=30s -timeout=60s || true
+
+  stress-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Stress Tests with Race Detection
+        run: go test -v -race -timeout 120s ./...

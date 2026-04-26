@@ -280,6 +280,7 @@ func (d *DashboardCLI) FullDashboard() error {
 
 // fetchJSON is a helper to fetch and parse JSON from the API.
 func fetchJSON(url string, v interface{}) error {
+	// #nosec G107 - URL is constructed internally from localhost:port configuration, not from user input
 	resp, err := http.Get(url)
 	if err != nil {
 		return err

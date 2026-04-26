@@ -1,6 +1,7 @@
 package batch
 
 import (
+	// #nosec G501 - MD5 is used only for non-cryptographic hash of cache keys, not for security-sensitive hashing
 	"crypto/md5"
 	"fmt"
 	"sync"
@@ -300,6 +301,7 @@ func (cm *CacheManager) SetCacheTTL(ttl time.Duration) {
 // Private helper methods
 
 func (cm *CacheManager) hashContent(content string) string {
+	// #nosec G401 - MD5 used only for cache key hashing, not security-sensitive
 	return fmt.Sprintf("%x", md5.Sum([]byte(content)))
 }
 
