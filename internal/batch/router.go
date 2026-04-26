@@ -121,12 +121,11 @@ func (r *Router) MakeRoutingDecision(req BatchRequest) (BatchDecision, error) {
 
 	case StrategyAuto:
 		// Use batch if:
-		// 1. Saving at least minSavingsPercent
-		// 2. Queue has items or wait time acceptable
-		// 3. Queue won't exceed max size
+		// 1. Saving at least minSavingsPercent AND
+		// 2. Queue won't exceed max size
+		// (requests are queued and flushed when queue reaches minBatchSize)
 		queueLen := len(r.queue)
 		shouldBatch := savingsPercent >= r.minSavingsPercent &&
-			(queueLen >= r.minBatchSize || req.MaxWaitTime >= r.maxBatchWaitTime) &&
 			queueLen < r.maxQueueSize
 
 		decision.UsesBatchAPI = shouldBatch
@@ -139,7 +138,7 @@ func (r *Router) MakeRoutingDecision(req BatchRequest) (BatchDecision, error) {
 				waitTime = r.maxBatchWaitTime
 			}
 			decision.EstimatedWaitTime = waitTime
-			decision.Reason = fmt.Sprintf("auto-batch enabled (saves $%.4f, queue=%d)", savingsAmount, queueLen)
+			decision.Reason = fmt.Sprintf("auto-batch queued (saves $%.4f, queue=%d/%d)", savingsAmount, queueLen, r.minBatchSize)
 
 			// Calculate ROI score: benefit vs cost of waiting
 			// ROI = (savings / wait_time_seconds) normalized to 0-1

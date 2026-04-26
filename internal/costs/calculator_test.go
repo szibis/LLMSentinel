@@ -187,12 +187,13 @@ func TestROICalculation(t *testing.T) {
 
 	result := roi.CalculateROI(breakdowns, distribution)
 
-	if result.TotalUsageCost != 0.30 {
-		t.Errorf("expected total usage cost 0.30, got %f", result.TotalUsageCost)
+	// Use approximate comparison for floating point values
+	if diff := result.TotalUsageCost - 0.30; diff < -0.001 || diff > 0.001 {
+		t.Errorf("expected total usage cost ~0.30, got %f", result.TotalUsageCost)
 	}
 
-	if result.TotalSavings != 0.75 {
-		t.Errorf("expected total savings 0.75, got %f", result.TotalSavings)
+	if diff := result.TotalSavings - 0.75; diff < -0.001 || diff > 0.001 {
+		t.Errorf("expected total savings ~0.75, got %f", result.TotalSavings)
 	}
 
 	expectedRate := (0.75 / (0.75 + 0.30)) * 100
