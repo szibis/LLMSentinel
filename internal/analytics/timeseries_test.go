@@ -159,13 +159,13 @@ func TestEnforceRetention(t *testing.T) {
 
 func TestMetricsTimeSeriesFields(t *testing.T) {
 	mts := MetricsTimeSeries{
-		Timestamp:       time.Now(),
-		Bucket:          "hourly",
-		TotalRequests:   1000,
-		CacheHits:       500,
-		SuccessRate:     0.95,
-		TotalCostUSD:    100.50,
-		P95LatencyMs:    250.5,
+		Timestamp:     time.Now(),
+		Bucket:        "hourly",
+		TotalRequests: 1000,
+		CacheHits:     500,
+		SuccessRate:   0.95,
+		TotalCostUSD:  100.50,
+		P95LatencyMs:  250.5,
 	}
 
 	if mts.TotalRequests != 1000 {

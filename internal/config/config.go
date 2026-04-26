@@ -25,8 +25,8 @@ const (
 	TierOpus   ModelTier = 3
 )
 
-// Config holds the runtime configuration for claude-escalate.
-type Config struct {
+// LegacyConfig holds legacy configuration (deprecated, use Config from types.go instead)
+type LegacyConfig struct {
 	DataDir            string  `json:"data_dir"`
 	DashboardPort      int     `json:"dashboard_port"`
 	DashboardBind      string  `json:"dashboard_bind"`      // Bind address (default 127.0.0.1)
@@ -37,9 +37,16 @@ type Config struct {
 	DailyBudgetUSD     float64 `json:"daily_budget_usd"`    // Daily spend guard (0 = unlimited)
 }
 
-// DefaultConfig returns the default configuration.
+// DefaultConfig returns the default configuration for Claude Escalate.
 func DefaultConfig() *Config {
-	return &Config{
+	loader := NewLoader("")
+	cfg := loader.generateDefaultConfig()
+	return cfg
+}
+
+// DefaultLegacyConfig returns the default legacy configuration (deprecated).
+func DefaultLegacyConfig() *LegacyConfig {
+	return &LegacyConfig{
 		DataDir:            filepath.Join(homeDir(), ".claude", "data", "escalation"),
 		DashboardPort:      8077,
 		FrustrationRetries: 2,

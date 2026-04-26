@@ -1,0 +1,56 @@
+tools:
+  rtk:
+    paths:
+      - ~/.local/bin/rtk
+      - /usr/local/bin/rtk
+      - /usr/bin/rtk
+
+  scrapling:
+    paths:
+      - ~/.local/bin/scrapling
+      - /usr/local/bin/scrapling
+
+  lsp_servers:
+    python:
+      - ~/.local/bin/pylsp
+      - /usr/local/bin/pylsp
+    go:
+      - ~/.local/bin/gopls
+      - /usr/local/bin/gopls
+
+  git:
+    paths:
+      - /usr/local/bin/git
+      - /usr/bin/git
+
+  languages:
+    python:
+      paths:
+        - /usr/local/bin/python3
+        - /usr/bin/python3
+    go:
+      paths:
+        - /usr/local/bin/go
+        - /usr/bin/go
+    node:
+      paths:
+        - ~/.nvm/*/bin/node
+        - /usr/local/bin/node
+
+timeout_seconds: 30
+concurrent_checks: 10
+
+platform_overrides:
+  darwin:
+    homebrew_paths:
+      - /usr/local/Cellar
+      - /opt/homebrew/Cellar
+
+  linux:
+    apt_paths:
+      - /usr/bin
+      - /usr/local/bin
+
+  windows:
+    paths_separator: ";"
+    executable_suffix: ".exe"

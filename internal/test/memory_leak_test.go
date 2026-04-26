@@ -26,12 +26,12 @@ func TestMemoryLeakClassificationLearner(t *testing.T) {
 	learner := classify.NewLearner(100, 1*time.Hour)
 	for i := 0; i < 1000; i++ {
 		event := classify.LearningEvent{
-			ID:             string(rune(i)),
-			Prompt:         "test prompt for memory leak detection",
-			PredictedTask:  classify.TaskConcurrency,
-			ActualTask:     classify.TaskConcurrency,
-			Succeeded:      i%2 == 0,
-			TokenError:     0.05,
+			ID:              string(rune(i)),
+			Prompt:          "test prompt for memory leak detection",
+			PredictedTask:   classify.TaskConcurrency,
+			ActualTask:      classify.TaskConcurrency,
+			Succeeded:       i%2 == 0,
+			TokenError:      0.05,
 			ConfidenceScore: 0.85,
 		}
 		learner.RecordOutcome(event)

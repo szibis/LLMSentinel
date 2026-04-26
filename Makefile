@@ -139,3 +139,70 @@ help:
 	@echo "  lint          Run linters"
 	@echo "  fmt           Format code"
 	@echo "  clean         Remove build artifacts"
+	@echo ""
+	@echo "Week 1.5 Verification Targets:"
+	@echo "  test-unit          Run unit tests only (fast)"
+	@echo "  test-integration   Run integration tests"
+	@echo "  test-e2e-week1.5   Run Week 1.5 E2E scenarios"
+	@echo "  verify-spec        Check spec compliance"
+	@echo "  verify-all         Full verification (unit + integration + coverage + spec)"
+	@echo ""
+	@echo "ML Models Targets:"
+	@echo "  test-models        Run ML model tests (manager, download, inference)"
+	@echo "  model-test         Alias for test-models"
+
+## Week 1.5 Verification Targets
+
+.PHONY: test-unit test-integration test-e2e-week1.5 verify-spec verify-all test-models model-test
+
+# Run unit tests for all modules
+test-unit:
+	@echo "Running Week 1.5 unit tests..."
+	@go test -v -race -timeout 30s ./internal/discovery/...
+	@go test -v -race -timeout 30s ./internal/intent/...
+	@go test -v -race -timeout 30s ./internal/security/...
+	@go test -v -race -timeout 30s ./internal/config/...
+	@go test -v -race -timeout 30s ./internal/metrics/...
+	@go test -v -race -timeout 30s ./internal/models/...
+	@echo "✅ Unit tests completed"
+
+# Run ML model-specific tests
+test-models:
+	@echo "Running ML model tests..."
+	@go test -v -race -timeout 60s ./internal/models/...
+	@echo "✅ Model tests completed"
+
+# Alias for test-models
+model-test: test-models
+
+# Run integration tests
+test-integration:
+	@echo "Running Week 1.5 integration tests..."
+	@RUN_INTEGRATION=1 go test -v -race -timeout 60s -run "Integration" ./internal/test/...
+	@echo "✅ Integration tests completed"
+
+# Run Week 1.5 E2E scenarios
+test-e2e-week1.5:
+	@echo "Running Week 1.5 E2E scenarios..."
+	@RUN_E2E_WEEK1_5=1 go test -v -timeout 120s -run "Scenario" ./internal/test/...
+	@echo "✅ Week 1.5 E2E tests completed"
+
+# Verify spec compliance
+verify-spec:
+	@echo "Validating specification compliance..."
+	@go run tools/spec_validator.go .
+	@echo "✅ Spec validation completed"
+
+# Full verification suite
+verify-all: test-unit test-integration test-cover verify-spec
+	@echo ""
+	@echo "═══════════════════════════════════════════════════════════════"
+	@echo "✅ WEEK 1.5 VERIFICATION COMPLETE"
+	@echo "═══════════════════════════════════════════════════════════════"
+	@echo ""
+	@echo "Summary:"
+	@echo "  ✓ Unit tests: All modules passing"
+	@echo "  ✓ Integration tests: Feature interactions verified"
+	@echo "  ✓ Code coverage: Generated in coverage.html"
+	@echo "  ✓ Spec compliance: All requirements tracked"
+	@echo ""

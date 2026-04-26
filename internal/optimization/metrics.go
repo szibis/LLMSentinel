@@ -8,98 +8,98 @@ import (
 // MetricsSummary provides real-world impact analysis
 type MetricsSummary struct {
 	// Cache metrics
-	TotalRequests           int64
-	CacheHits               int64
-	CacheMisses             int64
-	CacheHitRate            float64
+	TotalRequests int64
+	CacheHits     int64
+	CacheMisses   int64
+	CacheHitRate  float64
 
 	// Batch metrics
-	BatchDecisions          int64
-	BatchRequests           int64
-	DirectRequests          int64
-	ModelSwitches           int64
+	BatchDecisions int64
+	BatchRequests  int64
+	DirectRequests int64
+	ModelSwitches  int64
 
 	// Cost savings
-	TotalEstimatedCost      float64
-	TotalActualCost         float64
-	TotalSavings            float64
-	OverallSavingsPercent   float64
+	TotalEstimatedCost    float64
+	TotalActualCost       float64
+	TotalSavings          float64
+	OverallSavingsPercent float64
 
 	// Timing
-	AverageBatchWaitTime    time.Duration
-	CacheAverageAge         time.Duration
+	AverageBatchWaitTime time.Duration
+	CacheAverageAge      time.Duration
 
 	// ROI analysis
-	ROIScore                float64
-	CostPerRequest          float64
-	BreakdownByStrategy     map[string]StrategyMetrics
+	ROIScore            float64
+	CostPerRequest      float64
+	BreakdownByStrategy map[string]StrategyMetrics
 }
 
 // StrategyMetrics shows performance per optimization type
 type StrategyMetrics struct {
-	Count              int64
-	EstimatedCost      float64
-	ActualCost         float64
-	Savings            float64
-	SavingsPercent     float64
-	AverageWaitTime    time.Duration
+	Count           int64
+	EstimatedCost   float64
+	ActualCost      float64
+	Savings         float64
+	SavingsPercent  float64
+	AverageWaitTime time.Duration
 }
 
 // Metrics tracks real-world optimization impact
 type Metrics struct {
 	mu sync.RWMutex
 
-	totalRequests      int64
-	cacheHits          int64
-	cacheMisses        int64
-	batchDecisions     int64
-	batchRequests      int64
-	directRequests     int64
-	modelSwitches      int64
+	totalRequests  int64
+	cacheHits      int64
+	cacheMisses    int64
+	batchDecisions int64
+	batchRequests  int64
+	directRequests int64
+	modelSwitches  int64
 
 	totalEstimatedCost float64
 	totalActualCost    float64
 	totalSavings       float64
 
-	cacheEvents        []CacheEvent
-	batchEvents        []BatchEvent
-	directEvents       []DirectEvent
-	switchEvents       []SwitchEvent
+	cacheEvents  []CacheEvent
+	batchEvents  []BatchEvent
+	directEvents []DirectEvent
+	switchEvents []SwitchEvent
 
 	// Event logging limits to prevent memory exhaustion
-	maxEventCount      int
+	maxEventCount int
 }
 
 // Event types for detailed tracking
 type CacheEvent struct {
-	Timestamp      time.Time
-	Prompt         string
-	Model          string
-	SavedCost      float64
-	Age            time.Duration
+	Timestamp time.Time
+	Prompt    string
+	Model     string
+	SavedCost float64
+	Age       time.Duration
 }
 
 type BatchEvent struct {
-	Timestamp      time.Time
-	Prompt         string
-	Model          string
-	SavedCost      float64
-	WaitTime       time.Duration
-	EstimatedCost  float64
+	Timestamp     time.Time
+	Prompt        string
+	Model         string
+	SavedCost     float64
+	WaitTime      time.Duration
+	EstimatedCost float64
 }
 
 type DirectEvent struct {
-	Timestamp      time.Time
-	Prompt         string
-	Model          string
-	ActualCost     float64
+	Timestamp  time.Time
+	Prompt     string
+	Model      string
+	ActualCost float64
 }
 
 type SwitchEvent struct {
-	Timestamp      time.Time
-	FromModel      string
-	ToModel        string
-	SavedCost      float64
+	Timestamp time.Time
+	FromModel string
+	ToModel   string
+	SavedCost float64
 }
 
 // NewMetrics creates a new metrics tracker
@@ -215,9 +215,9 @@ func (m *Metrics) RecordDirect(prompt, model string) {
 	m.totalActualCost += directCost
 
 	m.directEvents = append(m.directEvents, DirectEvent{
-		Timestamp: time.Now(),
-		Prompt:    prompt,
-		Model:     model,
+		Timestamp:  time.Now(),
+		Prompt:     prompt,
+		Model:      model,
 		ActualCost: directCost,
 	})
 
@@ -329,11 +329,11 @@ func (m *Metrics) GetCacheStats() map[string]interface{} {
 	}
 
 	return map[string]interface{}{
-		"total_hits":       m.cacheHits,
-		"hit_rate":         hitRate,
-		"total_savings":    totalCacheSavings,
-		"average_age":      avgAge,
-		"events_count":     len(m.cacheEvents),
+		"total_hits":    m.cacheHits,
+		"hit_rate":      hitRate,
+		"total_savings": totalCacheSavings,
+		"average_age":   avgAge,
+		"events_count":  len(m.cacheEvents),
 	}
 }
 
@@ -359,11 +359,11 @@ func (m *Metrics) GetBatchStats() map[string]interface{} {
 	}
 
 	return map[string]interface{}{
-		"total_batched":    m.batchRequests,
-		"batch_rate":       batchRate,
-		"total_savings":    totalBatchSavings,
-		"average_wait":     avgWaitTime,
-		"events_count":     len(m.batchEvents),
+		"total_batched": m.batchRequests,
+		"batch_rate":    batchRate,
+		"total_savings": totalBatchSavings,
+		"average_wait":  avgWaitTime,
+		"events_count":  len(m.batchEvents),
 	}
 }
 
@@ -383,10 +383,10 @@ func (m *Metrics) GetSwitchStats() map[string]interface{} {
 	}
 
 	return map[string]interface{}{
-		"total_switches":   m.modelSwitches,
-		"switch_rate":      switchRate,
-		"total_savings":    totalSwitchSavings,
-		"events_count":     len(m.switchEvents),
+		"total_switches": m.modelSwitches,
+		"switch_rate":    switchRate,
+		"total_savings":  totalSwitchSavings,
+		"events_count":   len(m.switchEvents),
 	}
 }
 

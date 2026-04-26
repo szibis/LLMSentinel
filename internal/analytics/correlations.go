@@ -197,11 +197,11 @@ func (ca *CorrelationAnalyzer) CacheEffectiveness(days int) (map[string]interfac
 	}
 
 	return map[string]interface{}{
-		"cache_hit_rate":      cacheRate.Float64,
-		"cached_cost_usd":     cachedCost.Float64,
-		"uncached_cost_usd":   uncachedCost.Float64,
-		"total_savings":       savings,
-		"cached_avg_latency":  cachedLatency.Float64,
+		"cache_hit_rate":       cacheRate.Float64,
+		"cached_cost_usd":      cachedCost.Float64,
+		"uncached_cost_usd":    uncachedCost.Float64,
+		"total_savings":        savings,
+		"cached_avg_latency":   cachedLatency.Float64,
 		"uncached_avg_latency": uncachedLatency.Float64,
 	}, nil
 }

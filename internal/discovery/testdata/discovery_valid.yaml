@@ -1,0 +1,69 @@
+discovery:
+  rtk:
+    search_paths:
+      - /usr/local/bin/rtk
+      - ~/.local/bin/rtk
+    timeout_ms: 1000
+
+  scrapling:
+    search_paths:
+      - /usr/local/bin/scrapling
+      - ~/.local/bin/scrapling
+    timeout_ms: 1000
+
+  language_servers:
+    pylsp:
+      search_paths:
+        - ~/.local/bin/pylsp
+        - /usr/bin/pylsp
+      timeout_ms: 1000
+    gopls:
+      search_paths:
+        - ~/.local/bin/gopls
+        - /usr/bin/gopls
+      timeout_ms: 1000
+
+  git:
+    search_paths:
+      - /usr/bin/git
+      - /usr/local/bin/git
+    timeout_ms: 500
+
+  runtimes:
+    python:
+      search_paths:
+        - /usr/bin/python3
+        - /usr/local/bin/python3
+      timeout_ms: 500
+    go:
+      search_paths:
+        - /usr/bin/go
+        - /usr/local/bin/go
+      timeout_ms: 500
+
+  mcp_servers:
+    socket_search_paths:
+      - ~/.local/share/claude/mcp
+      - /tmp/mcp-sockets
+
+timeout:
+  individual_tool_check_ms: 500
+  total_discovery_ms: 5000
+  path_check_parallelism: 4
+
+cache:
+  enabled: true
+  ttl_minutes: 60
+  cache_dir: ~/.claude-escalate/discovery-cache
+
+platform_overrides:
+  darwin:
+    primary_paths:
+      - /opt/homebrew/bin
+      - /usr/local/bin
+      - ~/.local/bin
+  linux:
+    primary_paths:
+      - /usr/local/bin
+      - ~/.local/bin
+      - /usr/bin
