@@ -9,23 +9,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.5.0] - 2026-04-27
 
-### 🚀 Phase 2: Knowledge Graphs & Advanced Input Optimization
+### 🚀 Knowledge Graphs & Advanced Input Optimization
 
-#### Feature 1: Knowledge Graph Storage
+#### Knowledge Graph Storage
 - SQLite-backed knowledge graph for code relationship queries
 - Node types: function, class, interface, struct, variable, import, method, module
 - Relationship types: calls, defines, imports, references, inherits, implements
 - Recursive CTE traversal for efficient relationship queries
 - Graph lookup integration with cache layer (99% token savings on relationship queries)
 
-#### Feature 2: Content Indexing Pipeline
+#### Content Indexing Pipeline
 - CodeIndexer with file system watching and incremental indexing
 - AST-based parsers for Go, Python, TypeScript code extraction
 - Automatic entity detection (functions, classes, interfaces, imports)
 - Relationship extraction with confidence scoring
 - Graph persistence and query optimization
 
-#### Feature 3: Advanced Input Optimization (Layer 4)
+#### Advanced Input Optimization
 - RequestDeduplicator: Hash-based request caching (30-40% savings)
 - InputFormatter: Structured input conversion, whitespace removal, term shortening
 - ParameterCompressor: Key abbreviation and default value removal (20-35% savings)
