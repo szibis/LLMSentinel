@@ -77,6 +77,28 @@ func NewDetector() *Detector {
 	return d
 }
 
+// matchPatternWithTimeout checks if a pattern matches, with timeout protection against ReDoS.
+func (d *Detector) matchPatternWithTimeout(pattern *regexp.Regexp, text string, timeout time.Duration) bool {
+	// Add reasonable limit to prevent excessive regex processing
+	if len(text) > 10000 {
+		text = text[:10000]
+	}
+
+	// Use goroutine with channel to implement timeout
+	done := make(chan bool, 1)
+	go func() {
+		done <- pattern.MatchString(text)
+	}()
+
+	select {
+	case result := <-done:
+		return result
+	case <-time.After(timeout):
+		// Timeout exceeded - treat as non-match to be safe
+		return false
+	}
+}
+
 // Detect analyzes prompt for sentiment signals.
 func (d *Detector) Detect(prompt string, isFollowUp bool, timeSinceLastPrompt time.Duration) Score {
 	score := Score{
@@ -86,13 +108,14 @@ func (d *Detector) Detect(prompt string, isFollowUp bool, timeSinceLastPrompt ti
 	}
 
 	promptLower := strings.ToLower(prompt)
+	matchTimeout := 100 * time.Millisecond
 
 	// Check each sentiment pattern
 	sentimentScores := make(map[Sentiment]float64)
 
 	for sentiment, patternList := range d.patterns {
 		for _, pattern := range patternList {
-			if pattern.MatchString(prompt) {
+			if d.matchPatternWithTimeout(pattern, prompt, matchTimeout) {
 				sentimentScores[sentiment] += 0.5 // Simple weight
 				if sentiment == SentimentFrustrated || sentiment == SentimentConfused {
 					score.FrustrationRisk += 0.25
