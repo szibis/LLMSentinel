@@ -37,13 +37,6 @@ type LegacyConfig struct {
 	DailyBudgetUSD     float64 `json:"daily_budget_usd"`    // Daily spend guard (0 = unlimited)
 }
 
-// DefaultConfig returns the default configuration for Claude Escalate.
-func DefaultConfig() *Config {
-	loader := NewLoader("")
-	cfg := loader.generateDefaultConfig()
-	return cfg
-}
-
 // DefaultLegacyConfig returns the default legacy configuration (deprecated).
 func DefaultLegacyConfig() *LegacyConfig {
 	return &LegacyConfig{

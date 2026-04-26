@@ -7,9 +7,9 @@ import (
 	"os"
 	"strings"
 
-	"claude-escalate/internal/config"
-	"claude-escalate/internal/gateway"
-	"claude-escalate/internal/intent"
+	"github.com/szibis/claude-escalate/internal/config"
+	"github.com/szibis/claude-escalate/internal/gateway"
+	"github.com/szibis/claude-escalate/internal/intent"
 )
 
 func main() {

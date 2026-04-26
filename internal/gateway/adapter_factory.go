@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"sync"
 
-	"claude-escalate/internal/config"
+	"github.com/szibis/claude-escalate/internal/config"
 )
 
 // AdapterFactory creates and manages tool adapters

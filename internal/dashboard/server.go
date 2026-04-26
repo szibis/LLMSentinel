@@ -10,8 +10,8 @@ import (
 	"sync"
 	"time"
 
-	"claude-escalate/internal/config"
-	"claude-escalate/internal/metrics"
+	"github.com/szibis/claude-escalate/internal/config"
+	"github.com/szibis/claude-escalate/internal/metrics"
 )
 
 // Server represents the dashboard HTTP server
