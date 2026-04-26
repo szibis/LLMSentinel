@@ -9,7 +9,14 @@ Complete reference for all configuration parameters and their meanings. Use this
 3. [Intent Detection](#intent-detection)
 4. [Security](#security)
 5. [Metrics](#metrics)
-6. [Example Configuration](#example-configuration)
+6. [Thresholds Configuration](#thresholds-configuration)
+7. [Keywords Configuration](#keywords-configuration)
+8. [Signals Configuration](#signals-configuration)
+9. [Token Limits Configuration](#token-limits-configuration)
+10. [Timeouts Configuration](#timeouts-configuration)
+11. [Paths Configuration](#paths-configuration)
+12. [Models Configuration](#models-configuration)
+13. [Example Configuration](#example-configuration)
 
 ---
 
@@ -373,6 +380,178 @@ metrics:
    - Cache effectiveness over time
    - Cost savings realized
    - Top optimization sources
+
+---
+
+## Thresholds Configuration
+
+Numerical thresholds for decision-making and confidence scoring.
+
+### `thresholds.cache_similarity`
+- **Default**: `0.85` (cosine similarity, 0.0-1.0)
+- **Impact**: **CRITICAL QUALITY**. Controls semantic cache false positive rate
+  - `0.90-1.00`: Very conservative, <0.05% false positives (strict quality)
+  - `0.85`: Balanced (default), <0.1% false positives (recommended)
+  - `0.70`: Loose, ~5% false positives (NOT recommended)
+- **When to adjust**: Increase to 0.90 if observing wrong cached answers, never decrease below 0.85
+
+### `thresholds.confidence_scores`
+- **high** (default `0.95`): Very confident intent classification
+- **medium** (default `0.85`): Moderately confident intent classification
+- **low** (default `0.70`): Some uncertainty in intent classification
+- **Impact**: Used for escalating models when confidence is low. Keep defaults (well-calibrated)
+
+### `thresholds.model_accuracy`
+- **Default**: `0.85`
+- **Impact**: Threshold for auto-escalating to better model if accuracy drops
+- **When to adjust**: Keep default (well-calibrated threshold)
+
+---
+
+## Keywords Configuration
+
+Keywords for intent detection and security pattern matching.
+
+### `keywords.detail`
+- **Default**: `["detailed", "comprehensive", "explain", "why", "how", "deep", "thorough", "analysis"]`
+- **Purpose**: Detect requests for detailed analysis (should bypass cache, use premium model)
+- **When to adjust**: Add domain-specific detail keywords (e.g., "architectural", "design rationale")
+
+### `keywords.quick`
+- **Default**: `["quick", "brief", "summary", "tl;dr", "just", "simply", "shortly"]`
+- **Purpose**: Detect quick/summary requests (safe to cache, use cheaper model)
+- **When to adjust**: Add domain-specific quick keywords (e.g., "gist", "one-liner")
+
+### `keywords.follow_up`
+- **Default**: `["more", "additional", "also", "what about", "furthermore", "moreover"]`
+- **Purpose**: Detect follow-up refinements (need fresh analysis on new angle)
+- **When to adjust**: Add domain-specific refinement keywords (e.g., "now for", "in addition")
+
+### `keywords.learning`
+- **Default**: `["what if", "try", "experiment", "compare", "explore", "alternative"]`
+- **Purpose**: Detect exploratory/learning queries (different scenarios need fresh responses)
+- **When to adjust**: Add domain-specific exploration keywords (e.g., "contrast", "evaluate")
+
+### `keywords.suspicious`
+- **Default**: `["DROP TABLE", "DELETE FROM", "INSERT INTO", "UPDATE", "TRUNCATE", "UNION SELECT"]`
+- **Purpose**: Detect potential SQL injection in input
+- **When to adjust**: Keep defaults (standard SQL injection keywords)
+
+---
+
+## Signals Configuration
+
+User feedback signals for learning system (success, failure, frustration indicators).
+
+### `signals.success_signals`
+- **Map format**: `{signal: confidence}` (e.g., `"perfect": 0.95`)
+- **Default signals**: "thanks" (0.85), "solved" (0.90), "works" (0.85), "got_it" (0.85)
+- **Purpose**: Learn when optimizations are working (reinforce decisions)
+- **When to adjust**: Add domain-specific success indicators (e.g., "chef's kiss" → 0.95)
+
+### `signals.failure_signals`
+- **Map format**: `{signal: confidence}`
+- **Default signals**: "error" (0.90), "broken" (0.90), "failed" (0.90), "doesnt_work" (0.85)
+- **Purpose**: Learn when optimizations fail (adjust decisions)
+- **When to adjust**: Add domain-specific failure indicators (e.g., "bust" → 0.85)
+
+### `signals.frustration_keywords`
+- **Map format**: `{keyword: confidence}`
+- **Default signals**: "still_broken" (0.90), "going_in_circles" (0.85), "stuck" (0.85)
+- **Purpose**: Detect frustration (triggers model escalation, e.g., Haiku → Sonnet)
+- **When to adjust**: Keep defaults (well-validated frustration indicators)
+
+---
+
+## Token Limits Configuration
+
+Token budgets per intent type and model.
+
+| Setting | Default | Purpose |
+|---------|---------|---------|
+| `quick_answer` | 256 | Max tokens for summary responses |
+| `detailed_analysis` | 2000 | Max tokens for detailed analysis (essentially unlimited) |
+| `routine` | 256 | Max tokens for routine/repeated queries |
+| `learning` | 1024 | Max tokens for exploratory queries (discuss trade-offs) |
+| `follow_up` | 512 | Max tokens for follow-up refinements |
+| `cache_bypass` | 2000 | Max tokens for cache-bypassed fresh queries (no limit) |
+| `max_cache_size_per_model.haiku` | 5000 | Max embedding cache size for Haiku responses |
+| `max_cache_size_per_model.sonnet` | 10000 | Max embedding cache size for Sonnet responses |
+| `max_cache_size_per_model.opus` | 50000 | Max embedding cache size for Opus responses |
+
+### When to adjust:
+- **Increase `quick_answer` to 512** if users want more detail in summaries
+- **Increase `learning` to 2000** if users want very detailed exploration of alternatives
+- **Increase model cache sizes** if you have memory and want higher cache hit rate
+
+---
+
+## Timeouts Configuration
+
+Operation timeouts in milliseconds.
+
+| Setting | Default | Purpose |
+|---------|---------|---------|
+| `individual_tool_check_ms` | 500 | Timeout per tool during discovery |
+| `total_discovery_ms` | 5000 | Total timeout for all tool discovery (startup) |
+| `escalation_ms` | 2000 | Timeout for model escalation decision |
+| `intent_detection_ms` | 50 | Timeout for intent classification |
+| `security_validation_ms` | 20 | Timeout for security checks |
+| `cache_lookup_ms` | 10 | Timeout for semantic cache search |
+
+### When to adjust:
+- **Increase discovery timeouts** if tools are on slow storage
+- **Decrease intent/security timeouts** if you need ultra-fast responses
+- Keep **cache_lookup_ms** <10ms (critical for interactive performance)
+
+---
+
+## Paths Configuration
+
+Directory paths for data storage and configuration files.
+
+| Setting | Default | Purpose |
+|---------|---------|---------|
+| `config_dir` | ~/.claude-escalate | Configuration directory |
+| `data_dir` | ~/.claude-escalate/data | Runtime cache and state |
+| `graph_db_path` | ~/.claude-escalate/graph.db | Knowledge graph SQLite DB (Phase 2) |
+| `metrics_dir` | ~/.claude-escalate/metrics | Metrics log files |
+| `log_dir` | ~/.claude-escalate/logs | Application logs |
+| `cache_dir` | ~/.claude-escalate/cache | Cache storage |
+| `claude_home` | ~/.claude | Claude configuration directory |
+
+### When to adjust:
+- **Change to SSD** for `data_dir`, `cache_dir` (faster cache performance)
+- **Change `metrics_dir`** to central logging server in production
+- Keep others at defaults (system standard locations)
+
+---
+
+## Models Configuration
+
+Model identifiers and pricing for Haiku, Sonnet, Opus.
+
+### Format per model:
+```yaml
+MODEL:
+  id: claude-MODEL-VERSION              # API model ID
+  cost_per_1k_input: 0.0008             # Cost per 1,000 input tokens
+  cost_per_1k_output: 0.0004            # Cost per 1,000 output tokens
+  context_window: 200000                # Max context in tokens
+```
+
+### Current Models:
+
+| Model | ID | Input Cost | Output Cost | Context |
+|-------|----|----|--------|---------|
+| Haiku | claude-haiku-4-5-20251001 | $0.0008/1K | $0.0004/1K | 200K |
+| Sonnet | claude-sonnet-4-6 | $0.003/1K | $0.015/1K | 200K |
+| Opus | claude-opus-4-6 | $0.015/1K | $0.075/1K | 200K |
+
+### When to adjust:
+- **Update IDs** when Anthropic releases new model versions
+- **Update pricing** if pricing changes
+- **Update context_window** if API increases context size
 
 ---
 

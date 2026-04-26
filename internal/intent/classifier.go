@@ -12,12 +12,12 @@ import (
 type IntentType string
 
 const (
-	IntentQuickAnswer       IntentType = "quick_answer"
-	IntentDetailedAnalysis  IntentType = "detailed_analysis"
-	IntentRoutine           IntentType = "routine"
-	IntentLearning          IntentType = "learning"
-	IntentFollowUp          IntentType = "follow_up"
-	IntentCacheBypass       IntentType = "cache_bypass"
+	IntentQuickAnswer      IntentType = "quick_answer"
+	IntentDetailedAnalysis IntentType = "detailed_analysis"
+	IntentRoutine          IntentType = "routine"
+	IntentLearning         IntentType = "learning"
+	IntentFollowUp         IntentType = "follow_up"
+	IntentCacheBypass      IntentType = "cache_bypass"
 )
 
 // EffortLevel represents the effort required
@@ -40,16 +40,16 @@ const (
 
 // IntentDecision represents the full decision for a query
 type IntentDecision struct {
-	Intent              IntentType
-	CacheSafe           bool
-	RecommendedModel    ModelType
-	MaxTokens           int
-	OptimizeMode        OptimizeLevel
-	Confidence          float64
-	EffortLevel         EffortLevel
-	FeedbackBonus       float64
-	Explanation         string
-	Timestamp           time.Time
+	Intent           IntentType
+	CacheSafe        bool
+	RecommendedModel ModelType
+	MaxTokens        int
+	OptimizeMode     OptimizeLevel
+	Confidence       float64
+	EffortLevel      EffortLevel
+	FeedbackBonus    float64
+	Explanation      string
+	Timestamp        time.Time
 }
 
 // OptimizeLevel represents the optimization aggressiveness
@@ -297,7 +297,7 @@ func (c *Classifier) isCacheSafe(intent IntentType) bool {
 }
 
 // calculateConfidence calculates confidence in the classification
-func (c *Classifier) calculateConfidence(intent IntentType, feedback *UserFeedbackPattern, query string) float64 {
+func (c *Classifier) calculateConfidence(_ IntentType, feedback *UserFeedbackPattern, query string) float64 {
 	baseConfidence := 0.7
 
 	// Adjust based on keyword matches
@@ -391,7 +391,7 @@ func (c *Classifier) optimizeModeForIntent(intent IntentType) OptimizeLevel {
 }
 
 // explainDecision provides explanation for the decision
-func (c *Classifier) explainDecision(baseIntent, finalIntent IntentType, feedback *UserFeedbackPattern) string {
+func (c *Classifier) explainDecision(baseIntent, finalIntent IntentType, _ *UserFeedbackPattern) string {
 	if baseIntent == finalIntent {
 		return "Intent detected: " + string(finalIntent)
 	}
@@ -448,11 +448,11 @@ func (c *Classifier) RecordFeedback(userID string, decision *IntentDecision, rat
 // makeBypassPatterns creates the cache bypass patterns
 func makeBypassPatterns() map[string]bool {
 	return map[string]bool{
-		"--no-cache":  true,
-		"--fresh":     true,
-		"!":           true,
-		"(no cache)":  true,
-		"(bypass)":    true,
-		"(fresh)":     true,
+		"--no-cache": true,
+		"--fresh":    true,
+		"!":          true,
+		"(no cache)": true,
+		"(bypass)":   true,
+		"(fresh)":    true,
 	}
 }

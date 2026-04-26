@@ -1,6 +1,7 @@
 package test
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -44,7 +45,7 @@ func TestIntentCacheCoupling(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			decision := classifier.Classify(nil, tt.query, "test-user", nil)
+			decision := classifier.Classify(context.TODO(), tt.query, "test-user", nil)
 
 			if tt.expectIntent != "" && decision.Intent != tt.expectIntent {
 				t.Errorf("expected intent %v, got %v", tt.expectIntent, decision.Intent)
@@ -137,7 +138,7 @@ func TestCacheBypassPatterns(t *testing.T) {
 	}
 
 	for _, pattern := range bypassPatterns {
-		decision := classifier.Classify(nil, pattern, "test-user", nil)
+		decision := classifier.Classify(context.TODO(), pattern, "test-user", nil)
 
 		if decision.CacheSafe {
 			t.Errorf("bypass pattern %q should force cache unsafe, got safe", pattern)
@@ -194,7 +195,7 @@ func TestConcurrentIntentAndMetrics(t *testing.T) {
 	for _, query := range queries {
 		go func(q string) {
 			start := time.Now()
-			decision := classifier.Classify(nil, q, "test-user", nil)
+			decision := classifier.Classify(context.TODO(), q, "test-user", nil)
 			duration := time.Since(start)
 
 			if decision == nil {
@@ -226,7 +227,7 @@ func TestModelEscalationFromFeedback(t *testing.T) {
 	classifier := intent.NewClassifier(90)
 
 	// First classification: QUICK_ANSWER → Haiku
-	decision1 := classifier.Classify(nil, "Summarize this code", "test-user", nil)
+	decision1 := classifier.Classify(context.TODO(), "Summarize this code", "test-user", nil)
 
 	if decision1.RecommendedModel != intent.ModelHaiku && decision1.RecommendedModel != intent.ModelSonnet {
 		t.Logf("initial decision uses model: %v", decision1.RecommendedModel)
@@ -236,7 +237,7 @@ func TestModelEscalationFromFeedback(t *testing.T) {
 	// (In real implementation, this would adjust future decisions)
 	// For now, just verify the coupling is consistent
 
-	decision2 := classifier.Classify(nil, "Summarize this code", "test-user", nil)
+	decision2 := classifier.Classify(context.TODO(), "Summarize this code", "test-user", nil)
 
 	// Decisions should be consistent (same query = same model)
 	if decision1.RecommendedModel != decision2.RecommendedModel {
@@ -282,7 +283,7 @@ func TestSecurityIntentCacheFlow(t *testing.T) {
 
 			if secure {
 				// Step 2: If secure, proceed to intent classification
-				decision := classifier.Classify(nil, tt.input, "test-user", nil)
+				decision := classifier.Classify(context.TODO(), tt.input, "test-user", nil)
 				if decision == nil {
 					t.Error("expected non-nil decision")
 				}

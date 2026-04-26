@@ -6,25 +6,25 @@ import (
 
 // ModelConfig contains configuration for all models
 type ModelConfig struct {
-	Enabled              bool
-	AutoDownload         bool
-	CachePath            string
-	Intent               ModelSubConfig
-	SecurityAnomaly      ModelSubConfig
-	SemanticEmbeddings   ModelSubConfig
+	Enabled            bool
+	AutoDownload       bool
+	CachePath          string
+	Intent             ModelSubConfig
+	SecurityAnomaly    ModelSubConfig
+	SemanticEmbeddings ModelSubConfig
 }
 
 // ModelSubConfig contains configuration for a specific model
 type ModelSubConfig struct {
-	Enabled            bool
-	Source             string        // "huggingface", "local", "remote"
-	ModelID            string        // Model identifier (e.g., "distilbert-base-uncased")
-	Version            string        // Model version (e.g., "1.0.0")
-	Quantized          bool          // Use quantized version if available
-	FallbackTo         string        // Fallback mechanism ("keywords", "regex", "disabled")
-	InferenceTimeout   time.Duration // Max inference time
-	CacheResults       bool          // Cache inference results
-	MaxCacheSize       int           // Max cache entries
+	Enabled          bool
+	Source           string        // "huggingface", "local", "remote"
+	ModelID          string        // Model identifier (e.g., "distilbert-base-uncased")
+	Version          string        // Model version (e.g., "1.0.0")
+	Quantized        bool          // Use quantized version if available
+	FallbackTo       string        // Fallback mechanism ("keywords", "regex", "disabled")
+	InferenceTimeout time.Duration // Max inference time
+	CacheResults     bool          // Cache inference results
+	MaxCacheSize     int           // Max cache entries
 }
 
 // DefaultModelConfig returns sensible defaults

@@ -48,7 +48,8 @@ func (l *Loader) Load() (*Config, error) {
 	}
 
 	// No config file found, use auto-detected defaults
-	return l.generateDefaultConfigWithDiscovery()
+	cfg := l.generateDefaultConfigWithDiscovery()
+	return cfg, nil
 }
 
 // loadFromFile loads configuration from a YAML file
@@ -63,6 +64,9 @@ func (l *Loader) loadFromFile(path string) error {
 		return err
 	}
 
+	// Apply defaults for any missing configuration sections
+	applyNewConfigDefaults(cfg)
+
 	// Validate configuration
 	if err := cfg.Validate(); err != nil {
 		return err
@@ -73,7 +77,7 @@ func (l *Loader) loadFromFile(path string) error {
 }
 
 // generateDefaultConfig generates configuration with auto-detected tools
-func (l *Loader) generateDefaultConfig() (*Config, error) {
+func (l *Loader) generateDefaultConfig() *Config {
 	cfg := &Config{
 		Gateway: GatewayConfig{
 			Port:            8080,
@@ -101,8 +105,8 @@ func (l *Loader) generateDefaultConfig() (*Config, error) {
 						Type: "web_scraping",
 						Name: "scrapling",
 						Settings: map[string]interface{}{
-							"css_selector":   true,
-							"markdown_only":  true,
+							"css_selector":    true,
+							"markdown_only":   true,
 							"cache_responses": true,
 						},
 					},
@@ -110,8 +114,8 @@ func (l *Loader) generateDefaultConfig() (*Config, error) {
 						Type: "code_analysis",
 						Name: "builtin_lsp",
 						Settings: map[string]interface{}{
-							"use_lsp":        true,
-							"cache_symbols":  true,
+							"use_lsp":       true,
+							"cache_symbols": true,
 						},
 					},
 				},
@@ -137,10 +141,10 @@ func (l *Loader) generateDefaultConfig() (*Config, error) {
 				DeduplicateExactRequests: true,
 			},
 			OutputOptimization: OutputOptimizationConfig{
-				Enabled:               true,
-				ResponseCompression:   true,
-				FieldFiltering:        true,
-				DeltaDetection:        true,
+				Enabled:             true,
+				ResponseCompression: true,
+				FieldFiltering:      true,
+				DeltaDetection:      true,
 			},
 			BatchAPI: BatchAPIConfig{
 				Enabled:          false,
@@ -197,12 +201,15 @@ func (l *Loader) generateDefaultConfig() (*Config, error) {
 		},
 	}
 
+	// Apply defaults for all configuration sections
+	applyNewConfigDefaults(cfg)
+
 	l.config = cfg
-	return cfg, nil
+	return cfg
 }
 
 // generateDefaultConfigWithDiscovery generates configuration using YAML-based tool discovery
-func (l *Loader) generateDefaultConfigWithDiscovery() (*Config, error) {
+func (l *Loader) generateDefaultConfigWithDiscovery() *Config {
 	// Try to load discovery config
 	discoveryConfigPath := findDiscoveryConfig()
 	var detectedTools *discovery.DetectedTools
@@ -284,10 +291,10 @@ func (l *Loader) generateDefaultConfigWithDiscovery() (*Config, error) {
 				DeduplicateExactRequests: true,
 			},
 			OutputOptimization: OutputOptimizationConfig{
-				Enabled:               true,
-				ResponseCompression:   true,
-				FieldFiltering:        true,
-				DeltaDetection:        true,
+				Enabled:             true,
+				ResponseCompression: true,
+				FieldFiltering:      true,
+				DeltaDetection:      true,
 			},
 			BatchAPI: BatchAPIConfig{
 				Enabled:          false,
@@ -344,8 +351,11 @@ func (l *Loader) generateDefaultConfigWithDiscovery() (*Config, error) {
 		},
 	}
 
+	// Apply defaults for all configuration sections
+	applyNewConfigDefaults(cfg)
+
 	l.config = cfg
-	return cfg, nil
+	return cfg
 }
 
 // findDiscoveryConfig searches for discovery.yaml configuration file
@@ -440,6 +450,162 @@ func expandHome(path string) string {
 	}
 
 	return path
+}
+
+// applyNewConfigDefaults applies default values to new configuration sections
+func applyNewConfigDefaults(cfg *Config) {
+	// Apply Thresholds defaults
+	if cfg.Thresholds.CacheSimilarity == 0 {
+		cfg.Thresholds.CacheSimilarity = 0.85
+	}
+	if cfg.Thresholds.ConfidenceScores.High == 0 {
+		cfg.Thresholds.ConfidenceScores.High = 0.95
+	}
+	if cfg.Thresholds.ConfidenceScores.Medium == 0 {
+		cfg.Thresholds.ConfidenceScores.Medium = 0.85
+	}
+	if cfg.Thresholds.ConfidenceScores.Low == 0 {
+		cfg.Thresholds.ConfidenceScores.Low = 0.70
+	}
+	if cfg.Thresholds.ModelAccuracy == 0 {
+		cfg.Thresholds.ModelAccuracy = 0.85
+	}
+
+	// Apply Keywords defaults
+	if len(cfg.Keywords.Detail) == 0 {
+		cfg.Keywords.Detail = []string{"detailed", "comprehensive", "explain", "why", "how", "deep", "thorough", "analysis"}
+	}
+	if len(cfg.Keywords.Quick) == 0 {
+		cfg.Keywords.Quick = []string{"quick", "brief", "summary", "tl;dr", "just", "simply", "shortly"}
+	}
+	if len(cfg.Keywords.FollowUp) == 0 {
+		cfg.Keywords.FollowUp = []string{"more", "additional", "also", "what about", "furthermore", "moreover"}
+	}
+	if len(cfg.Keywords.Learning) == 0 {
+		cfg.Keywords.Learning = []string{"what if", "try", "experiment", "compare", "explore", "alternative"}
+	}
+	if len(cfg.Keywords.Suspicious) == 0 {
+		cfg.Keywords.Suspicious = []string{"DROP TABLE", "DELETE FROM", "INSERT INTO", "UPDATE", "TRUNCATE", "UNION SELECT"}
+	}
+
+	// Apply Signals defaults
+	if cfg.Signals.SuccessSignals == nil {
+		cfg.Signals.SuccessSignals = map[string]float64{
+			"perfect":   0.95,
+			"thanks":    0.85,
+			"thank_you": 0.85,
+			"solved":    0.90,
+			"works":     0.85,
+			"got_it":    0.85,
+		}
+	}
+	if cfg.Signals.FailureSignals == nil {
+		cfg.Signals.FailureSignals = map[string]float64{
+			"error":       0.90,
+			"broken":      0.90,
+			"failed":      0.90,
+			"doesnt_work": 0.85,
+			"issue":       0.80,
+		}
+	}
+	if cfg.Signals.FrustrationKeywords == nil {
+		cfg.Signals.FrustrationKeywords = map[string]float64{
+			"still_broken":     0.90,
+			"going_in_circles": 0.85,
+			"stuck":            0.85,
+			"frustrated":       0.80,
+		}
+	}
+
+	// Apply TokenLimits defaults
+	if cfg.TokenLimits.QuickAnswer == 0 {
+		cfg.TokenLimits.QuickAnswer = 256
+	}
+	if cfg.TokenLimits.DetailedAnalysis == 0 {
+		cfg.TokenLimits.DetailedAnalysis = 2000
+	}
+	if cfg.TokenLimits.Routine == 0 {
+		cfg.TokenLimits.Routine = 256
+	}
+	if cfg.TokenLimits.Learning == 0 {
+		cfg.TokenLimits.Learning = 1024
+	}
+	if cfg.TokenLimits.FollowUp == 0 {
+		cfg.TokenLimits.FollowUp = 512
+	}
+	if cfg.TokenLimits.CacheBypass == 0 {
+		cfg.TokenLimits.CacheBypass = 2000
+	}
+	if cfg.TokenLimits.MaxCacheSize == nil {
+		cfg.TokenLimits.MaxCacheSize = map[string]int{
+			"haiku":  5000,
+			"sonnet": 10000,
+			"opus":   50000,
+		}
+	}
+
+	// Apply Timeouts defaults (in milliseconds)
+	if cfg.Timeouts.IndividualToolCheckMs == 0 {
+		cfg.Timeouts.IndividualToolCheckMs = 500
+	}
+	if cfg.Timeouts.TotalDiscoveryMs == 0 {
+		cfg.Timeouts.TotalDiscoveryMs = 5000
+	}
+	if cfg.Timeouts.EscalationMs == 0 {
+		cfg.Timeouts.EscalationMs = 2000
+	}
+	if cfg.Timeouts.IntentDetectionMs == 0 {
+		cfg.Timeouts.IntentDetectionMs = 50
+	}
+	if cfg.Timeouts.SecurityValidationMs == 0 {
+		cfg.Timeouts.SecurityValidationMs = 20
+	}
+	if cfg.Timeouts.CacheLookupMs == 0 {
+		cfg.Timeouts.CacheLookupMs = 10
+	}
+
+	// Apply Paths defaults
+	if cfg.Paths.ConfigDir == "" {
+		cfg.Paths.ConfigDir = expandHome("~/.claude-escalate")
+	}
+	if cfg.Paths.DataDir == "" {
+		cfg.Paths.DataDir = expandHome("~/.claude-escalate/data")
+	}
+	if cfg.Paths.GraphDBPath == "" {
+		cfg.Paths.GraphDBPath = expandHome("~/.claude-escalate/graph.db")
+	}
+	if cfg.Paths.MetricsDir == "" {
+		cfg.Paths.MetricsDir = expandHome("~/.claude-escalate/metrics")
+	}
+	if cfg.Paths.LogDir == "" {
+		cfg.Paths.LogDir = expandHome("~/.claude-escalate/logs")
+	}
+	if cfg.Paths.CacheDir == "" {
+		cfg.Paths.CacheDir = expandHome("~/.claude-escalate/cache")
+	}
+	if cfg.Paths.ClaudeHome == "" {
+		cfg.Paths.ClaudeHome = expandHome("~/.claude")
+	}
+
+	// Apply Models defaults
+	if cfg.Models.Haiku.ID == "" {
+		cfg.Models.Haiku.ID = "claude-haiku-4-5-20251001"
+		cfg.Models.Haiku.CostPer1KInput = 0.0008
+		cfg.Models.Haiku.CostPer1KOutput = 0.0004
+		cfg.Models.Haiku.ContextWindow = 200000
+	}
+	if cfg.Models.Sonnet.ID == "" {
+		cfg.Models.Sonnet.ID = "claude-sonnet-4-6"
+		cfg.Models.Sonnet.CostPer1KInput = 0.003
+		cfg.Models.Sonnet.CostPer1KOutput = 0.015
+		cfg.Models.Sonnet.ContextWindow = 200000
+	}
+	if cfg.Models.Opus.ID == "" {
+		cfg.Models.Opus.ID = "claude-opus-4-6"
+		cfg.Models.Opus.CostPer1KInput = 0.015
+		cfg.Models.Opus.CostPer1KOutput = 0.075
+		cfg.Models.Opus.ContextWindow = 200000
+	}
 }
 
 // Validate validates the configuration

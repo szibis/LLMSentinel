@@ -44,75 +44,75 @@ type SecurityMetrics struct {
 
 // TokenMetrics tracks token usage and savings
 type TokenMetrics struct {
-	TotalInputTokens       int64
-	TotalOutputTokens      int64
+	TotalInputTokens          int64
+	TotalOutputTokens         int64
 	TokensSavedByOptimization int64
-	SavingsPercent         float64
-	CostUSD                float64
-	EstimatedSavingsUSD    float64
-	LastUpdated            time.Time
+	SavingsPercent            float64
+	CostUSD                   float64
+	EstimatedSavingsUSD       float64
+	LastUpdated               time.Time
 }
 
 // LatencyMetrics tracks latency by component
 type LatencyMetrics struct {
-	CacheLookupMs        float64
-	SecurityValidationMs float64
-	IntentDetectionMs    float64
-	OptimizationMs       float64
-	ClaudeAPICallMs      float64
+	CacheLookupMs         float64
+	SecurityValidationMs  float64
+	IntentDetectionMs     float64
+	OptimizationMs        float64
+	ClaudeAPICallMs       float64
 	ResponseCompressionMs float64
-	TotalMs              float64
-	LastUpdated          time.Time
+	TotalMs               float64
+	LastUpdated           time.Time
 }
 
 // OptimizerMetrics tracks per-optimizer savings
 type OptimizerMetrics struct {
-	OptimizerName      string
-	TokensSaved        int64
-	SavingsPercent     float64
-	RequestsProcessed  int64
-	CacheHitRate       float64
-	Errors             int64
-	LastUpdated        time.Time
+	OptimizerName     string
+	TokensSaved       int64
+	SavingsPercent    float64
+	RequestsProcessed int64
+	CacheHitRate      float64
+	Errors            int64
+	LastUpdated       time.Time
 }
 
 // MetricsCollector collects and aggregates metrics
 type MetricsCollector struct {
-	mu                 sync.RWMutex
-	cacheMetrics       *CacheMetrics
-	securityMetrics    *SecurityMetrics
-	tokenMetrics       *TokenMetrics
-	latencyMetrics     *LatencyMetrics
-	optimizerMetrics   map[string]*OptimizerMetrics
-	requestCount       int64
-	errorCount         int64
-	startTime          time.Time
-	metricsHistory     []MetricSnapshot
-	maxHistorySize     int
+	mu               sync.RWMutex
+	cacheMetrics     *CacheMetrics
+	securityMetrics  *SecurityMetrics
+	tokenMetrics     *TokenMetrics
+	latencyMetrics   *LatencyMetrics
+	optimizerMetrics map[string]*OptimizerMetrics
+	requestCount     int64
+	errorCount       int64
+	startTime        time.Time
+	metricsHistory   []MetricSnapshot
+	maxHistorySize   int
 }
 
 // MetricSnapshot represents a point-in-time snapshot of metrics
 type MetricSnapshot struct {
-	Timestamp          time.Time
-	CacheMetrics       *CacheMetrics
-	SecurityMetrics    *SecurityMetrics
-	TokenMetrics       *TokenMetrics
-	LatencyMetrics     *LatencyMetrics
-	OptimizerMetrics   map[string]*OptimizerMetrics
-	RequestCount       int64
+	Timestamp        time.Time
+	CacheMetrics     *CacheMetrics
+	SecurityMetrics  *SecurityMetrics
+	TokenMetrics     *TokenMetrics
+	LatencyMetrics   *LatencyMetrics
+	OptimizerMetrics map[string]*OptimizerMetrics
+	RequestCount     int64
 }
 
 // NewMetricsCollector creates a new metrics collector
 func NewMetricsCollector() *MetricsCollector {
 	return &MetricsCollector{
-		cacheMetrics:    &CacheMetrics{},
-		securityMetrics: &SecurityMetrics{},
-		tokenMetrics:    &TokenMetrics{},
-		latencyMetrics:  &LatencyMetrics{},
+		cacheMetrics:     &CacheMetrics{},
+		securityMetrics:  &SecurityMetrics{},
+		tokenMetrics:     &TokenMetrics{},
+		latencyMetrics:   &LatencyMetrics{},
 		optimizerMetrics: make(map[string]*OptimizerMetrics),
-		startTime:       time.Now(),
-		metricsHistory:  make([]MetricSnapshot, 0),
-		maxHistorySize:  1440, // Keep 24 hours at 1-minute intervals
+		startTime:        time.Now(),
+		metricsHistory:   make([]MetricSnapshot, 0),
+		maxHistorySize:   1440, // Keep 24 hours at 1-minute intervals
 	}
 }
 
@@ -356,13 +356,13 @@ func copyTokenMetrics(m *TokenMetrics) *TokenMetrics {
 
 func copyLatencyMetrics(m *LatencyMetrics) *LatencyMetrics {
 	return &LatencyMetrics{
-		CacheLookupMs:        m.CacheLookupMs,
-		SecurityValidationMs: m.SecurityValidationMs,
-		IntentDetectionMs:    m.IntentDetectionMs,
-		OptimizationMs:       m.OptimizationMs,
-		ClaudeAPICallMs:      m.ClaudeAPICallMs,
+		CacheLookupMs:         m.CacheLookupMs,
+		SecurityValidationMs:  m.SecurityValidationMs,
+		IntentDetectionMs:     m.IntentDetectionMs,
+		OptimizationMs:        m.OptimizationMs,
+		ClaudeAPICallMs:       m.ClaudeAPICallMs,
 		ResponseCompressionMs: m.ResponseCompressionMs,
-		TotalMs:              m.TotalMs,
-		LastUpdated:          m.LastUpdated,
+		TotalMs:               m.TotalMs,
+		LastUpdated:           m.LastUpdated,
 	}
 }

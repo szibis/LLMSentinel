@@ -46,24 +46,24 @@ func NewBypassDetector() *BypassDetector {
 
 		// Contextual patterns: natural language indicating bypass request
 		contextualPatterns: []*regexp.Regexp{
-			regexp.MustCompile(`(?i)bypass\s+cache`),      // "bypass cache"
-			regexp.MustCompile(`(?i)skip\s+cache`),        // "skip cache"
-			regexp.MustCompile(`(?i)fresh\s+response`),    // "fresh response"
-			regexp.MustCompile(`(?i)no\s+cache`),          // "no cache"
-			regexp.MustCompile(`(?i)don't\s+cache`),       // "don't cache"
-			regexp.MustCompile(`(?i)do\s+not\s+cache`),    // "do not cache"
+			regexp.MustCompile(`(?i)bypass\s+cache`),   // "bypass cache"
+			regexp.MustCompile(`(?i)skip\s+cache`),     // "skip cache"
+			regexp.MustCompile(`(?i)fresh\s+response`), // "fresh response"
+			regexp.MustCompile(`(?i)no\s+cache`),       // "no cache"
+			regexp.MustCompile(`(?i)don't\s+cache`),    // "don't cache"
+			regexp.MustCompile(`(?i)do\s+not\s+cache`), // "do not cache"
 		},
 
 		// Code block indicators: patterns that suggest pasted code
 		codeBlockIndicators: []*regexp.Regexp{
-			regexp.MustCompile("```"),                           // Markdown code block
-			regexp.MustCompile("^\\s*func\\s+"),                 // Go function
-			regexp.MustCompile("^\\s*def\\s+"),                  // Python function
-			regexp.MustCompile("^\\s*function\\s+"),             // JavaScript function
-			regexp.MustCompile("^\\s*class\\s+"),                // Class definition
-			regexp.MustCompile("SELECT|INSERT|UPDATE|DELETE"), // SQL
-			regexp.MustCompile("^#!"),                           // Shebang
-			regexp.MustCompile("=>"),                            // JavaScript arrow function
+			regexp.MustCompile("```"),                            // Markdown code block
+			regexp.MustCompile(`^\s*func\s+`),                    // Go function
+			regexp.MustCompile(`^\s*def\s+`),                     // Python function
+			regexp.MustCompile(`^\s*function\s+`),                // JavaScript function
+			regexp.MustCompile(`^\s*class\s+`),                   // Class definition
+			regexp.MustCompile("SELECT|INSERT|UPDATE|DELETE"),    // SQL
+			regexp.MustCompile("^#!"),                            // Shebang
+			regexp.MustCompile("=>"),                             // JavaScript arrow function
 		},
 	}
 }

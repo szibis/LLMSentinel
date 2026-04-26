@@ -8,45 +8,45 @@ func TestExplicitBypassPatterns(t *testing.T) {
 	detector := NewBypassDetector()
 
 	tests := []struct {
-		name       string
-		query      string
-		shouldBypass bool
+		name          string
+		query         string
+		shouldBypass  bool
 		minConfidence float64
 	}{
 		{
-			name:         "--no-cache prefix",
-			query:        "--no-cache Find functions calling authenticate",
-			shouldBypass: true,
+			name:          "--no-cache prefix",
+			query:         "--no-cache Find functions calling authenticate",
+			shouldBypass:  true,
 			minConfidence: 0.90,
 		},
 		{
-			name:         "--fresh prefix",
-			query:        "--fresh Analyze this code",
-			shouldBypass: true,
+			name:          "--fresh prefix",
+			query:         "--fresh Analyze this code",
+			shouldBypass:  true,
 			minConfidence: 0.90,
 		},
 		{
-			name:         "! prefix",
-			query:        "! Get all functions",
-			shouldBypass: true,
+			name:          "! prefix",
+			query:         "! Get all functions",
+			shouldBypass:  true,
 			minConfidence: 0.90,
 		},
 		{
-			name:         "(no cache) suffix",
-			query:        "Analyze this code (no cache)",
-			shouldBypass: true,
+			name:          "(no cache) suffix",
+			query:         "Analyze this code (no cache)",
+			shouldBypass:  true,
 			minConfidence: 0.90,
 		},
 		{
-			name:         "embedded --no-cache (not prefix)",
-			query:        "This code has --no-cache flag in it",
-			shouldBypass: false,
+			name:          "embedded --no-cache (not prefix)",
+			query:         "This code has --no-cache flag in it",
+			shouldBypass:  false,
 			minConfidence: 0.90,
 		},
 		{
-			name:         "no bypass pattern",
-			query:        "Find functions calling authenticate",
-			shouldBypass: false,
+			name:          "no bypass pattern",
+			query:         "Find functions calling authenticate",
+			shouldBypass:  false,
 			minConfidence: 0.90,
 		},
 	}
@@ -68,8 +68,8 @@ func TestContextualBypassPatterns(t *testing.T) {
 	detector := NewBypassDetector()
 
 	tests := []struct {
-		name      string
-		query     string
+		name         string
+		query        string
 		shouldDetect bool
 	}{
 		{
@@ -104,10 +104,10 @@ func TestPasteDetection(t *testing.T) {
 	detector := NewBypassDetector()
 
 	tests := []struct {
-		name             string
-		query            string
+		name              string
+		query             string
 		shouldDetectPaste bool
-		shouldBypass     bool
+		shouldBypass      bool
 	}{
 		{
 			name: "go code with --no-cache",
@@ -160,9 +160,9 @@ func TestPasteDetection(t *testing.T) {
 
 func TestExtractQuery(t *testing.T) {
 	tests := []struct {
-		name      string
-		input     string
-		expected  string
+		name     string
+		input    string
+		expected string
 	}{
 		{
 			name:     "--no-cache prefix",
@@ -215,10 +215,10 @@ func TestConfidenceThresholds(t *testing.T) {
 	detector := NewBypassDetector()
 
 	tests := []struct {
-		name          string
-		query         string
-		threshold     float64
-		shouldBypass  bool
+		name         string
+		query        string
+		threshold    float64
+		shouldBypass bool
 	}{
 		{
 			name:         "explicit pattern vs high threshold",

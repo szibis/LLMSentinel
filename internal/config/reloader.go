@@ -10,13 +10,13 @@ import (
 
 // Reloader watches config file for changes and reloads configuration
 type Reloader struct {
-	configPath string
-	loader     *Loader
+	configPath  string
+	loader      *Loader
 	lastModTime time.Time
-	mu         sync.RWMutex
-	done       chan bool
-	wg         sync.WaitGroup
-	callbacks  []ReloadCallback
+	mu          sync.RWMutex
+	done        chan bool
+	wg          sync.WaitGroup
+	callbacks   []ReloadCallback
 }
 
 // ReloadCallback is called when config is reloaded

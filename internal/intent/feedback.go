@@ -6,21 +6,21 @@ import (
 
 // UserFeedbackPattern tracks user feedback and preferences
 type UserFeedbackPattern struct {
-	UserID                   string
-	PositiveFeedbackCount    int
-	NegativeFeedbackCount    int
-	RecentAccuracy           float64  // 0.0-1.0
-	PrefersFreshness         bool     // True if user marks cached responses negatively
-	PrefersOpus              bool     // True if user often requests detailed analysis
-	PrefersBriefness         bool     // True if user marks verbose responses negatively
-	CacheHitRating           float64  // How user rates cached hits vs fresh
-	LastFeedbackTime         time.Time
+	UserID                      string
+	PositiveFeedbackCount       int
+	NegativeFeedbackCount       int
+	RecentAccuracy              float64 // 0.0-1.0
+	PrefersFreshness            bool    // True if user marks cached responses negatively
+	PrefersOpus                 bool    // True if user often requests detailed analysis
+	PrefersBriefness            bool    // True if user marks verbose responses negatively
+	CacheHitRating              float64 // How user rates cached hits vs fresh
+	LastFeedbackTime            time.Time
 	AverageResponseSatisfaction float64
 }
 
 // SentimentAnalyzer analyzes query sentiment
 type SentimentAnalyzer struct {
-	urgencyKeywords  []string
+	urgencyKeywords   []string
 	urgencyIndicators map[string]float64
 }
 
@@ -32,10 +32,10 @@ func NewSentimentAnalyzer() *SentimentAnalyzer {
 			"slow", "stuck", "blocked", "breaking", "critical",
 		},
 		urgencyIndicators: map[string]float64{
-			"!":    0.2,  // Single exclamation
-			"!!":   0.5,  // Double exclamation
-			"!!!":  0.8,  // Triple or more
-			"????": 0.3,  // Multiple questions
+			"!":    0.2, // Single exclamation
+			"!!":   0.5, // Double exclamation
+			"!!!":  0.8, // Triple or more
+			"????": 0.3, // Multiple questions
 		},
 	}
 }
@@ -77,31 +77,31 @@ func (sa *SentimentAnalyzer) AnalyzeSentiment(query string) *SentimentResult {
 
 // SentimentResult represents sentiment analysis result
 type SentimentResult struct {
-	UrgencyScore    float64  // 0.0-1.0
-	ComplexityScore float64  // 0.0-1.0
-	Tone            string   // "neutral", "polite", "casual", "urgent", "frustrated"
+	UrgencyScore    float64 // 0.0-1.0
+	ComplexityScore float64 // 0.0-1.0
+	Tone            string  // "neutral", "polite", "casual", "urgent", "frustrated"
 	Urgent          bool
 	Timestamp       time.Time
 }
 
 // QueryContext provides context for intent classification
 type QueryContext struct {
-	PreviousQuery   string
-	PreviousIntent  IntentType
-	PreviousModel   ModelType
-	IsCachedHit     bool
-	UserSessionID   string
-	QueryHistory    []QueryRecord
+	PreviousQuery  string
+	PreviousIntent IntentType
+	PreviousModel  ModelType
+	IsCachedHit    bool
+	UserSessionID  string
+	QueryHistory   []QueryRecord
 }
 
 // QueryRecord represents a single query record
 type QueryRecord struct {
-	Query      string
-	Intent     IntentType
-	Model      ModelType
-	Cached     bool
+	Query        string
+	Intent       IntentType
+	Model        ModelType
+	Cached       bool
 	Satisfaction float64 // User rating 0-1
-	Timestamp  time.Time
+	Timestamp    time.Time
 }
 
 // Helper functions

@@ -10,7 +10,7 @@ import (
 
 // Requirement represents a specification requirement
 type Requirement struct {
-	ID          string   // REQ-001
+	ID          string // REQ-001
 	Title       string
 	Description string
 	Files       []string // Implemented in files
@@ -26,13 +26,13 @@ type SpecValidator struct {
 
 // ValidationResults holds validation results
 type ValidationResults struct {
-	TotalRequirements    int
-	ImplementedCount     int
-	TestedCount          int
-	CompleteCount        int
-	UncoveredRequires    []*Requirement
-	PartiallyTestedReqs  []*Requirement
-	Coverage             float64
+	TotalRequirements   int
+	ImplementedCount    int
+	TestedCount         int
+	CompleteCount       int
+	UncoveredRequires   []*Requirement
+	PartiallyTestedReqs []*Requirement
+	Coverage            float64
 }
 
 // NewSpecValidator creates a new validator
@@ -255,9 +255,9 @@ func ValidateSecurityPatterns(srcDir string) {
 	patternText := string(content)
 
 	expectedPatterns := map[string][]string{
-		"SQL Injection": {"DROP", "DELETE", "UNION SELECT", "OR", "comment"},
+		"SQL Injection":     {"DROP", "DELETE", "UNION SELECT", "OR", "comment"},
 		"Command Injection": {"shell metacharacters", "$(", "eval", "system"},
-		"XSS": {"<script>", "javascript:", "onerror", "onclick", "onload"},
+		"XSS":               {"<script>", "javascript:", "onerror", "onclick", "onload"},
 	}
 
 	fmt.Println("\nSECURITY PATTERN VALIDATION:")

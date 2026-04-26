@@ -54,7 +54,7 @@ func (dm *DownloadManager) downloadFromHuggingFace(ctx context.Context, modelID,
 	// Map model IDs to HuggingFace URLs
 	urls := map[string]string{
 		"distilbert-base-uncased": "https://huggingface.co/distilbert-base-uncased/resolve/main/model.onnx",
-		"all-MiniLM-L6-v2":         "https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2/resolve/main/onnx/model.onnx",
+		"all-MiniLM-L6-v2":        "https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2/resolve/main/onnx/model.onnx",
 	}
 
 	modelURL, exists := urls[modelID]

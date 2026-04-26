@@ -40,7 +40,7 @@ type LegacyConfig struct {
 // DefaultConfig returns the default configuration for Claude Escalate.
 func DefaultConfig() *Config {
 	loader := NewLoader("")
-	cfg, _ := loader.generateDefaultConfig()
+	cfg := loader.generateDefaultConfig()
 	return cfg
 }
 
