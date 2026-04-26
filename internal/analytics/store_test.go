@@ -162,7 +162,7 @@ func TestSaveRecord_RollbackOnDuplicate(t *testing.T) {
 		t.Fatalf("expected error on duplicate validation_id")
 	}
 	if !strings.Contains(strings.ToLower(err.Error()), "fail") {
-		// just sanity check error message wraps something
+		t.Logf("warning: error message doesn't mention 'fail': %v", err)
 	}
 
 	if got := tableCount(t, db, "sentiment_outcomes"); got != beforeOutcomes {

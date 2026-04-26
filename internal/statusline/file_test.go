@@ -9,10 +9,10 @@ import (
 
 // withFakeHome rewrites $HOME to a temp dir for the duration of the test
 // and pre-creates the safe escalation directory.
-func withFakeHome(t *testing.T) (home, safe string) {
+func withFakeHome(t *testing.T) string {
 	t.Helper()
-	home = t.TempDir()
-	safe = filepath.Join(home, ".claude", "data", "escalation")
+	home := t.TempDir()
+	safe := filepath.Join(home, ".claude", "data", "escalation")
 	if err := os.MkdirAll(safe, 0o755); err != nil {
 		t.Fatalf("mkdir safe: %v", err)
 	}
@@ -22,12 +22,12 @@ func withFakeHome(t *testing.T) (home, safe string) {
 	t.Cleanup(func() {
 		_ = os.Setenv("HOME", prev)
 	})
-	return home, safe
+	return safe
 }
 
 // TestValidateFilePath_Rejects path-traversal and out-of-tree paths.
 func TestValidateFilePath_Rejects(t *testing.T) {
-	_, _ = withFakeHome(t)
+	_ = withFakeHome(t)
 
 	cases := []struct {
 		name string
@@ -50,7 +50,7 @@ func TestValidateFilePath_Rejects(t *testing.T) {
 
 // TestValidateFilePath_Accepts paths inside the safe directory.
 func TestValidateFilePath_Accepts(t *testing.T) {
-	_, safe := withFakeHome(t)
+	safe := withFakeHome(t)
 
 	in := filepath.Join(safe, "statusline.json")
 	out, err := validateFilePath(in)
@@ -65,7 +65,7 @@ func TestValidateFilePath_Accepts(t *testing.T) {
 // TestValidateFilePath_DefaultsToSafePath verifies an empty input falls
 // back to the canonical safe location.
 func TestValidateFilePath_DefaultsToSafePath(t *testing.T) {
-	_, safe := withFakeHome(t)
+	safe := withFakeHome(t)
 
 	out, err := validateFilePath("")
 	if err != nil {
@@ -80,7 +80,7 @@ func TestValidateFilePath_DefaultsToSafePath(t *testing.T) {
 // TestValidateFilePath_SymlinkEscape ensures a symlink whose target is
 // outside the safe base is rejected.
 func TestValidateFilePath_SymlinkEscape(t *testing.T) {
-	_, safe := withFakeHome(t)
+	safe := withFakeHome(t)
 
 	// Create a target outside the safe base.
 	outsideDir := t.TempDir()
@@ -102,7 +102,7 @@ func TestValidateFilePath_SymlinkEscape(t *testing.T) {
 
 // TestFilePoll_MalformedJSON checks malformed JSON is rejected.
 func TestFilePoll_MalformedJSON(t *testing.T) {
-	_, safe := withFakeHome(t)
+	safe := withFakeHome(t)
 	path := filepath.Join(safe, "statusline.json")
 	if err := os.WriteFile(path, []byte(`{not json`), 0o600); err != nil {
 		t.Fatalf("write: %v", err)
@@ -122,7 +122,7 @@ func TestFilePoll_MalformedJSON(t *testing.T) {
 
 // TestFilePoll_MissingRequiredFields checks missing fields rejected.
 func TestFilePoll_MissingRequiredFields(t *testing.T) {
-	_, safe := withFakeHome(t)
+	safe := withFakeHome(t)
 	path := filepath.Join(safe, "statusline.json")
 	if err := os.WriteFile(path, []byte(`{"model":"opus"}`), 0o600); err != nil {
 		t.Fatalf("write: %v", err)
@@ -142,7 +142,7 @@ func TestFilePoll_MissingRequiredFields(t *testing.T) {
 
 // TestFilePoll_ValidPayload exercises the happy path.
 func TestFilePoll_ValidPayload(t *testing.T) {
-	_, safe := withFakeHome(t)
+	safe := withFakeHome(t)
 	path := filepath.Join(safe, "statusline.json")
 	if err := os.WriteFile(path, []byte(`{"input_tokens":100,"output_tokens":200}`), 0o600); err != nil {
 		t.Fatalf("write: %v", err)
@@ -163,7 +163,7 @@ func TestFilePoll_ValidPayload(t *testing.T) {
 
 // TestFilePoll_NegativeTokens_Rejected ensures invalid ranges fail.
 func TestFilePoll_NegativeTokens_Rejected(t *testing.T) {
-	_, safe := withFakeHome(t)
+	safe := withFakeHome(t)
 	path := filepath.Join(safe, "statusline.json")
 	if err := os.WriteFile(path, []byte(`{"input_tokens":-5,"output_tokens":1}`), 0o600); err != nil {
 		t.Fatalf("write: %v", err)
