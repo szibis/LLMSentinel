@@ -88,7 +88,7 @@ func (io *InputOptimizer) OptimizeInput(ctx context.Context, req *PipelineReques
 	}
 
 	// Step 4: Compress parameters (biggest win typically)
-	if optimized.Params != nil && len(optimized.Params) > 0 {
+	if len(optimized.Params) > 0 {
 		originalParams, _ := json.Marshal(optimized.Params)
 		originalParamsSize := len(originalParams)
 

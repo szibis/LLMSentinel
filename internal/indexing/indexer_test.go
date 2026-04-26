@@ -35,7 +35,7 @@ func login(username string) {
 	}
 }
 `
-	if err := os.WriteFile(goFile, []byte(content), 0644); err != nil {
+	if err := os.WriteFile(goFile, []byte(content), 0600); err != nil {
 		t.Fatalf("WriteFile failed: %v", err)
 	}
 
@@ -112,7 +112,7 @@ class DataProcessor:
     def __init__(self):
         self.data = []
 `
-	if err := os.WriteFile(pyFile, []byte(content), 0644); err != nil {
+	if err := os.WriteFile(pyFile, []byte(content), 0600); err != nil {
 		t.Fatalf("WriteFile failed: %v", err)
 	}
 
@@ -165,7 +165,7 @@ export class UserService {
     }
 }
 `
-	if err := os.WriteFile(tsFile, []byte(content), 0644); err != nil {
+	if err := os.WriteFile(tsFile, []byte(content), 0600); err != nil {
 		t.Fatalf("WriteFile failed: %v", err)
 	}
 
@@ -206,12 +206,12 @@ func TestCodeIndexer_IndexDirectory(t *testing.T) {
 	goFile := filepath.Join(tmpDir, "main.go")
 	os.WriteFile(goFile, []byte(`package main
 func main() {}
-`), 0644)
+`), 0600)
 
 	pyFile := filepath.Join(tmpDir, "util.py")
 	os.WriteFile(pyFile, []byte(`def helper():
     pass
-`), 0644)
+`), 0600)
 
 	// Index directory
 	count, err := indexer.IndexDirectory(ctx, tmpDir)
@@ -240,7 +240,7 @@ func TestCodeIndexer_WatchFile_Detects_Changes(t *testing.T) {
 func initial() {}
 func helper() {}
 `
-	os.WriteFile(goFile, []byte(initialContent), 0644)
+	os.WriteFile(goFile, []byte(initialContent), 0600)
 
 	// Start watching
 	changes := make(chan *IndexingResult, 10)
@@ -258,7 +258,7 @@ func initial() {}
 func helper() {}
 func newFunction() {}
 `
-	os.WriteFile(goFile, []byte(updatedContent), 0644)
+	os.WriteFile(goFile, []byte(updatedContent), 0600)
 
 	// Verify change detected - watch for result channel
 	changeCount := 0
@@ -293,7 +293,7 @@ func TestCodeIndexer_Incremental_Update(t *testing.T) {
 func funcA() {}
 func funcB() {}
 `
-	os.WriteFile(goFile, []byte(content), 0644)
+	os.WriteFile(goFile, []byte(content), 0600)
 
 	// First index
 	result1, _ := indexer.IndexFile(ctx, goFile)
@@ -306,7 +306,7 @@ func funcA() {}
 func funcB() {}
 func funcC() {}
 `
-	os.WriteFile(goFile, []byte(updatedContent), 0644)
+	os.WriteFile(goFile, []byte(updatedContent), 0600)
 
 	// Re-index (should only add funcC, not duplicate A and B)
 	result2, _ := indexer.IndexFile(ctx, goFile)
@@ -336,7 +336,7 @@ func login(user string) {
 	authenticate(user)
 }
 `
-	os.WriteFile(goFile, []byte(content), 0644)
+	os.WriteFile(goFile, []byte(content), 0600)
 
 	result, _ := indexer.IndexFile(ctx, goFile)
 
@@ -371,7 +371,7 @@ func TestCodeIndexer_Unsupported_Language(t *testing.T) {
 
 	// Create unsupported file type
 	unknownFile := filepath.Join(tmpDir, "test.xyz")
-	os.WriteFile(unknownFile, []byte("some content"), 0644)
+	os.WriteFile(unknownFile, []byte("some content"), 0600)
 
 	result, err := indexer.IndexFile(ctx, unknownFile)
 
@@ -393,7 +393,7 @@ func TestCodeIndexer_Empty_File(t *testing.T) {
 	indexer := NewCodeIndexer(graphDB)
 
 	goFile := filepath.Join(tmpDir, "empty.go")
-	os.WriteFile(goFile, []byte(""), 0644)
+	os.WriteFile(goFile, []byte(""), 0600)
 
 	result, err := indexer.IndexFile(ctx, goFile)
 
@@ -419,7 +419,7 @@ func TestCodeIndexer_Large_File(t *testing.T) {
 	for i := 0; i < 100; i++ {
 		largeContent += fmt.Sprintf("func func%d() {}\n", i)
 	}
-	os.WriteFile(goFile, []byte(largeContent), 0644)
+	os.WriteFile(goFile, []byte(largeContent), 0600)
 
 	result, err := indexer.IndexFile(ctx, goFile)
 	if err != nil {
@@ -444,7 +444,7 @@ func TestCodeIndexer_Concurrent_Indexing(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		file := filepath.Join(tmpDir, fmt.Sprintf("test%d.go", i))
 		content := fmt.Sprintf("package main\n\nfunc test%d() {}\n", i)
-		os.WriteFile(file, []byte(content), 0644)
+		os.WriteFile(file, []byte(content), 0600)
 		files[i] = file
 	}
 
@@ -495,7 +495,7 @@ func bar() {
 	foo()
 }
 `
-	os.WriteFile(goFile, []byte(content), 0644)
+	os.WriteFile(goFile, []byte(content), 0600)
 
 	result, _ := indexer.IndexFile(ctx, goFile)
 

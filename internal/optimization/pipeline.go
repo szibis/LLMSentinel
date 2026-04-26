@@ -160,7 +160,7 @@ func (p *OptimizationPipeline) Process(req *PipelineRequest) *PipelineResponse {
 
 // buildResponse constructs a PipelineResponse with transparency footer
 func (p *OptimizationPipeline) buildResponse(
-	req *PipelineRequest,
+	_ *PipelineRequest,
 	cacheResult *cache.GraphQueryResult,
 	layer int,
 	startTime time.Time,
@@ -180,9 +180,7 @@ func (p *OptimizationPipeline) buildResponse(
 	// Add graph context if applicable
 	if cacheResult.IsGraphMatch && len(cacheResult.RelatedNodes) > 0 {
 		nodes := make([]graph.Node, len(cacheResult.RelatedNodes))
-		for i, n := range cacheResult.RelatedNodes {
-			nodes[i] = n
-		}
+		copy(nodes, cacheResult.RelatedNodes)
 		resp.GraphContext = &GraphContext{
 			GraphHit:    true,
 			Nodes:       nodes,

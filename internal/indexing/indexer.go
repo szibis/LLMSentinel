@@ -191,7 +191,7 @@ func (ci *CodeIndexer) WatchFile(ctx context.Context, filePath string, changes c
 }
 
 // storeInGraph saves entities and relationships to the graph database
-func (ci *CodeIndexer) storeInGraph(ctx context.Context, filePath string, result *IndexingResult) error {
+func (ci *CodeIndexer) storeInGraph(ctx context.Context, _ string, result *IndexingResult) error {
 	if result == nil || ci.graphDB == nil {
 		return nil
 	}

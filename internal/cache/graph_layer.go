@@ -161,7 +161,7 @@ func (cgl *CacheGraphLayer) lookupGraph(ctx context.Context, query string) *grap
 	if cgl.graphDB == nil {
 		return &graph.GraphLookupResult{
 			Found: false,
-			Error: fmt.Sprintf("graph database not available"),
+			Error: "graph database not available",
 		}
 	}
 
