@@ -78,6 +78,7 @@ func TestStress_HighConcurrencyHighContention(t *testing.T) {
 		wg.Add(1)
 		go func(goroutineID int) {
 			defer wg.Done()
+			// #nosec G404 - math/rand acceptable for test randomization
 			rng := rand.New(rand.NewSource(int64(goroutineID)))
 			for r := 0; r < requestsPerGoroutine; r++ {
 				prompt := sharedPrompts[rng.Intn(len(sharedPrompts))]
