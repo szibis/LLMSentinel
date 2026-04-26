@@ -329,7 +329,7 @@ docker-compose up   # Service + dashboard
 
 - **Go 1.26** (for building from source)
 - **Node.js 18+** (for building web dashboard)
-- **Linux, macOS, or Windows** (Intel/ARM)
+- **Linux or macOS** (Intel/ARM)
 - **8 MB disk space** (binary + cache)
 - **20 MB RAM** (service + metrics + cache)
 

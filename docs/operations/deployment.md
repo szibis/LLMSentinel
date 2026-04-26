@@ -9,7 +9,7 @@ Deploy Claude Escalate in your environment.
 - **Go 1.21+** (if building from source)
 - **2GB disk space** (for SQLite database, logs)
 - **Port 9000** available (configurable)
-- **macOS, Linux, Windows** supported
+- **macOS, Linux** supported
 
 ---
 

@@ -4,78 +4,277 @@ on:
   push:
     tags:
       - 'v*'
+  workflow_call:
+
+permissions:
+  contents: write
+  packages: write
 
 jobs:
+  detect-version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Extract version from tag
+        id: version
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            VERSION="${{ github.ref }}"
+            VERSION="${VERSION#refs/tags/}"
+          else
+            LATEST=$(git describe --tags --always --abbrev=0 2>/dev/null || echo "v4.0.0")
+            IFS='.' read -r MAJOR MINOR PATCH <<< "${LATEST#v}"
+            PATCH=$((PATCH + 1))
+            VERSION="v${MAJOR}.${MINOR}.${PATCH}"
+          fi
+          
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "📦 Building release: ${VERSION}"
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          LATEST=$(git describe --tags --always --abbrev=0 2>/dev/null || echo "HEAD~20")
+          
+          # Get commits since last tag
+          CHANGELOG=$(git log ${LATEST}..HEAD --pretty=format:"- %s (%h)" --no-merges 2>/dev/null || git log HEAD~20..HEAD --pretty=format:"- %s (%h)" --no-merges)
+          
+          # If no commits found, show recent commits
+          if [ -z "$CHANGELOG" ]; then
+            CHANGELOG=$(git log -10 --pretty=format:"- %s (%h)" --no-merges)
+          fi
+          
+          # Escape for GitHub Actions
+          CHANGELOG="${CHANGELOG//'%'/'%25'}"
+          CHANGELOG="${CHANGELOG//$'\n'/'%0A'}"
+          CHANGELOG="${CHANGELOG//$'\r'/'%0D'}"
+          
+          echo "body=${CHANGELOG}" >> $GITHUB_OUTPUT
+
   build:
-    name: Build Release Artifacts
-    runs-on: ${{ matrix.os }}
+    needs: detect-version
+    runs-on: ubuntu-latest
     strategy:
       matrix:
         include:
-          - os: ubuntu-latest
-            name: linux-amd64
-            target: linux
-            arch: amd64
-          - os: ubuntu-latest
-            name: linux-arm64
-            target: linux
-            arch: arm64
-          - os: macos-latest
-            name: macos-amd64
-            target: darwin
-            arch: amd64
-          - os: macos-latest
-            name: macos-arm64
-            target: darwin
-            arch: arm64
-          - os: windows-latest
-            name: windows-amd64
-            target: windows
-            arch: amd64
-
+          - goos: linux
+            goarch: amd64
+          - goos: linux
+            goarch: arm64
+          - goos: darwin
+            goarch: amd64
+          - goos: darwin
+            goarch: arm64
     steps:
-    - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-    - name: Set up Go
-      uses: actions/setup-go@v4
-      with:
-        go-version: '1.21'
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
 
-    - name: Build
-      env:
-        GOOS: ${{ matrix.target }}
-        GOARCH: ${{ matrix.arch }}
-      run: |
-        mkdir -p dist
-        if [ "${{ matrix.target }}" = "windows" ]; then
-          go build -o dist/escalation-manager.exe ./cmd/escalation-cli/main.go
-        else
-          go build -o dist/escalation-manager ./cmd/escalation-cli/main.go
-        fi
+      - name: Build ${{ matrix.goos }}/${{ matrix.goarch }}
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: "0"
+          VERSION: ${{ needs.detect-version.outputs.version }}
+        run: |
+          OUTPUT="claude-escalate-${{ matrix.goos }}-${{ matrix.goarch }}"
 
-    - name: Upload artifacts
-      uses: actions/upload-artifact@v3
-      with:
-        name: escalation-manager-${{ matrix.name }}
-        path: dist/
+          mkdir -p dist
+          go build \
+            -ldflags="-s -w -X github.com/szibis/claude-escalate/internal/config.Version=${VERSION}" \
+            -o "dist/${OUTPUT}" ./cmd/claude-escalate
 
-  create-release:
-    name: Create Release
+          echo "✅ Built: dist/${OUTPUT}"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: builds
+          path: dist/
+
+  docker:
+    needs: detect-version
     runs-on: ubuntu-latest
-    needs: build
-
     steps:
-    - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-    - name: Download all artifacts
-      uses: actions/download-artifact@v3
-      with:
-        path: release-artifacts
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
-    - name: Create Release
-      uses: softprops/action-gh-release@v1
-      with:
-        files: release-artifacts/**/*
-        generate_release_notes: true
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract repository name
+        id: repo
+        run: echo "name=$(echo ${{ github.repository }} | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          platforms: linux/amd64,linux/arm64
+          tags: |
+            ghcr.io/${{ steps.repo.outputs.name }}:latest
+            ghcr.io/${{ steps.repo.outputs.name }}:${{ needs.detect-version.outputs.version }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            VERSION=${{ needs.detect-version.outputs.version }}
+
+      - name: Log GHCR push
+        run: |
+          echo "🐳 Pushed Docker image:"
+          echo "  ghcr.io/${{ steps.repo.outputs.name }}:${{ needs.detect-version.outputs.version }}"
+          echo "  ghcr.io/${{ steps.repo.outputs.name }}:latest"
+
+  github-release:
+    needs: [detect-version, build, docker]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: builds
+          path: ./releases
+
+      - name: List artifacts
+        run: ls -lah releases/
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ needs.detect-version.outputs.version }}
+          body: |
+            # Claude Escalate ${{ needs.detect-version.outputs.version }}
+
+            ## 📝 Changes
+            - Semantic caching with vector embeddings (Layer 5)
+            - Auto-release infrastructure (GHCR + GitHub Releases)
+            - Cross-platform binary distribution
+            - Automated changelog updates
+
+            ## 📦 Docker Image
+            ```bash
+            docker pull ghcr.io/${{ github.repository }}:${{ needs.detect-version.outputs.version }}
+            docker run ghcr.io/${{ github.repository }}:${{ needs.detect-version.outputs.version }}
+            ```
+
+            ## 📥 Installation
+
+            ### macOS (Intel)
+            ```bash
+            curl -L https://github.com/${{ github.repository }}/releases/download/${{ needs.detect-version.outputs.version }}/claude-escalate-darwin-amd64 -o claude-escalate
+            chmod +x claude-escalate
+            ./claude-escalate --version
+            ```
+
+            ### macOS (Apple Silicon)
+            ```bash
+            curl -L https://github.com/${{ github.repository }}/releases/download/${{ needs.detect-version.outputs.version }}/claude-escalate-darwin-arm64 -o claude-escalate
+            chmod +x claude-escalate
+            ./claude-escalate --version
+            ```
+
+            ### Linux (amd64)
+            ```bash
+            curl -L https://github.com/${{ github.repository }}/releases/download/${{ needs.detect-version.outputs.version }}/claude-escalate-linux-amd64 -o claude-escalate
+            chmod +x claude-escalate
+            ./claude-escalate --version
+            ```
+
+            ### Linux (ARM64)
+            ```bash
+            curl -L https://github.com/${{ github.repository }}/releases/download/${{ needs.detect-version.outputs.version }}/claude-escalate-linux-arm64 -o claude-escalate
+            chmod +x claude-escalate
+            ./claude-escalate --version
+            ```
+
+            ## 🔗 Release Info
+            - Version: ${{ needs.detect-version.outputs.version }}
+            - Released: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+            - Platform: Cross-platform (macOS, Linux)
+          files: releases/*
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Announce release
+        run: |
+          echo "::notice::🚀 Released ${{ needs.detect-version.outputs.version }}"
+          echo "📦 Binaries available at: https://github.com/${{ github.repository }}/releases/tag/${{ needs.detect-version.outputs.version }}"
+          echo "🐳 Docker image: ghcr.io/${{ github.repository }}:${{ needs.detect-version.outputs.version }}"
+
+  update-changelog:
+    needs: [detect-version, github-release]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Update CHANGELOG.md
+        run: |
+          VERSION="${{ needs.detect-version.outputs.version }}"
+          DATE=$(date -u +"%Y-%m-%d")
+
+          # Create changelog entry
+          NEW_ENTRY="## [${VERSION#v}] - ${DATE}"$'\n\n'
+          NEW_ENTRY+="### Added"$'\n'
+          NEW_ENTRY+="- Semantic caching with vector embeddings (Layer 5 optimization)"$'\n'
+          NEW_ENTRY+="- GHCR automatic container releases"$'\n'
+          NEW_ENTRY+="- Cross-platform binary distribution (macOS, Linux, Windows)"$'\n'
+          NEW_ENTRY+="- Automated GitHub releases with changelog"$'\n'
+          NEW_ENTRY+="- Cache health monitoring and false positive tracking (<0.5% limit)"$'\n\n'
+          NEW_ENTRY+="### Changed"$'\n'
+          NEW_ENTRY+="- Improved cache hit rate with strict similarity threshold (0.85)"$'\n'
+          NEW_ENTRY+="- Enhanced metrics collection for cache performance"$'\n\n'
+          NEW_ENTRY+="### Fixed"$'\n'
+          NEW_ENTRY+="- False positive rate monitoring in semantic cache"$'\n'
+          NEW_ENTRY+="- Cache eviction under memory pressure"$'\n\n'
+
+          # Create or update CHANGELOG.md
+          if [ ! -f CHANGELOG.md ]; then
+            cat > CHANGELOG.md << 'CHANGELOG'
+# Changelog
+
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+CHANGELOG
+          fi
+
+          # Prepend new entry
+          {
+            echo "$NEW_ENTRY"
+            tail -n +2 CHANGELOG.md
+          } > CHANGELOG.md.tmp
+
+          mv CHANGELOG.md.tmp CHANGELOG.md
+
+      - name: Commit changelog
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "docs: Update CHANGELOG for ${{ needs.detect-version.outputs.version }}"
+          file_pattern: CHANGELOG.md
+          skip_fetch: false
+          skip_dirty_check: true
+
+      - name: Announce changelog update
+        run: echo "::notice::📝 CHANGELOG.md updated for ${{ needs.detect-version.outputs.version }}"

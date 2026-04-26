@@ -144,10 +144,11 @@ type MetricsConfig struct {
 
 // PublishTargets configures where metrics are published
 type PublishTargets struct {
-	Prometheus PrometheusTarget `yaml:"prometheus"`
-	Grafana    GrafanaTarget    `yaml:"grafana"`
-	CloudWatch CloudWatchTarget `yaml:"cloudwatch"`
-	DebugLogs  DebugLogsTarget  `yaml:"debug_logs"`
+	Prometheus    PrometheusTarget    `yaml:"prometheus"`
+	Grafana       GrafanaTarget       `yaml:"grafana"`
+	CloudWatch    CloudWatchTarget    `yaml:"cloudwatch"`
+	OpenTelemetry OpenTelemetryTarget `yaml:"opentelemetry"`
+	DebugLogs     DebugLogsTarget     `yaml:"debug_logs"`
 }
 
 // PrometheusTarget configures Prometheus export
@@ -167,6 +168,20 @@ type GrafanaTarget struct {
 type CloudWatchTarget struct {
 	Enabled   bool   `yaml:"enabled"`
 	Namespace string `yaml:"namespace"`
+}
+
+// OpenTelemetryTarget configures OpenTelemetry metrics export
+type OpenTelemetryTarget struct {
+	Enabled         bool   `yaml:"enabled"`
+	ExporterType    string `yaml:"exporter_type"`    // "otlp" (default), "jaeger", "prometheus"
+	OTLPEndpoint    string `yaml:"otlp_endpoint"`    // e.g., "http://localhost:4317" for OTLP/gRPC
+	JaegerEndpoint  string `yaml:"jaeger_endpoint"`  // e.g., "http://localhost:14268/api/traces" for Jaeger HTTP
+	ServiceName     string `yaml:"service_name"`     // Default: "claude-escalate"
+	ServiceVersion  string `yaml:"service_version"`  // Default: version from config.Version
+	Environment     string `yaml:"environment"`      // e.g., "production", "staging"
+	BatchSize       int    `yaml:"batch_size"`       // Metrics batch size (default: 512)
+	BatchTimeout    int    `yaml:"batch_timeout_ms"` // Batch timeout in milliseconds (default: 5000)
+	Headers         map[string]string `yaml:"headers"` // Custom headers (e.g., API keys)
 }
 
 // DebugLogsTarget configures local debug logging

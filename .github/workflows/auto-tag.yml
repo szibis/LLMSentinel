@@ -1,0 +1,83 @@
+name: Auto-Tag & Release
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  auto-tag:
+    runs-on: ubuntu-latest
+    outputs:
+      new-tag: ${{ steps.tag.outputs.new-tag }}
+      should-release: ${{ steps.tag.outputs.should-release }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get latest tag
+        id: latest
+        run: |
+          LATEST=$(git describe --tags --always --abbrev=0 2>/dev/null || echo "v4.0.0")
+          echo "tag=${LATEST}" >> $GITHUB_OUTPUT
+
+      - name: Check commits since last tag
+        id: commits
+        run: |
+          LATEST=${{ steps.latest.outputs.tag }}
+          COMMITS=$(git log ${LATEST}..HEAD --oneline 2>/dev/null | wc -l)
+          echo "count=${COMMITS}" >> $GITHUB_OUTPUT
+          
+          if [ "$COMMITS" -gt 0 ]; then
+            echo "has-commits=true" >> $GITHUB_OUTPUT
+          else
+            echo "has-commits=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Calculate next version
+        id: tag
+        if: steps.commits.outputs.has-commits == 'true'
+        run: |
+          LATEST="${{ steps.latest.outputs.tag }}"
+          
+          # Parse version
+          VERSION="${LATEST#v}"
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$VERSION"
+          
+          # Increment patch
+          PATCH=$((PATCH + 1))
+          NEW_TAG="v${MAJOR}.${MINOR}.${PATCH}"
+          
+          echo "new-tag=${NEW_TAG}" >> $GITHUB_OUTPUT
+          echo "should-release=true" >> $GITHUB_OUTPUT
+          
+          echo "📦 Next release: ${NEW_TAG}"
+
+      - name: Create and push tag
+        if: steps.tag.outputs.should-release == 'true'
+        run: |
+          NEW_TAG="${{ steps.tag.outputs.new-tag }}"
+          
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          
+          git tag "${NEW_TAG}" -m "Release ${NEW_TAG}"
+          git push origin "${NEW_TAG}"
+          
+          echo "✅ Created and pushed tag: ${NEW_TAG}"
+
+      - name: Log release info
+        if: steps.tag.outputs.should-release == 'true'
+        run: |
+          echo "::notice::Auto-release triggered for ${{ steps.tag.outputs.new-tag }}"
+          echo "Commits since last tag: ${{ steps.commits.outputs.count }}"
+          echo "This will trigger release.yml workflow"
+
+  trigger-release:
+    needs: auto-tag
+    if: needs.auto-tag.outputs.should-release == 'true'
+    uses: ./.github/workflows/release.yml
+    secrets: inherit

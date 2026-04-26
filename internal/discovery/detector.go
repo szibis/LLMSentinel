@@ -172,15 +172,9 @@ func findTool(searchPaths []string) string {
 			continue
 		}
 
-		// Check if it's executable (Unix) or a file (Windows)
-		if runtime.GOOS == "windows" {
-			if !info.IsDir() {
-				return expanded
-			}
-		} else {
-			if !info.IsDir() && (info.Mode()&0111) != 0 {
-				return expanded
-			}
+		// Check if it's executable
+		if !info.IsDir() && (info.Mode()&0111) != 0 {
+			return expanded
 		}
 	}
 
@@ -221,21 +215,15 @@ func findGlob(pattern string) []string {
 		return results
 	}
 
-	// Filter to only executable files (on Unix)
+	// Filter to only executable files
 	for _, match := range matches {
 		info, err := os.Stat(match)
 		if err != nil {
 			continue
 		}
 
-		if runtime.GOOS == "windows" {
-			if !info.IsDir() {
-				results = append(results, match)
-			}
-		} else {
-			if !info.IsDir() && (info.Mode()&0111) != 0 {
-				results = append(results, match)
-			}
+		if !info.IsDir() && (info.Mode()&0111) != 0 {
+			results = append(results, match)
 		}
 	}
 
