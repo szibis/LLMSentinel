@@ -48,10 +48,9 @@ func (e *EmbeddingModel) Embed(ctx context.Context, text string) ([]float32, err
 	// Generate deterministic mock embedding (same text → same vector)
 	hash := fnvHash(text)
 	for i := 0; i < e.dimension; i++ {
-		// Pseudo-random but deterministic (seeded by hash)
-		// Use simple LCG with safe bit operations to avoid gosec overflow checks
-		iVal := uint64(i)
-		seed := uint64(hash) ^ (iVal << 8) ^ (iVal * 7)
+		// gosec: uint64 conversion is safe here since i is always >= 0
+		// #nosec G115
+		seed := uint64(hash) ^ (uint64(i) << 8) ^ (uint64(i) * 7) // #nosec G115
 		seed = seed*6364136223846793005 + 1442695040888963407
 		embedding[i] = float32((seed >> 32) % 10000) / 10000.0
 	}
