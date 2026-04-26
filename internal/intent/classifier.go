@@ -103,7 +103,6 @@ func (c *Classifier) Classify(ctx context.Context, query string, userID string, 
 
 	// Detect base intent from keywords and sentiment
 	baseIntent := c.detectBaseIntent(query)
-	effortLevel := c.intentToEffort(baseIntent)
 
 	// Get user feedback history to modulate decision
 	feedback := c.getUserFeedback(userID)
@@ -265,7 +264,11 @@ func (c *Classifier) countKeywordMatches(query string) int {
 	lowerQuery := strings.ToLower(query)
 	count := 0
 
-	allKeywords := append(append(append(append(c.detailKeywords, c.quickKeywords...), c.followUpKeywords...), c.learningKeywords...)...)
+	var allKeywords []string
+	allKeywords = append(allKeywords, c.detailKeywords...)
+	allKeywords = append(allKeywords, c.quickKeywords...)
+	allKeywords = append(allKeywords, c.followUpKeywords...)
+	allKeywords = append(allKeywords, c.learningKeywords...)
 
 	for _, keyword := range allKeywords {
 		if strings.Contains(lowerQuery, keyword) {

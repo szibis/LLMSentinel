@@ -1,0 +1,313 @@
+# Claude Escalate Tool Discovery Configuration
+# Specifies where to search for common development tools across platforms
+# Paths are tried in order; first match wins
+
+discovery:
+  # RTK (Rust Token Killer) - 99.4% command output savings
+  rtk:
+    search_paths:
+      # User-installed via Cargo
+      - ~/.cargo/bin/rtk
+      - ~/.cargo/bin/rtk.exe  # Windows
+      # Homebrew (macOS)
+      - /usr/local/bin/rtk
+      - /opt/homebrew/bin/rtk  # Apple Silicon
+      # Linux system paths
+      - /usr/local/bin/rtk
+      - /usr/bin/rtk
+      # Custom local installations
+      - ~/.local/bin/rtk
+      - /opt/rtk/bin/rtk
+      # Snap (Ubuntu)
+      - /snap/bin/rtk
+      # Nix (NixOS)
+      - ~/.nix-profile/bin/rtk
+      - /nix/var/nix/profiles/default/bin/rtk
+    timeout_ms: 2000
+
+  # Scrapling (Web scraping with CSS selectors)
+  scrapling:
+    search_paths:
+      # Cargo installation
+      - ~/.cargo/bin/scrapling
+      - ~/.cargo/bin/scrapling.exe
+      # npm global
+      - ~/.npm-global/bin/scrapling
+      - ~/.nvm/*/bin/scrapling
+      - /usr/local/lib/node_modules/.bin/scrapling
+      # Homebrew (macOS)
+      - /usr/local/bin/scrapling
+      - /opt/homebrew/bin/scrapling
+      # Linux system
+      - /usr/local/bin/scrapling
+      - /usr/bin/scrapling
+      # Local user
+      - ~/.local/bin/scrapling
+      # Nix
+      - ~/.nix-profile/bin/scrapling
+      # Snap
+      - /snap/bin/scrapling
+    timeout_ms: 2000
+
+  # Language Servers (LSP) - Code navigation
+  language_servers:
+    # Go
+    gopls:
+      search_paths:
+        - ~/go/bin/gopls
+        - $GOPATH/bin/gopls
+        - /usr/local/go/bin/gopls
+        - /opt/go/bin/gopls
+        - ~/.nix-profile/bin/gopls
+      timeout_ms: 2000
+
+    # Python (Pyright)
+    pyright:
+      search_paths:
+        - ~/.venv/bin/pyright
+        - ~/.local/bin/pyright
+        - /usr/local/bin/pyright
+        - ~/.nix-profile/bin/pyright
+        - /opt/homebrew/bin/pyright  # macOS
+      timeout_ms: 2000
+
+    # Python (Pylance/Pylsp)
+    pylsp:
+      search_paths:
+        - ~/.venv/bin/pylsp
+        - ~/.local/bin/pylsp
+        - /usr/local/bin/pylsp
+        - ~/.nix-profile/bin/pylsp
+      timeout_ms: 2000
+
+    # TypeScript/JavaScript
+    typescript-language-server:
+      search_paths:
+        - node_modules/.bin/typescript-language-server
+        - ~/.npm-global/bin/typescript-language-server
+        - /usr/local/lib/node_modules/.bin/typescript-language-server
+        - ~/.nvm/*/bin/typescript-language-server
+        - ~/.nix-profile/bin/typescript-language-server
+      timeout_ms: 2000
+
+    # Rust
+    rust-analyzer:
+      search_paths:
+        - ~/.cargo/bin/rust-analyzer
+        - ~/.cargo/bin/rust-analyzer.exe
+        - /usr/local/bin/rust-analyzer
+        - /opt/homebrew/bin/rust-analyzer  # macOS
+        - ~/.nix-profile/bin/rust-analyzer
+      timeout_ms: 2000
+
+    # C/C++
+    clangd:
+      search_paths:
+        - /usr/local/bin/clangd
+        - /usr/bin/clangd
+        - /opt/homebrew/bin/clangd  # macOS
+        - ~/.nix-profile/bin/clangd
+        - /opt/clang/bin/clangd
+        - C:/Program Files/LLVM/bin/clangd.exe  # Windows
+      timeout_ms: 2000
+
+  # Version Control
+  git:
+    search_paths:
+      - /usr/local/bin/git
+      - /usr/bin/git
+      - /opt/homebrew/bin/git  # macOS
+      - ~/.nix-profile/bin/git
+      - C:/Program Files/Git/bin/git.exe  # Windows
+      - C:/Program Files (x86)/Git/bin/git.exe
+    timeout_ms: 1000
+
+  # Programming Language Runtimes
+  runtimes:
+    # Python
+    python:
+      search_paths:
+        - /usr/local/bin/python3
+        - /usr/bin/python3
+        - ~/.pyenv/versions/*/bin/python3
+        - /opt/homebrew/bin/python3  # macOS
+        - ~/.nix-profile/bin/python3
+        - C:/Python*/python.exe  # Windows
+      timeout_ms: 1000
+
+    # Node.js
+    node:
+      search_paths:
+        - /usr/local/bin/node
+        - /usr/bin/node
+        - ~/.nvm/versions/node/*/bin/node
+        - /opt/homebrew/bin/node  # macOS
+        - ~/.nix-profile/bin/node
+        - C:/Program Files/nodejs/node.exe  # Windows
+      timeout_ms: 1000
+
+    # Go
+    go:
+      search_paths:
+        - /usr/local/go/bin/go
+        - /usr/bin/go
+        - ~/go/bin/go
+        - /opt/go/bin/go
+        - /opt/homebrew/bin/go  # macOS
+        - ~/.nix-profile/bin/go
+      timeout_ms: 1000
+
+    # Rust
+    rustc:
+      search_paths:
+        - ~/.cargo/bin/rustc
+        - ~/.cargo/bin/rustc.exe
+        - /usr/local/bin/rustc
+        - /opt/homebrew/bin/rustc  # macOS
+        - ~/.nix-profile/bin/rustc
+      timeout_ms: 1000
+
+    # Ruby
+    ruby:
+      search_paths:
+        - /usr/local/bin/ruby
+        - /usr/bin/ruby
+        - ~/.rbenv/versions/*/bin/ruby
+        - /opt/homebrew/bin/ruby  # macOS
+        - ~/.nix-profile/bin/ruby
+      timeout_ms: 1000
+
+  # Package Managers (for tool discovery)
+  package_managers:
+    # Homebrew (macOS)
+    brew:
+      search_paths:
+        - /usr/local/bin/brew
+        - /opt/homebrew/bin/brew
+      timeout_ms: 2000
+
+    # npm (JavaScript)
+    npm:
+      search_paths:
+        - /usr/local/bin/npm
+        - ~/.nvm/*/bin/npm
+        - ~/.npm-global/bin/npm
+        - /usr/bin/npm
+      timeout_ms: 2000
+
+    # pip (Python)
+    pip:
+      search_paths:
+        - /usr/local/bin/pip3
+        - /usr/bin/pip3
+        - ~/.pyenv/versions/*/bin/pip3
+        - ~/.venv/bin/pip3
+      timeout_ms: 2000
+
+    # cargo (Rust)
+    cargo:
+      search_paths:
+        - ~/.cargo/bin/cargo
+        - ~/.cargo/bin/cargo.exe
+        - /usr/local/bin/cargo
+      timeout_ms: 2000
+
+  # Common CLI Tools
+  cli_tools:
+    ls:
+      search_paths:
+        - /bin/ls
+        - /usr/bin/ls
+      timeout_ms: 500
+
+    grep:
+      search_paths:
+        - /bin/grep
+        - /usr/bin/grep
+      timeout_ms: 500
+
+    find:
+      search_paths:
+        - /usr/bin/find
+        - /bin/find
+      timeout_ms: 500
+
+    cat:
+      search_paths:
+        - /bin/cat
+        - /usr/bin/cat
+      timeout_ms: 500
+
+    head:
+      search_paths:
+        - /usr/bin/head
+        - /bin/head
+      timeout_ms: 500
+
+    tail:
+      search_paths:
+        - /usr/bin/tail
+        - /bin/tail
+      timeout_ms: 500
+
+  # MCP Server Socket Paths
+  mcp_servers:
+    socket_search_paths:
+      # Standard MCP directories
+      - ~/.mcp/servers
+      - ~/.claude/mcp
+      - ~/.claude-escalate/mcp
+      # System directories
+      - /etc/mcp/servers
+      - /opt/mcp/servers
+      # Temporary
+      - /tmp/mcp-servers
+      - /var/run/mcp-servers
+
+  # Platform-Specific Configuration
+  platform_overrides:
+    darwin:  # macOS
+      primary_paths:
+        - /opt/homebrew/bin        # Apple Silicon default
+        - /usr/local/bin            # Intel Macs
+        - ~/.local/bin
+        - ~/.cargo/bin
+        - ~/.nix-profile/bin
+
+    linux:
+      primary_paths:
+        - ~/.local/bin
+        - ~/.cargo/bin
+        - ~/.nix-profile/bin
+        - /usr/local/bin
+        - /usr/bin
+        - /snap/bin
+
+    windows:
+      primary_paths:
+        - ~/.cargo/bin
+        - ~/.local/bin
+        - C:/Program Files/nodejs
+        - C:/Program Files/Git/bin
+        - C:/Program Files (x86)/Git/bin
+
+  # Environment Variables to Check
+  env_paths:
+    - PATH                    # Standard PATH
+    - GOPATH                  # Go workspace
+    - CARGO_HOME              # Cargo home (~/.cargo)
+    - NVM_DIR                 # Node version manager
+    - PYENV_ROOT              # Python version manager
+    - RBENV_ROOT              # Ruby version manager
+
+# Timeout and retry configuration
+timeout:
+  individual_tool_check_ms: 2000  # Max time to check if a single tool exists
+  total_discovery_ms: 30000       # Max time for entire discovery process
+  path_check_parallelism: 10      # Number of concurrent path checks
+
+# Caching
+cache:
+  enabled: true
+  ttl_minutes: 60                 # Cache results for 1 hour
+  cache_dir: ~/.claude-escalate/discovery-cache
