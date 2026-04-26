@@ -90,31 +90,26 @@ graph LR
 
 ### Query 2: Find Inheritance Chain
 
-```
-User: "Show the class hierarchy for User"
-    ↓
-Graph Query: Recursive CTE traversal of 'inherits' edges
-    ↓
-Result: User -> BaseModel -> Object
-    ↓
-Response Time: <50ms (even for deep hierarchies)
-    ↓
-Savings: 99% token reduction
+```mermaid
+graph LR
+    A["📦 User: Show class<br/>hierarchy for User"] --> B["📊 Graph Query<br/>Recursive CTE"]
+    B --> C["🔗 User<br/>↓ inherits<br/>BaseModel<br/>↓ inherits<br/>Object"]
+    C --> D["📤 Response<br/><50ms<br/>0 tokens"]
+    
+    style A fill:#4F46E5,stroke:#312E81,color:#fff
+    style D fill:#10B981,stroke:#065F46,color:#fff
 ```
 
 ### Query 3: Import Dependencies
 
-```
-User: "What packages does auth.go import?"
-    ↓
-Graph Query: SELECT target_id FROM edges 
-             WHERE source_id = 'auth.go' AND type = 'imports'
-    ↓
-Result: [crypto, fmt, log, ...] from graph
-    ↓
-Response Time: <5ms
-    ↓
-Savings: 99% token reduction
+```mermaid
+graph LR
+    A["📦 User: What packages<br/>does auth.go import?"] --> B["📊 Graph Query<br/>Edge traversal"]
+    B --> C["📚 Result<br/>crypto<br/>fmt<br/>log<br/>errors"]
+    C --> D["📤 Response<br/><5ms<br/>0 tokens"]
+    
+    style A fill:#4F46E5,stroke:#312E81,color:#fff
+    style D fill:#10B981,stroke:#065F46,color:#fff
 ```
 
 ## Query Detection

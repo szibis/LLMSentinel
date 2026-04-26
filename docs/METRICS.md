@@ -2,40 +2,34 @@
 
 ## Overview
 
-Claude Escalate exports metrics for monitoring cache performance, token savings, security events, and system health. Metrics are available in multiple formats: Prometheus, OpenTelemetry (OTEL), JSON, and local logs.
+Claude Escalate exports metrics for monitoring cache performance, token savings, security events, and system health. Two formats:
+- **Prometheus**: `http://localhost:8080/metrics` (pull-based scraping)
+- **OpenTelemetry**: Push metrics to collector (configurable push interval)
 
-## Metrics Dashboard
-
-Access the web dashboard at **http://localhost:8080/dashboard**:
+## Metrics Export Architecture
 
 ```mermaid
 graph TD
-    A["📊 Metrics Dashboard<br/>http://localhost:8080"] --> B["Overview Tab"]
-    A --> C["Analytics Tab"]
-    A --> D["Security Tab"]
-    A --> E["Config Tab"]
+    A["📊 Claude Escalate<br/>Collecting Metrics"] --> B["📈 Prometheus<br/>Pull /metrics"]
+    A --> C["📤 OTEL<br/>Push to Collector"]
     
-    B --> B1["Real-time metrics"]
-    B --> B2["Cache hit rate"]
-    B --> B3["Token savings %"]
+    B --> B1["Prometheus<br/>Server"]
+    B1 --> B2["Grafana"]
     
-    C --> C1["Historical trends"]
-    C --> C2["Savings breakdown"]
-    C --> C3["Performance stats"]
-    
-    D --> D1["Injection blocks"]
-    D --> D2["Rate limits"]
-    D --> D3["Security events"]
-    
-    E --> E1["Configuration"]
-    E --> E2["Live reload"]
-    E --> E3["Settings"]
+    C --> C1["OTEL<br/>Collector"]
+    C1 --> C2["Datadog"]
+    C1 --> C3["Jaeger"]
+    C1 --> C4["Prometheus"]
     
     style A fill:#4F46E5,stroke:#312E81,color:#fff
-    style B1 fill:#10B981,stroke:#065F46,color:#fff
     style B2 fill:#10B981,stroke:#065F46,color:#fff
-    style B3 fill:#10B981,stroke:#065F46,color:#fff
+    style C2 fill:#10B981,stroke:#065F46,color:#fff
+    style C3 fill:#10B981,stroke:#065F46,color:#fff
 ```
+
+## Web Dashboard
+
+Access dashboard at **http://localhost:8080/dashboard** for real-time visualization of metrics and configuration.
 
 ## Metrics Collection
 

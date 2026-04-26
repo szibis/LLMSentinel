@@ -300,22 +300,20 @@ graph LR
 
 ### Example 2: Documentation Generation
 
-```
-User: "Generate API docs from this interface"
-
-Before: 2200 tokens
-├─ Tools: 1200
-├─ Interface definition: 500
-├─ Generation options: 200 tokens (verbose names, all defaults)
-└─ Total: 2200 tokens
-
-After: 1300 tokens
-├─ Tools: 650
-├─ Interface definition: 500
-├─ Generation options: 50 tokens (compressed params)
-└─ Total: 1300 tokens
-
-Savings: 900 tokens (41%)
+```mermaid
+graph LR
+    A["Generate API docs<br/>from interface<br/>2200 tokens"] -->|Tool Strip| B["1200→650t"]
+    B -->|Interface Unchanged| C["Interface: 500t"]
+    C -->|Compress Params| D["200→50t"]
+    D --> E["Result: 1300t<br/>41% savings"]
+    
+    F["❌ Before<br/>2200 tokens"] -.-> E
+    G["✅ After<br/>1300 tokens"] -.-> E
+    
+    style A fill:#EF4444,stroke:#7F1D1D,color:#fff
+    style E fill:#10B981,stroke:#065F46,color:#fff
+    style F fill:#EF4444,stroke:#7F1D1D,color:#fff
+    style G fill:#10B981,stroke:#065F46,color:#fff
 ```
 
 ## Disable Optimization (Advanced)

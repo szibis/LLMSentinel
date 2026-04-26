@@ -244,6 +244,27 @@ graph TD
 
 ---
 
+## 📊 Monitoring & Observability
+
+```mermaid
+graph LR
+    A["🔄 Claude Escalate<br/>Metrics Collected"] --> B["📈 Prometheus<br/>Pull Endpoint<br/>:8080/metrics"]
+    A --> C["📤 OTEL Push<br/>gRPC to Collector<br/>:4317"]
+    
+    B --> B1["Prometheus<br/>Server"]
+    B1 --> B2["Grafana"]
+    
+    C --> C1["OTEL Collector"]
+    C1 --> C2["Datadog<br/>Jaeger<br/>Prometheus<br/>New Relic"]
+    
+    B2 --> D["📊 Dashboards<br/>Alerts<br/>Analytics"]
+    C2 --> D
+    
+    style A fill:#4F46E5,stroke:#312E81,color:#fff
+    style B2 fill:#10B981,stroke:#065F46,color:#fff
+    style D fill:#10B981,stroke:#065F46,color:#fff
+```
+
 ## 💰 Real-World Savings
 
 | Optimization | Per Hit | Typical Hit Rate | Overall Impact |
@@ -355,27 +376,75 @@ Your Claude API requests are now being optimized automatically!
 
 ## 🏗️ Architecture
 
-**Core Modules** (v0.5.0):
-- `internal/optimization/` — Seven-layer optimization pipeline (dedup, security, graph, input compression)
-- `internal/cache/` — Semantic caching with embeddings, exact deduplication
-- `internal/graph/` — SQLite-backed knowledge graph with recursive CTE queries
-- `internal/indexing/` — Code indexing pipeline with file watching (Go, Python, TypeScript)
-- `internal/intent/` — Query intent classification (QUICK_ANSWER, DETAILED_ANALYSIS, etc)
-- `internal/security/` — Input/output validation, injection detection
-- `internal/gateway/` — Tool adapters (MCP, CLI, REST, Database, Binary)
-- `internal/config/` — Configuration management with live reload
-- `internal/metrics/` — Prometheus metrics collection and export
-- `internal/dashboard/` — Web UI and REST API endpoints
+```mermaid
+graph TB
+    subgraph "📥 Input"
+        A["User Query<br/>Tool Request<br/>MCP/CLI/REST"]
+    end
+    
+    subgraph "🔧 Optimization Pipeline"
+        B["Cache Bypass<br/>Check"]
+        C["Exact Dedup<br/>SHA256"]
+        D["Security<br/>Validation"]
+        E["Knowledge<br/>Graph Lookup"]
+        F["Input<br/>Optimization"]
+        G["Claude<br/>API Call"]
+    end
+    
+    subgraph "💾 Storage"
+        H["Cache DB<br/>Embeddings"]
+        I["Graph DB<br/>Relationships"]
+        J["Config<br/>YAML"]
+    end
+    
+    subgraph "📊 Monitoring"
+        K["Prometheus<br/>/metrics"]
+        L["OTEL Push<br/>to Collector"]
+    end
+    
+    A --> B
+    B --> C
+    C --> D
+    D --> E
+    E --> F
+    F --> G
+    
+    C -.-> H
+    E -.-> I
+    J -.-> G
+    
+    G --> M["📤 Response<br/>to User"]
+    
+    G -.-> K
+    G -.-> L
+    
+    style A fill:#4F46E5,stroke:#312E81,color:#fff
+    style M fill:#10B981,stroke:#065F46,color:#fff
+    style K fill:#3B82F6,stroke:#1E40AF,color:#fff
+    style L fill:#3B82F6,stroke:#1E40AF,color:#fff
+```
+
+**Core Modules**:
+- `internal/optimization/` — 7-layer pipeline
+- `internal/cache/` — Semantic caching + exact dedup
+- `internal/graph/` — SQLite knowledge graph with CTE queries
+- `internal/indexing/` — Code indexing (Go, Python, TypeScript)
+- `internal/intent/` — Query classification
+- `internal/security/` — Injection detection (50+ patterns)
+- `internal/gateway/` — Tool adapters (MCP, CLI, REST)
+- `internal/metrics/` — Prometheus + OTEL export
 
 **Storage**:
-- `~/.claude-escalate/graph.db` — SQLite knowledge graph
-- `~/.claude-escalate/cache.db` — Semantic cache with embeddings
-- `~/.claude-escalate/config.yaml` — User configuration
+- `~/.claude-escalate/graph.db` — Knowledge graph
+- `~/.claude-escalate/cache.db` — Semantic cache
+- `~/.claude-escalate/config.yaml` — Configuration
 
-**Service**: Single binary (12-15 MB including SQLite)
-**Database**: SQLite (knowledge graph, cache, metrics)
-**Web Dashboard**: Minimal embedded HTML/CSS/JS
-**Dependencies**: fsnotify (file watching), standard library
+**Deployment**:
+- Single binary (12-15 MB)
+- SQLite embedded (no external DB)
+- Prometheus metrics endpoint
+- OpenTelemetry push support
+- Dependencies: fsnotify only
 
 ---
 
