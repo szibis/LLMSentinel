@@ -1,9 +1,17 @@
 # Binaries
 /bin/
 /claude-escalate
+/claude-escalate-*
+/claude-escalate-new
+/claude-escalate-service
+/escalation-cli
+/main
 *.test
+*.exe
+*.out
 coverage.out
 coverage.html
+test_output.txt
 
 # IDE
 .idea/
@@ -17,7 +25,16 @@ Thumbs.db
 
 # Build
 dist/
-*.exe
 
 # Claude Code
 .claude/
+
+# Prevent new root-level Markdown files (use docs/ folder instead)
+# Allowed root docs: README.md, CHANGELOG.md, CONTRIBUTING.md, SECURITY.md, LICENSE
+/*.md
+!/README.md
+!/CHANGELOG.md
+!/CONTRIBUTING.md
+!/SECURITY.md
+!/CLAUDE.md
+!/CODEOWNERS

@@ -20,6 +20,7 @@ type WebhookSource struct {
 }
 
 // validateWebhookURL ensures the webhook URL is safe to call.
+// Prevents SSRF attacks by blocking local, private, reserved, and metadata addresses.
 func validateWebhookURL(rawURL string) error {
 	u, err := url.Parse(rawURL)
 	if err != nil {
@@ -31,18 +32,52 @@ func validateWebhookURL(rawURL string) error {
 		return fmt.Errorf("webhook must use https, got %s", u.Scheme)
 	}
 
-	// Reject private/loopback IPs to prevent SSRF attacks
 	hostname := u.Hostname()
 	if hostname == "" {
 		return fmt.Errorf("webhook URL missing hostname")
 	}
 
+	// Validate against literal IP
 	ip := net.ParseIP(hostname)
-	if ip != nil && (ip.IsLoopback() || ip.IsPrivate()) {
-		return fmt.Errorf("webhook cannot target private/loopback address: %s", hostname)
+	if ip != nil {
+		if isRestrictedIP(ip) {
+			return fmt.Errorf("webhook cannot target reserved/private address: %s", hostname)
+		}
+		return nil // Valid public IP
+	}
+
+	// Resolve hostname and validate all returned IPs (prevent DNS rebinding)
+	ips, err := net.LookupIP(hostname)
+	if err != nil {
+		return fmt.Errorf("failed to resolve webhook hostname: %w", err)
+	}
+
+	if len(ips) == 0 {
+		return fmt.Errorf("webhook hostname resolved to no addresses: %s", hostname)
+	}
+
+	for _, ip := range ips {
+		if isRestrictedIP(ip) {
+			return fmt.Errorf("webhook hostname resolves to restricted address: %s -> %s", hostname, ip.String())
+		}
 	}
 
 	return nil
+}
+
+// isRestrictedIP checks if an IP is in a restricted range (loopback, private, link-local, metadata, etc.)
+func isRestrictedIP(ip net.IP) bool {
+	return ip.IsLoopback() ||
+		ip.IsPrivate() ||
+		ip.IsLinkLocalUnicast() ||
+		ip.IsLinkLocalMulticast() ||
+		ip.IsInterfaceLocalMulticast() ||
+		ip.IsMulticast() ||
+		ip.IsUnspecified() ||
+		ip.Equal(net.IPv4bcast) ||
+		ip.Equal(net.IPv4allsys) ||
+		ip.Equal(net.IPv4allrouter) ||
+		ip.Equal(net.IPv4zero)
 }
 
 // NewWebhookSource creates a webhook source.

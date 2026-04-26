@@ -20,45 +20,21 @@ Intelligent model escalation system for Claude Code that automatically routes ta
 
 ## 📚 Documentation
 
-### ⭐ Start Here (New Structure)
+### Start Here
 
-**[Complete Documentation Index →](docs/README.md)** — All guides organized by topic
+**[Complete Documentation Index →](docs/index.md)** — All guides organized by topic
 
-The documentation has been reorganized for clarity:
-- **[Quick Start](docs/quick-start/)** — Get running in 5 minutes
-- **[Architecture](docs/architecture/)** — How the system works
-- **[Integration](docs/integration/)** — Connect with your environment
-- **[Operations](docs/operations/)** — Deploy and monitor
-- **[Analytics](docs/analytics/)** — Understand your usage
+All non-root documentation lives under [`docs/`](docs/). Highlights:
 
-### Legacy Documentation
-
-Older guides (still valid):
-
-| Document | Purpose |
-|----------|---------|
-| **[QUICK_START.md](QUICK_START.md)** | ⚡ 5-minute setup guide |
-| **[SERVICE_MODE.md](SERVICE_MODE.md)** | 🔄 HTTP service architecture & API |
-| **[SETUP.md](SETUP.md)** | 🚀 Installation & configuration |
-| **[USAGE.md](USAGE.md)** | 📖 How to use escalation commands |
-
-### Validation & Metrics
-| Document | Purpose |
-|----------|---------|
-| **[VALIDATION_QUICKSTART.md](VALIDATION_QUICKSTART.md)** | ⚡ 15-minute validation setup |
-| **[ARCHITECTURE_DIAGRAMS.md](ARCHITECTURE_DIAGRAMS.md)** | 📊 12 Mermaid system diagrams |
-| **[VALIDATION_INTEGRATION.md](VALIDATION_INTEGRATION.md)** | 🔍 Complete validation implementation |
-| **[STATUSLINE_INTEGRATION.md](STATUSLINE_INTEGRATION.md)** | 🔌 Plugin integration for metrics |
-| **[VALIDATION_PURE_BINARY.md](VALIDATION_PURE_BINARY.md)** | 💾 Pure binary design (no scripts) |
-| **[FULL_CYCLE_FLOW.md](FULL_CYCLE_FLOW.md)** | 🔄 End-to-end validation workflow |
-
-### Dashboards & Deployment
-| Document | Purpose |
-|----------|---------|
-| **[DASHBOARD.md](DASHBOARD.md)** | 📊 Dashboard features and metrics |
-| **[ARCHITECTURE.md](ARCHITECTURE.md)** | 🏗️ Technical design |
-| **[DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md)** | 🌐 Production deployment |
-| **[TROUBLESHOOTING.md](TROUBLESHOOTING.md)** | 🔧 Common issues and fixes |
+- **[Quick Start](docs/QUICK_START.md)** — 5-minute setup guide
+- **[Service Mode](docs/SERVICE_MODE.md)** — HTTP service architecture & API
+- **[Setup](docs/SETUP.md)** — Installation & configuration
+- **[Usage](docs/USAGE.md)** — How to use escalation commands
+- **[Architecture](docs/ARCHITECTURE.md)** — Technical design
+- **[Validation Quickstart](docs/VALIDATION_QUICKSTART.md)** — 15-minute validation setup
+- **[Statusline Integration](docs/STATUSLINE_INTEGRATION.md)** — Plugin integration for metrics
+- **[Deployment Guide](docs/DEPLOYMENT_GUIDE.md)** — Production deployment
+- **[Troubleshooting](docs/TROUBLESHOOTING.md)** — Common issues and fixes
 
 ## 👨‍💻 Developer Requirements
 
@@ -401,8 +377,8 @@ WantedBy=default.target
 ## Support
 
 For issues or questions:
-1. Check [TROUBLESHOOTING.md](TROUBLESHOOTING.md) for common issues
-2. Review [SERVICE_MODE.md](SERVICE_MODE.md) for API reference
+1. Check [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) for common issues
+2. Review [docs/SERVICE_MODE.md](docs/SERVICE_MODE.md) for API reference
 3. Check logs: `curl http://localhost:9000/api/stats`
 4. Inspect database: `~/.claude/data/escalation/escalation.db`
 
@@ -428,4 +404,4 @@ Contributions welcome! Areas for enhancement:
 **Test Coverage**: 100% of core features  
 **Performance**: <50ms per request, <1% CPU idle  
 
-**Get Started**: See [QUICK_START.md](QUICK_START.md) for 5-minute setup
+**Get Started**: See [docs/QUICK_START.md](docs/QUICK_START.md) for 5-minute setup

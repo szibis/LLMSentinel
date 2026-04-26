@@ -16,7 +16,7 @@ type FileSource struct {
 	enabled bool
 }
 
-// validateFilePath ensures the path is within the safe directory (prevents traversal attacks).
+// validateFilePath ensures the path is within the safe directory (prevents traversal and symlink attacks).
 func validateFilePath(configuredPath string) (string, error) {
 	homeDir := os.Getenv("HOME")
 	if homeDir == "" {
@@ -42,10 +42,33 @@ func validateFilePath(configuredPath string) (string, error) {
 		return "", fmt.Errorf("invalid safe base: %w", err)
 	}
 
-	// Ensure the path is within safe base directory
-	if !strings.HasPrefix(absPath, filepath.Clean(absSafeBase)+string(filepath.Separator)) &&
-		absPath != filepath.Clean(absSafeBase) {
+	// Ensure the path is within safe base directory (prefix check)
+	cleanPath := filepath.Clean(absPath)
+	cleanBase := filepath.Clean(absSafeBase)
+	if !strings.HasPrefix(cleanPath, cleanBase+string(filepath.Separator)) &&
+		cleanPath != cleanBase {
 		return "", fmt.Errorf("path outside allowed directory: %s", absPath)
+	}
+
+	// Resolve symlinks and re-validate (prevents symlink escape attacks).
+	// Also resolve the safe base so platform-level symlinks (e.g. /var -> /private/var
+	// on macOS) don't cause false positives.
+	realPath, err := filepath.EvalSymlinks(absPath)
+	if err != nil && !os.IsNotExist(err) {
+		return "", fmt.Errorf("failed to resolve symlinks: %w", err)
+	}
+
+	// If EvalSymlinks succeeded (file exists), re-validate the real path
+	if err == nil {
+		cleanReal := filepath.Clean(realPath)
+		realBase := cleanBase
+		if rb, rbErr := filepath.EvalSymlinks(cleanBase); rbErr == nil {
+			realBase = filepath.Clean(rb)
+		}
+		if !strings.HasPrefix(cleanReal, realBase+string(filepath.Separator)) &&
+			cleanReal != realBase {
+			return "", fmt.Errorf("resolved path outside allowed directory: %s -> %s", absPath, realPath)
+		}
 	}
 
 	return absPath, nil

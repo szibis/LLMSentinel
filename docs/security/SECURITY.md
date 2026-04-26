@@ -14,18 +14,19 @@ Security audit of v3.0.0 identified 17 issues across sentiment detection, budget
 
 ## Phase 1: CRITICAL Fixes (v3.0.0 Patch)
 
-**Timeline**: Immediate (1-2 days)  
-**Status**: ✅ FIXED in PR #13
+**Timeline**: Immediate (1-2 days)
+**Status**: FIXED in PR #13 (all four files now validated)
 
 ### C1: Unsafe JSON Deserialization
 
 **Issue**: JSON responses from webhooks, files, and native statusline sources are deserialized without field validation. Malformed or oversized values could cause integer overflow, nil pointer dereference, or code injection.
 
-**Files Affected**:
-- `internal/statusline/webhook.go` (lines 78-104)
-- `internal/statusline/file.go` (lines 71-98)
-- `internal/statusline/native.go` (similar pattern)
-- `internal/analytics/store.go` (lines 87-89)
+**Files Affected** (all fixed):
+- `internal/statusline/webhook.go`
+- `internal/statusline/file.go`
+- `internal/statusline/native.go`
+- `internal/statusline/barista.go`
+- `internal/analytics/store.go`
 
 **Fix Applied**:
 1. Changed JSON struct fields to pointers to detect missing required fields
@@ -61,17 +62,9 @@ if *webhookMetrics.InputTokens > maxTokens || *webhookMetrics.OutputTokens > max
 }
 ```
 
-**Tests**: Added test cases for:
-- Missing required fields in JSON
-- Negative token counts
-- Token counts exceeding max
-- Unknown JSON fields (rejected)
-- Non-numeric values in numeric fields
-
-**Verification**:
+**Verification** (test coverage tracked in the "Test Coverage" section below):
 ```bash
-go test -v ./internal/statusline -run TestJSON
-go test -v ./internal/analytics -run TestValidation
+go test -v ./internal/statusline ./internal/analytics
 ```
 
 ---
@@ -83,11 +76,19 @@ go test -v ./internal/analytics -run TestValidation
 
 ### H1: Unvalidated Webhook URLs (SSRF Vulnerability)
 
+**Status**: FIXED — all callers (webhook, file, native, barista) now validate input.
+
 **Issue**: Webhook URLs from configuration are not validated. Attacker can specify `http://localhost:6006`, `http://169.254.169.254/` (AWS metadata), or internal service IPs, potentially leaking sensitive data.
 
 **File**: `internal/statusline/webhook.go`
 
 **Risk**: Arbitrary internal service access, credential theft, metadata service exploitation
+
+**Implementation**: Reserved-address detection lives in `isRestrictedIP(ip net.IP)` in
+`internal/statusline/webhook.go`. It rejects loopback, RFC1918 private ranges, link-local
+(IPv4 169.254.0.0/16 and IPv6 fe80::/10 — including AWS IMDS at 169.254.169.254),
+multicast, unspecified, and IPv4 broadcast (255.255.255.255 / 0.0.0.0). Hostnames are
+resolved and **all** returned addresses are checked to mitigate DNS rebinding.
 
 **Fix**:
 ```go
@@ -128,15 +129,7 @@ func NewWebhookSource(url, authToken string) *WebhookSource {
 }
 ```
 
-**Tests**:
-- ✅ Rejects `http://` URLs (must be HTTPS)
-- ✅ Rejects `127.0.0.1`
-- ✅ Rejects `localhost`
-- ✅ Rejects `10.0.0.1` (private)
-- ✅ Rejects `169.254.169.254` (AWS metadata)
-- ✅ Accepts `https://api.example.com`
-
-**Timeline**: Immediate after C1
+**Timeline**: Immediate after C1 (test coverage tracked in "Test Coverage" below)
 
 ---
 
@@ -180,13 +173,7 @@ func validateFilePath(configuredPath string) (string, error) {
 }
 ```
 
-**Tests**:
-- ✅ Rejects `../../etc/passwd`
-- ✅ Rejects `/etc/passwd`
-- ✅ Rejects symlinks to outside directories
-- ✅ Accepts `.claude/data/escalation/custom.json`
-
-**Timeline**: With H1
+**Timeline**: With H1 (test coverage tracked in "Test Coverage" below)
 
 ---
 
@@ -258,12 +245,7 @@ func matchWithTimeout(ctx context.Context, re *regexp.Regexp, text string, timeo
 matches, err := matchWithTimeout(ctx, pattern, prompt, 100*time.Millisecond)
 ```
 
-**Tests**:
-- ✅ Timeout on complex regex pattern
-- ✅ Returns valid results within timeout
-- ✅ No performance degradation for normal patterns
-
-**Timeline**: With H1-H3
+**Timeline**: With H1-H3 (test coverage tracked in "Test Coverage" below)
 
 ---
 
@@ -334,12 +316,7 @@ func (s *Store) SaveRecord(record AnalyticsRecord) error {
 }
 ```
 
-**Tests**:
-- ✅ All or nothing semantics (no partial saves)
-- ✅ Rollback on any error
-- ✅ Consistent state after commit
-
-**Timeline**: With H1-H3
+**Timeline**: With H1-H3 (test coverage tracked in "Test Coverage" below)
 
 ---
 
@@ -441,6 +418,24 @@ See plan file for detailed fixes (similar pattern: add validation, use safe func
 ## Phase 4: LOW Priority Fixes (v3.0.3+)
 
 Hardcoded timeout values, predictable sentiment scoring, enhanced input validation.
+
+---
+
+## Test Coverage
+
+| Issue | Test File | Tests Validating Fix |
+|-------|-----------|----------------------|
+| C1 / H1 (SSRF, JSON validation) | `internal/statusline/webhook_test.go` | `TestValidateWebhookURL_SSRFProtection`, `TestValidateWebhookURL_DNSRebinding`, `TestNewWebhookSource_DisabledOnInvalid`, `TestWebhookPoll_PayloadValidation`, `TestIsRestrictedIP` |
+| C1 / H2 / H5 (path traversal, symlink, TOCTOU, JSON validation) | `internal/statusline/file_test.go` | `TestValidateFilePath_Rejects`, `TestValidateFilePath_Accepts`, `TestValidateFilePath_DefaultsToSafePath`, `TestValidateFilePath_SymlinkEscape`, `TestFilePoll_MalformedJSON`, `TestFilePoll_MissingRequiredFields`, `TestFilePoll_ValidPayload`, `TestFilePoll_NegativeTokens_Rejected` |
+| C1 (native / barista JSON validation) | covered indirectly via shared helpers | follow-up tests planned in v3.0.1 |
+| H3 / H6 (atomic transaction in analytics) | `internal/analytics/store_test.go` | `TestSaveRecord_AtomicSuccess`, `TestSaveRecord_FrustrationEventConditional`, `TestSaveRecord_RollbackOnDuplicate`, `TestSaveRecord_RollbackOnChildFailure`, `TestSaveRecord_ErrorPropagation` |
+| H4 (regex ReDoS) | not yet covered | tests planned in v3.0.1 |
+
+Run the security-related tests with:
+
+```bash
+go test ./internal/statusline ./internal/analytics
+```
 
 ---
 

@@ -1,1 +1,0 @@
-Go test: 46 passed in 16 packages
