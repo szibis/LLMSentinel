@@ -1,37 +1,53 @@
 # Claude Escalate Documentation
 
-Complete guides and API reference for Claude Escalate v3.0.0.
+Complete guides and API reference for Claude Escalate v4.0.0.
+
+**Version**: 4.0.0 | **Release**: 2026-04-26 | **Status**: Production Ready
 
 ---
 
 ## 🚀 Getting Started (Start Here!)
 
 ### New Users
-1. **[5-Minute Setup](quick-start/5-minute-setup.md)** — Install and run in 5 minutes
-2. **[How It Works](architecture/overview.md)** — Understand the three optimization layers
-3. **[Dashboard Guide](analytics/dashboards.md)** — Monitor savings in real-time
+1. **[Installation & Setup](GETTING_STARTED.md)** — Install and configure (2 min)
+2. **[Quick Start Guide](QUICK_START.md)** — Get running in 5 minutes  
+3. **[Architecture Overview](ARCHITECTURE.md)** — Understand v4.0.0 components
+4. **[Web Dashboard](DASHBOARD.md)** — Access analytics and monitoring
 
 ### First Steps
-- **[First Escalation](quick-start/first-escalation.md)** — Try the optimization
-- **[Budget Setup](quick-start/budgets-setup.md)** — Set spending limits
+- **[ML Classification Guide](how-it-works.md)** — Understand task routing
+- **[Budget Management](quick-start/budgets-setup.md)** — Set spending limits
+- **[Analytics Basics](analytics/dashboards.md)** — View timeseries and forecasts
 
 ---
 
-## 📚 Core Documentation
+## 📚 Core Documentation (v4.0.0)
+
+### New Features in v4.0.0
+- **[ML Task Classification](how-it-works.md)** — Automatic task complexity detection
+- **[Advanced Analytics](analytics/dashboards.md)** — Timeseries, percentiles, forecasts
+- **[Dynamic Budgets](quick-start/budgets-setup.md)** — Multi-tier budget management
+- **[Web Dashboard](DASHBOARD.md)** — React-based real-time monitoring
+- **[Observability](operations/monitoring.md)** — Prometheus metrics & health checks
+- **[Security Hardening](security/SECURITY.md)** — OWASP Top 10 compliance
 
 ### Architecture & Design
-- **[System Overview](architecture/overview.md)** — High-level architecture
-- **[Three-Phase Flow](architecture/3-phase-flow.md)** — Cache → Batch → Model selection
-- **[Sentiment Detection](architecture/sentiment-detection.md)** — Task complexity analysis
+- **[System Architecture](ARCHITECTURE.md)** — v4.0.0 component design
+- **[ML Classification Pipeline](how-it-works.md)** — Task detection & routing
+- **[Analytics Engine](analytics/dashboards.md)** — Metrics collection & forecasting
+- **[Three-Layer Optimization](how-it-works.md)** — Cache → Batch → Model selection
 
 ### Features & Integration
-- **[API Reference](integration/api-reference.md)** — HTTP endpoints & responses
-- **[Budgets & Limits](integration/budgets.md)** — Cost enforcement
-- **[Sentiment Detection](integration/sentiment-detection.md)** — Task routing
+- **[REST API Reference](API.md)** — All v4.0.0 endpoints
+- **[Budgets & Cost Control](quick-start/budgets-setup.md)** — Dynamic enforcement
+- **[Task Classification](how-it-works.md)** — ML-based routing
+- **[Configuration API](API.md)** — Runtime settings management
 
 ### Analytics & Monitoring
-- **[Dashboards](analytics/dashboards.md)** — Real-time metrics & charts
-- **[Cost Analysis](analytics/cost-analysis.md)** — Savings breakdown
+- **[Dashboards Guide](DASHBOARD.md)** — Web UI features and usage
+- **[Metrics & Health](operations/monitoring.md)** — Prometheus & health endpoints
+- **[Cost Analysis](analytics/cost-analysis.md)** — Savings breakdown & forecasts
+- **[Performance Profiling](TESTING.md)** — CPU/memory/goroutine profiles
 
 ---
 
@@ -52,50 +68,73 @@ Complete guides and API reference for Claude Escalate v3.0.0.
 
 ---
 
-## 👨‍💻 Development
+## 👨‍💻 Development & Quality
 
-### Contributing
+### Contributing & Setup
 - **[Developer Guide](../CLAUDE.md)** — Local development setup *(in root)*
 - **[Contributing Guide](../CONTRIBUTING.md)** — How to contribute *(in root)*
-- **[Testing](TESTING.md)** — How to run tests
+- **[Build Instructions](../BUILD.md)** — Build from source *(in root)*
 
-### Code Quality
-- **[Architecture Details](ARCHITECTURE.md)** — Deep dive into design
-- **[Quality Standards](QUALITY.md)** — Code quality & testing
+### Testing & Quality
+- **[Testing Guide](TESTING.md)** — Run unit, integration, and stress tests
+- **[Memory Leak Detection](TESTING.md)** — Runtime leak analysis
+- **[Performance Profiling](TESTING.md)** — pprof integration (CPU, heap, goroutine)
+- **[Security Testing](security/SECURITY.md)** — OWASP Top 10 coverage
+
+### Code Quality Standards
+- **[Quality Standards](QUALITY.md)** — Code quality gates & requirements
+- **[Race Detection](TESTING.md)** — Concurrent safety verification
+- **[SLO Enforcement](TESTING.md)** — Performance boundaries
 
 ---
 
-## 🔒 Security
+## 🔒 Security (OWASP Top 10)
 
-- **[Security Policy](security/SECURITY.md)** — Vulnerability reporting & fixes
-- **[Hardening Guide](security/SECURITY.md)** — Input validation, overflow protection
+### Security Features
+- **[Security Policy](security/SECURITY.md)** — OWASP Top 10 hardening
+- **[Input Validation](security/SECURITY.md)** — SQL injection, XSS, command injection prevention
+- **[Memory Safety](security/SECURITY.md)** — Bounds checking, leak detection
+- **[Cryptography](security/SECURITY.md)** — Secure hashing and key management
+- **[Fuzzing Tests](TESTING.md)** — Native Go 1.18+ fuzz testing
 
 ---
 
 ## 📖 Reference
 
 ### API Documentation
-- **[API Reference](integration/api-reference.md)** — Complete API endpoints
+- **[REST API Reference](API.md)** — Complete v4.0.0 endpoints
+- **[Configuration API](API.md)** — Runtime config management
+- **[Health & Metrics](API.md)** — Status and Prometheus endpoints
 
-### Configuration
-- **[Config Guide](SETUP.md)** — Configuration file format & options
+### Configuration & Setup
+- **[Setup Guide](SETUP.md)** — Configuration file format & options
+- **[Docker Setup](DOCKER_SERVICE.md)** — Container deployment
+- **[Deployment Guide](operations/deployment.md)** — Production setup
 
 ### Logs & Debugging
-- **[Logs & Debugging](TROUBLESHOOTING.md#logs-and-debugging)** — Where to find logs
+- **[Troubleshooting Guide](TROUBLESHOOTING.md)** — Common issues & solutions
+- **[Logs & Debugging](TROUBLESHOOTING.md#logs-and-debugging)** — Logging setup
+- **[FAQ](TROUBLESHOOTING.md#faq)** — Frequently asked questions
 
 ---
 
-## 📊 Detailed Guides
+## 📊 Advanced Topics
+
+### Analytics & Reporting
+- **[Cost Analysis](analytics/cost-analysis.md)** — Detailed savings breakdown
+- **[Timeseries Analytics](analytics/dashboards.md)** — Metrics collection & aggregation
+- **[Forecasting](analytics/dashboards.md)** — Cost and usage predictions
+- **[Correlation Analysis](analytics/dashboards.md)** — Task-accuracy relationships
 
 ### Real-World Usage
-- **[Real World Impact](REAL_WORLD_IMPACT.md)** — Savings examples
-- **[Conservative Analysis](CONSERVATIVE_ANALYSIS.md)** — Realistic projections
-- **[Optimization Analysis](OPTIMIZATION_ANALYSIS.md)** — Deep dive
+- **[Usage Patterns](USAGE.md)** — Common implementation patterns
+- **[Budget Strategies](quick-start/budgets-setup.md)** — Cost control patterns
+- **[Optimization Examples](how-it-works.md)** — Real-world use cases
 
-### Implementation Details
-- **[Phase Completion](PHASE_7_COMPLETION.md)** — Latest updates
-- **[Integration Status](INTEGRATION_COMPLETE.md)** — Feature status
-- **[Validation Progress](VALIDATION_PROGRESS.md)** — Quality metrics
+### v4.0.0 Updates
+- **[Changelog](../CHANGELOG.md)** — Full v4.0.0 release notes
+- **[Migration Guide](../CHANGELOG.md)** — Upgrading from v3.0.0
+- **[Feature Overview](ARCHITECTURE.md)** — New v4.0.0 components
 
 ---
 
