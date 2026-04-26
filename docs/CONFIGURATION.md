@@ -2,13 +2,11 @@
 
 ## Overview
 
-Claude Escalate is configured via a single `config.yaml` file. Default location: `~/.claude-escalate/config.yaml`
+Claude Escalate is configured via `config.yaml`. Default: `~/.claude-escalate/config.yaml`
 
-All settings support **live reload** — changes apply immediately without restarting the service.
+Settings support **live reload** — changes apply immediately without restart.
 
 ## Quick Start
-
-### Minimal Configuration
 
 ```yaml
 gateway:
@@ -25,9 +23,15 @@ cache:
 knowledge_graph:
   enabled: true
   index_paths: [./src, ./lib]
+
+metrics:
+  prometheus: true
+  otel:
+    enabled: true
+    endpoint: "http://localhost:4317"
 ```
 
-## Configuration Sections
+## Core Configuration Sections
 
 ### Gateway
 
@@ -35,8 +39,14 @@ knowledge_graph:
 gateway:
   host: 127.0.0.1
   port: 8080
-  log_level: "info"      # debug, info, warn, error
+  log_level: "info"              # debug, info, warn, error
   request_timeout_seconds: 30
+  max_request_body_mb: 10
+  
+  # TLS (optional)
+  tls_enabled: false
+  tls_cert_path: ""
+  tls_key_path: ""
 ```
 
 ### Claude API
@@ -46,6 +56,9 @@ claude_api:
   api_key: ${CLAUDE_API_KEY}
   default_model: "claude-3-5-haiku-20241022"
   timeout_seconds: 60
+  max_tokens: 4096
+  rate_limit_rpm: 60
+  max_retries: 3
 ```
 
 ### Cache
@@ -55,9 +68,11 @@ cache:
   enabled: true
   exact_dedup_enabled: true
   semantic_enabled: true
-  semantic_threshold: 0.85      # 0-1 scale
+  semantic_threshold: 0.85            # Cosine similarity (0-1)
   database: "~/.claude-escalate/cache.db"
-  ttl_hours: 168
+  max_cache_size_mb: 500
+  ttl_hours: 168                      # 7 days
+  false_positive_rate_limit: 0.005    # 0.5%
 ```
 
 ### Knowledge Graph
@@ -70,6 +85,8 @@ knowledge_graph:
   database: "~/.claude-escalate/graph.db"
   enable_file_watching: true
   debounce_ms: 500
+  max_traversal_depth: 10
+  supported_languages: [go, python, typescript]
 ```
 
 ### Input Optimization
@@ -82,32 +99,46 @@ input_optimization:
     parameter_compression: true
     structured_formatting: true
     whitespace_removal: true
-  aggressiveness: "moderate"    # conservative, moderate, aggressive
+  aggressiveness: "moderate"          # conservative, moderate, aggressive
+```
+
+### Intent Detection
+
+```yaml
+intent_detection:
+  enabled: true
+  learn_from_feedback: true
+  feedback_history_days: 90
+  cache_bypass_patterns:
+    - "--no-cache"
+    - "--fresh"
+    - "!"
 ```
 
 ### Security
 
 ```yaml
 security:
-  enabled: true  # CANNOT BE DISABLED
+  enabled: true                        # ALWAYS ON
   validate_sql_injection: true
   validate_xss: true
   validate_command_injection: true
   rate_limit_rps: 1000
+  rate_limit_per_ip_rpm: 1000
 ```
 
-### Metrics & OpenTelemetry
+### Metrics (Prometheus + OTEL)
 
 ```yaml
 metrics:
   enabled: true
+  collection_interval_seconds: 1
+  retention_days: 90
   
-  export_prometheus: true
-  export_json: true
-  export_otel: true
-  export_logs: true
+  # Export formats
+  prometheus: true                    # /metrics endpoint
   
-  # OpenTelemetry push endpoint (for production monitoring)
+  # OpenTelemetry push (to collector)
   otel:
     enabled: true
     endpoint: "http://localhost:4317"
@@ -115,19 +146,12 @@ metrics:
     environment: "production"
     push_interval_seconds: 30
     
-    # Headers for authentication (optional)
-    headers:
+    # Optional: TLS
+    tls_enabled: false
+    
+    # Optional: Authentication headers
+    headers: {}
       # Authorization: "Bearer YOUR_TOKEN"
-  
-  # Prometheus metrics
-  prometheus:
-    port: 8080
-    path: "/metrics"
-  
-  # Alerting thresholds
-  thresholds:
-    cache_false_positive_limit: 0.005  # 0.5%
-    min_cache_hit_rate: 0.30
 ```
 
 ### Dashboard
@@ -136,13 +160,11 @@ metrics:
 dashboard:
   enabled: true
   port: 8080
+  host: 127.0.0.1
   refresh_interval_ms: 1000
-  dark_mode: "auto"  # auto, light, dark
 ```
 
 ## Environment Variables
-
-Replace values with environment variables:
 
 ```bash
 export CLAUDE_API_KEY="sk-ant-..."
@@ -165,29 +187,40 @@ metrics:
 ```yaml
 gateway:
   log_level: "debug"
+  host: 0.0.0.0
 
 cache:
   semantic_threshold: 0.95
 
 knowledge_graph:
   debounce_ms: 200
+
+metrics:
+  prometheus: true
 ```
 
-### Enterprise with OTEL Push
+### Production with OTEL Push
 
 ```yaml
 metrics:
+  prometheus: true
   otel:
     enabled: true
-    endpoint: "http://datadog-agent:4317"
+    endpoint: "http://otel-collector:4317"
+    service_name: "claude-escalate-prod"
     headers:
-      Authorization: "Bearer ${DD_API_KEY}"
+      Authorization: "Bearer ${OTEL_TOKEN}"
 
 security:
   rate_limit_per_ip_rpm: 500
+
+gateway:
+  tls_enabled: true
+  tls_cert_path: /etc/ssl/certs/server.crt
+  tls_key_path: /etc/ssl/private/server.key
 ```
 
-### Strict Security
+### Strict Security (No Caching)
 
 ```yaml
 cache:
@@ -195,15 +228,18 @@ cache:
 
 knowledge_graph:
   enabled: false
+
+security:
+  rate_limit_rps: 100
 ```
 
-## Management
+## Management Commands
 
 ```bash
 # Show configuration
 claude-escalate config show
 
-# Validate configuration
+# Validate syntax
 claude-escalate config validate
 
 # Update setting (live reload)
@@ -211,50 +247,54 @@ claude-escalate config set cache.semantic_threshold 0.90
 
 # View metrics
 claude-escalate metrics --now
-
-# Stream metrics to OTEL
-# (Configured via config.yaml metrics.otel.enabled)
 ```
 
-## OTEL Integration
+## Prometheus Integration
 
-Claude Escalate pushes metrics to OpenTelemetry Collector:
+Scrape metrics from `http://localhost:8080/metrics`:
 
 ```yaml
+# prometheus.yml
+scrape_configs:
+  - job_name: 'claude-escalate'
+    static_configs:
+      - targets: ['localhost:8080']
+    metrics_path: '/metrics'
+    scrape_interval: 15s
+```
+
+## OpenTelemetry Integration
+
+Push metrics to OTEL Collector:
+
+```yaml
+# In config.yaml
 metrics:
   otel:
     enabled: true
-    endpoint: "http://localhost:4317"      # OTLP gRPC endpoint
-    service_name: "claude-escalate"
+    endpoint: "http://otel-collector:4317"
     push_interval_seconds: 30
 ```
 
-**Metrics pushed**:
-- Request counts and latency
-- Cache hit rates
-- Token savings
-- Security events
-- Graph query performance
-
-**Compatible with**:
+**Supported OTEL backends**:
 - Datadog (via OTLP)
-- Jaeger
 - Prometheus (via OTLP)
+- Jaeger
 - New Relic
 - Any OpenTelemetry Collector
 
 ## Troubleshooting
 
 ```bash
-# Validate configuration syntax
+# Validate configuration
 claude-escalate config validate --verbose
+
+# Check Prometheus endpoint
+curl http://localhost:8080/metrics | head -20
 
 # Check OTEL connectivity
 telnet localhost 4317
 
-# View metrics
-curl http://localhost:8080/metrics
-
-# Check logs
-tail -f ~/.claude-escalate/gateway.log
+# View configuration
+claude-escalate config get metrics.otel
 ```

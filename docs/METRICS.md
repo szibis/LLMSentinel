@@ -101,6 +101,8 @@ graph TD
 
 Endpoint: `http://localhost:8080/metrics`
 
+Metrics in Prometheus text format:
+
 ```
 # HELP requests_total Total requests processed
 # TYPE requests_total counter
@@ -113,9 +115,21 @@ cache_hit_rate 52.3
 # HELP token_savings_percent Average token reduction percentage
 # TYPE token_savings_percent gauge
 token_savings_percent 42
+
+# HELP cache_entries Current cached responses
+# TYPE cache_entries gauge
+cache_entries 1247
+
+# HELP graph_nodes_total Total indexed code nodes
+# TYPE graph_nodes_total gauge
+graph_nodes_total 1247
+
+# HELP injections_blocked Total injection attacks blocked
+# TYPE injections_blocked counter
+injections_blocked 47
 ```
 
-**Scrape configuration for Prometheus**:
+**Prometheus Scrape Configuration**:
 
 ```yaml
 # prometheus.yml
@@ -131,68 +145,65 @@ scrape_configs:
 
 ### 2. OpenTelemetry Push (OTEL)
 
-Configure OTEL push in `config.yaml`:
+Push metrics to OpenTelemetry Collector via OTLP gRPC protocol.
+
+Configure in `config.yaml`:
 
 ```yaml
 metrics:
   enabled: true
   
-  # OpenTelemetry push configuration
   otel:
     enabled: true
-    
-    # OTLP gRPC endpoint (OpenTelemetry Collector)
-    endpoint: "http://localhost:4317"
-    
-    # Push interval
-    interval_seconds: 30
-    
-    # Service name for OTEL
+    endpoint: "http://localhost:4317"    # OTLP gRPC endpoint
     service_name: "claude-escalate"
-    
-    # Environment labels
     environment: "production"
     version: "0.5.0"
+    push_interval_seconds: 30
     
-    # Headers (optional, for auth)
+    # Optional: TLS for secure connection
+    tls_enabled: false
+    
+    # Optional: Authentication headers
     headers:
       Authorization: "Bearer YOUR_TOKEN"
-    
-    # TLS configuration (optional)
-    tls_enabled: false
-    tls_cert_path: ""
-    tls_key_path: ""
-    ca_cert_path: ""
 ```
 
-**Data pushed to OTEL Collector**:
+**Metrics pushed to OTEL Collector**:
 
-```
-Span: cache_lookup
-├─ Duration: 2.3ms
-├─ Status: SUCCESS
-├─ Attributes:
-│  ├─ cache_hit: true
-│  ├─ tokens_saved: 2450
-│  └─ request_id: abc123
+All metrics listed above are pushed as OpenTelemetry metric types:
+- **Counters**: requests_total, cache_exact_hits, injections_blocked, tokens_sent
+- **Gauges**: cache_hit_rate, token_savings_percent, graph_nodes_total, cache_memory_mb
+- **Histograms**: latency_ms (with P50, P95, P99 percentiles)
 
-Span: graph_query
-├─ Duration: 8.1ms
-├─ Status: SUCCESS
-├─ Attributes:
-│  ├─ query_type: relationship
-│  ├─ result_count: 5
-│  ├─ tokens_saved: 2500
-│  └─ request_id: abc123
+**OTEL Collector Configuration** (example):
 
-Span: claude_api
-├─ Duration: 450ms
-├─ Status: SUCCESS
-├─ Attributes:
-│  ├─ input_tokens: 1200
-│  ├─ output_tokens: 350
-│  ├─ model: haiku
-│  └─ request_id: abc123
+```yaml
+# otel-collector-config.yaml
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+
+processors:
+  batch:
+    timeout: 10s
+    send_batch_size: 100
+
+exporters:
+  prometheus:
+    endpoint: "0.0.0.0:8888"
+  
+  otlp:
+    endpoint: "datadog-agent:4317"
+
+service:
+  pipelines:
+    metrics:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [prometheus, otlp]
 ```
 
 ### 3. JSON Export
@@ -254,32 +265,17 @@ Endpoint: `http://localhost:8080/api/metrics/export`
 }
 ```
 
-### 4. Local Logs
+## Real-Time Streaming (WebSocket)
 
-Metrics written to `~/.claude-escalate/metrics.log`:
+Optional WebSocket endpoint for real-time metrics:
 
 ```
-[2026-04-27 12:30:45] METRICS: requests=1247 cache_hit_rate=52.3% token_savings=42%
-[2026-04-27 12:31:45] METRICS: cache_hits=18 graph_hits=5 latency_p99=200ms
-[2026-04-27 12:32:45] METRICS: injections_blocked=2 cost_savings=$25.30
+ws://localhost:8080/api/metrics/stream
 ```
 
-## Real-Time Streaming
+Provides metrics every 1 second to connected clients (for dashboard).
 
-WebSocket endpoint: `ws://localhost:8080/api/metrics/stream`
-
-```javascript
-// JavaScript client
-const ws = new WebSocket('ws://localhost:8080/api/metrics/stream');
-
-ws.onmessage = (event) => {
-  const metrics = JSON.parse(event.data);
-  console.log('Cache hit rate:', metrics.cache.hit_rate);
-  console.log('Token savings:', metrics.optimization.input_savings_percent);
-};
-```
-
-**Stream frequency**: Every 1 second (configurable)
+**Note**: Production monitoring should use Prometheus scraping or OTEL push, not WebSocket streaming.
 
 ## Grafana Integration
 
@@ -365,40 +361,40 @@ metrics:
   
   # Retention policy
   retention:
-    days: 90          # Keep 90 days of metrics
-    cleanup_interval_hours: 24  # Clean up daily
+    days: 90
+    cleanup_interval_hours: 24
   
   # Collection interval
   collection_interval_seconds: 1
   
   # Export formats
   export:
-    prometheus: true  # Enable Prometheus /metrics endpoint
-    json: true        # Enable JSON export endpoint
-    otel: true        # Enable OpenTelemetry push
-    logs: true        # Write to metrics.log
+    prometheus: true   # Prometheus /metrics endpoint
+    otel: true         # OpenTelemetry push
   
   # Performance settings
   max_entries_in_memory: 10000
   batch_export_size: 100
   
-  # Prometheus scrape settings
+  # Prometheus endpoint
   prometheus:
     port: 8080
     path: "/metrics"
-    enable_timestamps: true
   
-  # OpenTelemetry settings
+  # OpenTelemetry push
   otel:
     enabled: true
     endpoint: "http://localhost:4317"
-    interval_seconds: 30
+    service_name: "claude-escalate"
+    environment: "production"
+    push_interval_seconds: 30
     
-  # Thresholds for alerts
-  thresholds:
-    cache_false_positive_limit: 0.005  # 0.5%
-    min_cache_hit_rate: 0.30           # 30%
-    security_event_threshold: 10       # per minute
+    # Optional: TLS
+    tls_enabled: false
+    
+    # Optional: Authentication
+    headers: {}
+      # Authorization: "Bearer YOUR_TOKEN"
 ```
 
 ## Troubleshooting
