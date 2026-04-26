@@ -17,13 +17,40 @@ func NewStore(db *sql.DB) *Store {
 	return &Store{db: db}
 }
 
-// SaveRecord persists a complete analytics record.
+// SaveRecord persists a complete analytics record within a transaction.
+// All operations succeed or all are rolled back (atomicity guaranteed).
 func (s *Store) SaveRecord(record AnalyticsRecord) error {
 	// Serialize Phase data as JSON
-	phase1JSON, _ := json.Marshal(record.Phase1)
-	phase2JSON, _ := json.Marshal(record.Phase2)
-	phase3JSON, _ := json.Marshal(record.Phase3)
+	phase1JSON, err := json.Marshal(record.Phase1)
+	if err != nil {
+		return fmt.Errorf("failed to marshal phase1 data: %w", err)
+	}
 
+	phase2JSON, err := json.Marshal(record.Phase2)
+	if err != nil {
+		return fmt.Errorf("failed to marshal phase2 data: %w", err)
+	}
+
+	phase3JSON, err := json.Marshal(record.Phase3)
+	if err != nil {
+		return fmt.Errorf("failed to marshal phase3 data: %w", err)
+	}
+
+	// Begin transaction for atomic save
+	tx, err := s.db.Begin()
+	if err != nil {
+		return fmt.Errorf("failed to start transaction: %w", err)
+	}
+
+	// Defer rollback in case of any error
+	defer func() {
+		if r := recover(); r != nil {
+			tx.Rollback()
+			panic(r)
+		}
+	}()
+
+	// Save primary analytics record
 	query := `
 		INSERT INTO analytics_records (
 			validation_id, timestamp,
@@ -31,7 +58,7 @@ func (s *Store) SaveRecord(record AnalyticsRecord) error {
 		) VALUES (?, ?, ?, ?, ?)
 	`
 
-	_, err := s.db.Exec(query,
+	_, err = tx.Exec(query,
 		record.ValidationID,
 		record.Timestamp,
 		string(phase1JSON),
@@ -40,18 +67,33 @@ func (s *Store) SaveRecord(record AnalyticsRecord) error {
 	)
 
 	if err != nil {
+		tx.Rollback()
 		return fmt.Errorf("failed to save analytics record: %w", err)
 	}
 
-	// Also store sentiment outcome for learning
-	s.storeSentimentOutcome(record)
+	// Store sentiment outcome for learning
+	if err := s.storeSentimentOutcomeWithTx(tx, record); err != nil {
+		tx.Rollback()
+		return fmt.Errorf("failed to store sentiment outcome: %w", err)
+	}
 
 	// Store budget impact
-	s.storeBudgetImpact(record)
+	if err := s.storeBudgetImpactWithTx(tx, record); err != nil {
+		tx.Rollback()
+		return fmt.Errorf("failed to store budget impact: %w", err)
+	}
 
 	// Store frustration event if applicable
 	if record.Phase3.UserSentiment.FrustrationDetected {
-		s.storeFrustrationEvent(record)
+		if err := s.storeFrustrationEventWithTx(tx, record); err != nil {
+			tx.Rollback()
+			return fmt.Errorf("failed to store frustration event: %w", err)
+		}
+	}
+
+	// Commit all changes atomically
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
 	return nil
@@ -84,9 +126,17 @@ func (s *Store) GetRecord(validationID string) (AnalyticsRecord, error) {
 	}
 
 	// Deserialize JSON
-	json.Unmarshal([]byte(phase1JSON), &record.Phase1)
-	json.Unmarshal([]byte(phase2JSON), &record.Phase2)
-	json.Unmarshal([]byte(phase3JSON), &record.Phase3)
+	if err := json.Unmarshal([]byte(phase1JSON), &record.Phase1); err != nil {
+		return record, fmt.Errorf("failed to unmarshal phase1 data: %w", err)
+	}
+
+	if err := json.Unmarshal([]byte(phase2JSON), &record.Phase2); err != nil {
+		return record, fmt.Errorf("failed to unmarshal phase2 data: %w", err)
+	}
+
+	if err := json.Unmarshal([]byte(phase3JSON), &record.Phase3); err != nil {
+		return record, fmt.Errorf("failed to unmarshal phase3 data: %w", err)
+	}
 
 	return record, nil
 }
@@ -283,6 +333,74 @@ func (s *Store) storeFrustrationEvent(record AnalyticsRecord) error {
 	}
 
 	_, err := s.db.Exec(query,
+		record.ValidationID,
+		record.Timestamp,
+		record.Phase3.UserSentiment.ImplicitSentiment,
+		record.Phase1.TaskType,
+		record.Phase1.RoutedModel,
+		escalatedTo,
+		record.Phase3.Learning.Success,
+		record.Phase3.UserSentiment.TimeToSignal.Seconds(),
+	)
+
+	return err
+}
+
+// Transaction-aware versions for atomic SaveRecord
+
+func (s *Store) storeSentimentOutcomeWithTx(tx *sql.Tx, record AnalyticsRecord) error {
+	query := `
+		INSERT INTO sentiment_outcomes (
+			validation_id, task_type, model, sentiment,
+			success, tokens, duration, timestamp
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+	`
+
+	_, err := tx.Exec(query,
+		record.ValidationID,
+		record.Phase1.TaskType,
+		record.Phase1.RoutedModel,
+		record.Phase3.UserSentiment.ImplicitSentiment,
+		record.Phase3.Learning.Success,
+		record.Phase3.ActualTotalTokens,
+		record.Phase3.Learning.DurationSeconds,
+		record.Timestamp,
+	)
+
+	return err
+}
+
+func (s *Store) storeBudgetImpactWithTx(tx *sql.Tx, record AnalyticsRecord) error {
+	query := `
+		INSERT INTO budget_history (
+			model, tokens, cost_usd, timestamp
+		) VALUES (?, ?, ?, ?)
+	`
+
+	_, err := tx.Exec(query,
+		record.Phase1.RoutedModel,
+		record.Phase3.ActualTotalTokens,
+		record.Phase3.ActualCostUSD,
+		record.Timestamp,
+	)
+
+	return err
+}
+
+func (s *Store) storeFrustrationEventWithTx(tx *sql.Tx, record AnalyticsRecord) error {
+	query := `
+		INSERT INTO frustration_events (
+			validation_id, timestamp, sentiment, task_type,
+			initial_model, escalated_to, resolved, resolution_time
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+	`
+
+	escalatedTo := ""
+	if record.Phase3.DecisionMade.Action == "escalate" {
+		escalatedTo = record.Phase3.DecisionMade.NextModel
+	}
+
+	_, err := tx.Exec(query,
 		record.ValidationID,
 		record.Timestamp,
 		record.Phase3.UserSentiment.ImplicitSentiment,
