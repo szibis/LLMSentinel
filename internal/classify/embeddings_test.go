@@ -72,8 +72,8 @@ func TestSetConfidenceThreshold(t *testing.T) {
 	}{
 		{0.5, 0.5},
 		{0.95, 0.95},
-		{-0.1, 0.0},  // Should clamp to 0.0
-		{1.5, 1.0},   // Should clamp to 1.0
+		{-0.1, 0.0}, // Should clamp to 0.0
+		{1.5, 1.0},  // Should clamp to 1.0
 	}
 
 	for _, test := range tests {

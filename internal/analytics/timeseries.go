@@ -9,22 +9,22 @@ import (
 
 // MetricsTimeSeries represents aggregated metrics over a time bucket.
 type MetricsTimeSeries struct {
-	Timestamp       time.Time `json:"timestamp"`
-	Bucket          string    `json:"bucket"` // "hourly", "daily", "weekly"
-	TotalRequests   int64     `json:"total_requests"`
-	CacheHits       int64     `json:"cache_hits"`
-	CacheMisses     int64     `json:"cache_misses"`
-	BatchQueued     int64     `json:"batch_queued"`
-	DirectRequests  int64     `json:"direct_requests"`
-	TotalCostUSD    float64   `json:"total_cost_usd"`
-	EstimatedCostUSD float64  `json:"estimated_cost_usd"`
-	ActualCostUSD   float64   `json:"actual_cost_usd"`
-	SavingsUSD      float64   `json:"savings_usd"`
-	SuccessRate     float64   `json:"success_rate"`
-	AvgLatencyMs    float64   `json:"avg_latency_ms"`
-	P50LatencyMs    float64   `json:"p50_latency_ms"`
-	P95LatencyMs    float64   `json:"p95_latency_ms"`
-	P99LatencyMs    float64   `json:"p99_latency_ms"`
+	Timestamp        time.Time `json:"timestamp"`
+	Bucket           string    `json:"bucket"` // "hourly", "daily", "weekly"
+	TotalRequests    int64     `json:"total_requests"`
+	CacheHits        int64     `json:"cache_hits"`
+	CacheMisses      int64     `json:"cache_misses"`
+	BatchQueued      int64     `json:"batch_queued"`
+	DirectRequests   int64     `json:"direct_requests"`
+	TotalCostUSD     float64   `json:"total_cost_usd"`
+	EstimatedCostUSD float64   `json:"estimated_cost_usd"`
+	ActualCostUSD    float64   `json:"actual_cost_usd"`
+	SavingsUSD       float64   `json:"savings_usd"`
+	SuccessRate      float64   `json:"success_rate"`
+	AvgLatencyMs     float64   `json:"avg_latency_ms"`
+	P50LatencyMs     float64   `json:"p50_latency_ms"`
+	P95LatencyMs     float64   `json:"p95_latency_ms"`
+	P99LatencyMs     float64   `json:"p99_latency_ms"`
 }
 
 // TimeSeriesStore handles time-series metrics persistence and aggregation.

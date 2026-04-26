@@ -67,7 +67,7 @@ func TestModelLoading(t *testing.T) {
 		CachePath:    tmpDir,
 		AutoDownload: false, // Skip download for test
 		Intent: ModelSubConfig{
-			Enabled:   true,
+			Enabled:    true,
 			FallbackTo: "keywords",
 		},
 	}

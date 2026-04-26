@@ -24,41 +24,41 @@ const (
 
 // BatchRequest represents a request queued for batch processing
 type BatchRequest struct {
-	ID                string
-	PromptLength      int
-	EstimatedOutput   int
-	Model             string
-	Priority          int // 0 = low, 1 = medium, 2 = high (processed first)
-	MaxWaitTime       time.Duration
-	CreatedAt         time.Time
-	EstimatedCost     float64
+	ID                    string
+	PromptLength          int
+	EstimatedOutput       int
+	Model                 string
+	Priority              int // 0 = low, 1 = medium, 2 = high (processed first)
+	MaxWaitTime           time.Duration
+	CreatedAt             time.Time
+	EstimatedCost         float64
 	EstimatedBatchSavings float64
-	UserContext       map[string]interface{}
+	UserContext           map[string]interface{}
 }
 
 // BatchDecision represents the routing decision for a request
 type BatchDecision struct {
-	RequestID           string
-	UsesBatchAPI        bool
-	Reason              string
-	EstimatedSavings    float64
-	EstimatedWaitTime   time.Duration
-	ROIScore            float64 // 0.0-1.0: benefit of batching vs waiting
-	AlternativeModel    string  // Suggested cheaper model
-	AlternativeSavings  float64
-	UserCanOverride     bool
+	RequestID          string
+	UsesBatchAPI       bool
+	Reason             string
+	EstimatedSavings   float64
+	EstimatedWaitTime  time.Duration
+	ROIScore           float64 // 0.0-1.0: benefit of batching vs waiting
+	AlternativeModel   string  // Suggested cheaper model
+	AlternativeSavings float64
+	UserCanOverride    bool
 }
 
 // Router manages batch request routing and queue decisions
 type Router struct {
-	strategy           BatchStrategy
-	queue              []*BatchRequest
-	calculator         *costs.Calculator
-	maxQueueSize       int
-	maxBatchWaitTime   time.Duration
-	minBatchSize       int
-	minSavingsPercent  float64
-	mu                 sync.RWMutex
+	strategy          BatchStrategy
+	queue             []*BatchRequest
+	calculator        *costs.Calculator
+	maxQueueSize      int
+	maxBatchWaitTime  time.Duration
+	minBatchSize      int
+	minSavingsPercent float64
+	mu                sync.RWMutex
 }
 
 // NewRouter creates a new batch router with default settings
@@ -196,12 +196,12 @@ func (r *Router) QueueStats() QueueStatistics {
 	defer r.mu.RUnlock()
 
 	stats := QueueStatistics{
-		Size:              len(r.queue),
-		MaxSize:           r.maxQueueSize,
-		OldestRequestAge:  0,
-		AverageWaitTime:   0,
-		TotalPendingCost:  0,
-		EstimatedSavings:  0,
+		Size:             len(r.queue),
+		MaxSize:          r.maxQueueSize,
+		OldestRequestAge: 0,
+		AverageWaitTime:  0,
+		TotalPendingCost: 0,
+		EstimatedSavings: 0,
 	}
 
 	if len(r.queue) == 0 {
@@ -228,12 +228,12 @@ func (r *Router) QueueStats() QueueStatistics {
 
 // QueueStatistics contains queue metrics
 type QueueStatistics struct {
-	Size               int
-	MaxSize            int
-	OldestRequestAge   time.Duration
-	AverageWaitTime    time.Duration
-	TotalPendingCost   float64
-	EstimatedSavings   float64
+	Size             int
+	MaxSize          int
+	OldestRequestAge time.Duration
+	AverageWaitTime  time.Duration
+	TotalPendingCost float64
+	EstimatedSavings float64
 }
 
 // FlushQueue processes all queued requests

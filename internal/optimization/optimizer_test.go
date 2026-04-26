@@ -16,16 +16,16 @@ func TestRealWorldScenario_SingleUserSession(t *testing.T) {
 
 	// Scenario: User working on documentation task (repeated similar prompts)
 	prompts := []string{
-		"How do I optimize function X?",           // Initial question
-		"How do I improve function X?",            // Similar follow-up (cache hit)
-		"Can I make function X faster?",           // Related (cache hit)
-		"Write tests for function X",              // Different (direct/batch)
-		"How to optimize function X more?",        // Similar again (cache hit)
-		"Refactor function X completely",          // Different (direct/batch)
-		"What's the best way to optimize X?",      // Similar (cache hit)
-		"Add logging to function X",               // Different (direct/batch)
-		"How do I debug function X?",              // Different (direct/batch)
-		"Optimize function X performance",         // Similar (cache hit)
+		"How do I optimize function X?",      // Initial question
+		"How do I improve function X?",       // Similar follow-up (cache hit)
+		"Can I make function X faster?",      // Related (cache hit)
+		"Write tests for function X",         // Different (direct/batch)
+		"How to optimize function X more?",   // Similar again (cache hit)
+		"Refactor function X completely",     // Different (direct/batch)
+		"What's the best way to optimize X?", // Similar (cache hit)
+		"Add logging to function X",          // Different (direct/batch)
+		"How do I debug function X?",         // Different (direct/batch)
+		"Optimize function X performance",    // Similar (cache hit)
 	}
 
 	model := "sonnet"
@@ -363,9 +363,9 @@ func TestRealWorldImpact_MonthlyProjection(t *testing.T) {
 		modelSwitchRate := 0.05
 
 		optimizedCost := 0.0
-		optimizedCost += float64(monthlyRequests) * cacheHitRate * costPerRequest * 0.002 // Cache: 99.8% off
-		optimizedCost += float64(monthlyRequests) * batchRate * costPerRequest * 0.5      // Batch: 50% off
-		optimizedCost += float64(monthlyRequests) * modelSwitchRate * costPerRequest * 0.4 // Switch: 60% off
+		optimizedCost += float64(monthlyRequests) * cacheHitRate * costPerRequest * 0.002                             // Cache: 99.8% off
+		optimizedCost += float64(monthlyRequests) * batchRate * costPerRequest * 0.5                                  // Batch: 50% off
+		optimizedCost += float64(monthlyRequests) * modelSwitchRate * costPerRequest * 0.4                            // Switch: 60% off
 		optimizedCost += float64(monthlyRequests) * (1 - cacheHitRate - batchRate - modelSwitchRate) * costPerRequest // Rest: no savings
 
 		savings := unoptimizedMonthly - optimizedCost

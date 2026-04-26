@@ -14,14 +14,14 @@ import (
 
 // Server represents the dashboard HTTP server
 type Server struct {
-	host            string
-	port            int
-	configLoader    *config.Loader
+	host             string
+	port             int
+	configLoader     *config.Loader
 	metricsCollector *metrics.MetricsCollector
 	metricsPublisher *metrics.MetricsPublisher
-	httpServer      *http.Server
-	mu              sync.RWMutex
-	configPath      string
+	httpServer       *http.Server
+	mu               sync.RWMutex
+	configPath       string
 }
 
 // NewServer creates a new dashboard server
@@ -104,7 +104,7 @@ func (s *Server) handleConfig(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (s *Server) handleConfigGet(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleConfigGet(w http.ResponseWriter, _ *http.Request) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -199,7 +199,7 @@ func (s *Server) handleMetricsStream(w http.ResponseWriter, r *http.Request) {
 	// For now, return polling recommendation
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"message": "WebSocket streaming not yet implemented, use /api/metrics with polling",
+		"message":  "WebSocket streaming not yet implemented, use /api/metrics with polling",
 		"interval": "1000ms (recommended)",
 	})
 }

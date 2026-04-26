@@ -350,7 +350,7 @@ func printStatsTypes(db *store.Store) {
 	fmt.Println()
 }
 
-func printStatsPredictions(db *store.Store, cfg *config.Config) {
+func printStatsPredictions(db *store.Store, _ *config.Config) {
 	fmt.Println("═══════════════════════════════════════════")
 	fmt.Println("  Predictive Escalation Status")
 	fmt.Println("═══════════════════════════════════════════")

@@ -57,15 +57,15 @@ type DiscoveryConfig struct {
 
 // DetectedTools contains information about discovered tools
 type DetectedTools struct {
-	RTKPath               string
-	ScraplingPath         string
-	LSPServers            map[string]string
-	GitPath               string
-	LanguageRuntimes      map[string]string
-	InstalledLanguages    []string
-	DetectedAt            string
-	MCPServersAvailable   []string
-	PlatformPrimaryPaths  []string
+	RTKPath              string
+	ScraplingPath        string
+	LSPServers           map[string]string
+	GitPath              string
+	LanguageRuntimes     map[string]string
+	InstalledLanguages   []string
+	DetectedAt           string
+	MCPServersAvailable  []string
+	PlatformPrimaryPaths []string
 }
 
 // ConfigLoader loads discovery configuration from YAML
@@ -314,16 +314,16 @@ func DetectInstalledLanguages() []string {
 	var langs []string
 
 	langChecks := map[string]string{
-		"python":   "python3",
-		"go":       "go",
-		"rust":     "rustc",
-		"node":     "node",
-		"ruby":     "ruby",
-		"java":     "java",
-		"php":      "php",
-		"csharp":   "dotnet",
-		"cpp":      "g++",
-		"c":        "gcc",
+		"python": "python3",
+		"go":     "go",
+		"rust":   "rustc",
+		"node":   "node",
+		"ruby":   "ruby",
+		"java":   "java",
+		"php":    "php",
+		"csharp": "dotnet",
+		"cpp":    "g++",
+		"c":      "gcc",
 	}
 
 	for lang, cmd := range langChecks {

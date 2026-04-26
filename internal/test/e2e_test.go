@@ -129,8 +129,8 @@ func (suite *E2ETestSuite) TestFeature3Observability(t *testing.T) {
 // TestFeature4WebDashboard verifies web dashboard components
 func (suite *E2ETestSuite) TestFeature4WebDashboard(t *testing.T) {
 	endpoints := []struct {
-		path   string
-		name   string
+		path string
+		name string
 	}{
 		{"/", "Overview"},
 		{"/analytics", "Analytics"},

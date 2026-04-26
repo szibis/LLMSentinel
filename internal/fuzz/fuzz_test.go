@@ -55,7 +55,7 @@ func FuzzClassifyPrompt(f *testing.F) {
 func FuzzLearnerRecording(f *testing.F) {
 	f.Add("test-1", int32(0), int32(0), true, 0.05)
 	f.Add("test-2", int32(1), int32(1), false, 0.5)
-	f.Add("very-long-id-" + strings.Repeat("x", 100), int32(100), int32(50), true, 0.25)
+	f.Add("very-long-id-"+strings.Repeat("x", 100), int32(100), int32(50), true, 0.25)
 
 	f.Fuzz(func(t *testing.T, id string, predicted, actual int32, succeeded bool, tokenError float64) {
 		if len(id) > 1000 {
@@ -80,12 +80,12 @@ func FuzzLearnerRecording(f *testing.F) {
 		actIdx := int(actual) % len(taskTypes)
 
 		event := classify.LearningEvent{
-			ID:             id,
-			Prompt:         "test prompt",
-			PredictedTask:  taskTypes[predIdx],
-			ActualTask:     taskTypes[actIdx],
-			Succeeded:      succeeded,
-			TokenError:     tokenError,
+			ID:              id,
+			Prompt:          "test prompt",
+			PredictedTask:   taskTypes[predIdx],
+			ActualTask:      taskTypes[actIdx],
+			Succeeded:       succeeded,
+			TokenError:      tokenError,
 			ConfidenceScore: 0.8,
 		}
 
@@ -120,7 +120,7 @@ func FuzzMetricsRecording(f *testing.F) {
 		}
 
 		pm := classify.NewEmbeddingClassifier() // Use as placeholder
-		_ = pm // Prevent unused variable
+		_ = pm                                  // Prevent unused variable
 
 		// Create metrics and record
 		// This verifies the metrics recording doesn't panic with various inputs

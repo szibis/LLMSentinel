@@ -9,23 +9,23 @@ import (
 
 // TaskEmbedding represents a task type with its semantic embedding vector.
 type TaskEmbedding struct {
-	TaskType  TaskType
-	Vector    []float64 // 384-dimensional embedding
+	TaskType   TaskType
+	Vector     []float64 // 384-dimensional embedding
 	Confidence float64
 }
 
 // EmbeddingClassifier uses semantic similarity for task classification.
 type EmbeddingClassifier struct {
-	taskEmbeddings []TaskEmbedding
+	taskEmbeddings      []TaskEmbedding
 	confidenceThreshold float64
-	fallback           func(string) TaskType // Fallback to regex classifier
+	fallback            func(string) TaskType // Fallback to regex classifier
 }
 
 // NewEmbeddingClassifier creates a new embedding-based classifier.
 func NewEmbeddingClassifier() *EmbeddingClassifier {
 	ec := &EmbeddingClassifier{
 		confidenceThreshold: 0.75,
-		fallback:           Classify, // Use existing regex classifier as fallback
+		fallback:            Classify, // Use existing regex classifier as fallback
 	}
 	ec.initializeTaskEmbeddings()
 	return ec
@@ -41,53 +41,53 @@ func (ec *EmbeddingClassifier) initializeTaskEmbeddings() {
 
 	ec.taskEmbeddings = []TaskEmbedding{
 		{
-			TaskType: TaskConcurrency,
-			Vector:   generateEmbedding("race condition deadlock concurrent goroutine channel mutex thread async await parallel"),
+			TaskType:   TaskConcurrency,
+			Vector:     generateEmbedding("race condition deadlock concurrent goroutine channel mutex thread async await parallel"),
 			Confidence: 0.95,
 		},
 		{
-			TaskType: TaskParsing,
-			Vector:   generateEmbedding("regex parse grammar tokenize lexer ast syntax state machine compiler"),
+			TaskType:   TaskParsing,
+			Vector:     generateEmbedding("regex parse grammar tokenize lexer ast syntax state machine compiler"),
 			Confidence: 0.93,
 		},
 		{
-			TaskType: TaskOptimization,
-			Vector:   generateEmbedding("optimize performance speed latency throughput benchmark profile cache memory"),
+			TaskType:   TaskOptimization,
+			Vector:     generateEmbedding("optimize performance speed latency throughput benchmark profile cache memory"),
 			Confidence: 0.92,
 		},
 		{
-			TaskType: TaskDebugging,
-			Vector:   generateEmbedding("debug traceback segfault panic stack trace core dump breakpoint error"),
+			TaskType:   TaskDebugging,
+			Vector:     generateEmbedding("debug traceback segfault panic stack trace core dump breakpoint error"),
 			Confidence: 0.91,
 		},
 		{
-			TaskType: TaskArchitecture,
-			Vector:   generateEmbedding("architecture design structure microservice monolith event driven domain driven system"),
+			TaskType:   TaskArchitecture,
+			Vector:     generateEmbedding("architecture design structure microservice monolith event driven domain driven system"),
 			Confidence: 0.90,
 		},
 		{
-			TaskType: TaskSecurity,
-			Vector:   generateEmbedding("crypto security encrypt auth tls ssl oauth jwt certificate xss sqli csrf"),
+			TaskType:   TaskSecurity,
+			Vector:     generateEmbedding("crypto security encrypt auth tls ssl oauth jwt certificate xss sqli csrf"),
 			Confidence: 0.94,
 		},
 		{
-			TaskType: TaskDatabase,
-			Vector:   generateEmbedding("database sql query migration schema index transaction postgres mysql redis"),
+			TaskType:   TaskDatabase,
+			Vector:     generateEmbedding("database sql query migration schema index transaction postgres mysql redis"),
 			Confidence: 0.93,
 		},
 		{
-			TaskType: TaskNetworking,
-			Vector:   generateEmbedding("network socket tcp udp http dns proxy websocket grpc load balance"),
+			TaskType:   TaskNetworking,
+			Vector:     generateEmbedding("network socket tcp udp http dns proxy websocket grpc load balance"),
 			Confidence: 0.92,
 		},
 		{
-			TaskType: TaskTesting,
-			Vector:   generateEmbedding("test spec assert mock stub fixture coverage tdd bdd unit integration"),
+			TaskType:   TaskTesting,
+			Vector:     generateEmbedding("test spec assert mock stub fixture coverage tdd bdd unit integration"),
 			Confidence: 0.91,
 		},
 		{
-			TaskType: TaskDevOps,
-			Vector:   generateEmbedding("deploy docker ci cd pipeline kubernetes helm terraform ansible jenkins container"),
+			TaskType:   TaskDevOps,
+			Vector:     generateEmbedding("deploy docker ci cd pipeline kubernetes helm terraform ansible jenkins container"),
 			Confidence: 0.92,
 		},
 	}

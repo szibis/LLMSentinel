@@ -33,14 +33,14 @@ type OptimizationPlugin interface {
 
 // Metrics represents token/cost savings from an optimization
 type Metrics struct {
-	TokensIn              int64
-	TokensOut             int64
-	TokensSaved           int64
-	SavingsPercent        float64
-	ProcessingTimeMs      int64
-	CacheHit              bool
-	CacheConfidence       float64
-	RecommendedFreshness  bool
+	TokensIn             int64
+	TokensOut            int64
+	TokensSaved          int64
+	SavingsPercent       float64
+	ProcessingTimeMs     int64
+	CacheHit             bool
+	CacheConfidence      float64
+	RecommendedFreshness bool
 }
 
 // PluginMetrics represents aggregated plugin metrics
@@ -64,11 +64,11 @@ type Config struct {
 
 // RTKOptimizationPlugin represents RTK optimization plugin
 type RTKOptimizationPlugin struct {
-	name              string
-	version           string
-	enabled           bool
-	savingRate        float64
-	metrics           *PluginMetrics
+	name       string
+	version    string
+	enabled    bool
+	savingRate float64
+	metrics    *PluginMetrics
 }
 
 // NewRTKOptimizationPlugin creates a new RTK plugin
@@ -110,8 +110,8 @@ func (p *RTKOptimizationPlugin) OptimizeOutput(ctx context.Context, resp interfa
 	// In production, this would call RTK to compress command output
 	// For now, return metrics indicating potential savings
 	metrics := &Metrics{
-		TokensOut:      1000,  // Example
-		TokensSaved:    994,   // 99.4% savings
+		TokensOut:      1000, // Example
+		TokensSaved:    994,  // 99.4% savings
 		SavingsPercent: 99.4,
 		CacheHit:       false,
 	}

@@ -8,15 +8,15 @@ import (
 
 func TestDetectToolsWithConfig(t *testing.T) {
 	tests := []struct {
-		name    string
+		name     string
 		yamlFile string
-		wantErr bool
-		check   func(t *testing.T, tools *DetectedTools)
+		wantErr  bool
+		check    func(t *testing.T, tools *DetectedTools)
 	}{
 		{
-			name:    "valid config",
+			name:     "valid config",
 			yamlFile: "testdata/discovery_valid.yaml",
-			wantErr: false,
+			wantErr:  false,
 			check: func(t *testing.T, tools *DetectedTools) {
 				if tools == nil {
 					t.Error("expected non-nil DetectedTools")
@@ -24,10 +24,10 @@ func TestDetectToolsWithConfig(t *testing.T) {
 			},
 		},
 		{
-			name:    "missing file",
+			name:     "missing file",
 			yamlFile: "testdata/nonexistent.yaml",
-			wantErr: true,
-			check:   nil,
+			wantErr:  true,
+			check:    nil,
 		},
 	}
 
@@ -53,6 +53,7 @@ func TestDetectTools(t *testing.T) {
 
 	if tools == nil {
 		t.Error("expected non-nil DetectedTools")
+		return
 	}
 
 	// At minimum, we should detect git
@@ -63,8 +64,8 @@ func TestDetectTools(t *testing.T) {
 
 func TestExpandPath(t *testing.T) {
 	tests := []struct {
-		name string
-		path string
+		name  string
+		path  string
 		check func(t *testing.T, expanded string)
 	}{
 		{
@@ -100,7 +101,8 @@ func TestFindTool(t *testing.T) {
 	// Create temporary directory with a fake tool
 	dir := t.TempDir()
 	toolPath := filepath.Join(dir, "fake-tool")
-	os.WriteFile(toolPath, []byte("#!/bin/sh\necho test"), 0755)
+	os.WriteFile(toolPath, []byte("#!/bin/sh\necho test"), 0o600)
+	os.Chmod(toolPath, 0o700) // Make executable for test
 
 	tests := []struct {
 		name    string

@@ -9,13 +9,13 @@ import (
 
 // OTELConfig holds OpenTelemetry configuration.
 type OTELConfig struct {
-	Enabled            bool          `yaml:"enabled"`
-	ExporterType       string        `yaml:"exporter_type"`       // "otlpmetrichttp", "otlpmetricgrpc"
-	Endpoint           string        `yaml:"endpoint"`            // e.g., http://localhost:4318
-	Interval           time.Duration `yaml:"interval"`            // Push interval (default 60s)
-	Insecure           bool          `yaml:"insecure"`            // Allow HTTP for local dev
-	TimeoutSeconds     int           `yaml:"timeout_seconds"`     // Request timeout
-	Headers            map[string]string `yaml:"headers"`        // Custom headers for auth
+	Enabled        bool              `yaml:"enabled"`
+	ExporterType   string            `yaml:"exporter_type"`   // "otlpmetrichttp", "otlpmetricgrpc"
+	Endpoint       string            `yaml:"endpoint"`        // e.g., http://localhost:4318
+	Interval       time.Duration     `yaml:"interval"`        // Push interval (default 60s)
+	Insecure       bool              `yaml:"insecure"`        // Allow HTTP for local dev
+	TimeoutSeconds int               `yaml:"timeout_seconds"` // Request timeout
+	Headers        map[string]string `yaml:"headers"`         // Custom headers for auth
 }
 
 // OTELMetricsExporter exports metrics to OpenTelemetry collectors.
@@ -152,12 +152,12 @@ func (ome *OTELMetricsExporter) buildOTLPMetrics(snapshot map[string]interface{}
 			"sum": map[string]interface{}{
 				"dataPoints": []map[string]interface{}{
 					{
-						"asInt": totalReqs,
+						"asInt":      totalReqs,
 						"attributes": []map[string]interface{}{},
 					},
 				},
 				"aggregationTemporality": "CUMULATIVE",
-				"isMonotonic": true,
+				"isMonotonic":            true,
 			},
 		})
 	}

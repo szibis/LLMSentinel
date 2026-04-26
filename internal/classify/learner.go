@@ -21,14 +21,14 @@ type LearningEvent struct {
 
 // Learner handles active learning from classification outcomes.
 type Learner struct {
-	mu                sync.RWMutex
-	recentEvents      []LearningEvent
-	maxHistorySize    int
-	updateFrequency   time.Duration
-	lastUpdate        time.Time
-	onUpdateComplete  func(stats LearningStats) // Callback when learning completes
-	accuracyByTask    map[TaskType]TaskAccuracy
-	accuracyByModel   map[string]ModelAccuracy
+	mu               sync.RWMutex
+	recentEvents     []LearningEvent
+	maxHistorySize   int
+	updateFrequency  time.Duration
+	lastUpdate       time.Time
+	onUpdateComplete func(stats LearningStats) // Callback when learning completes
+	accuracyByTask   map[TaskType]TaskAccuracy
+	accuracyByModel  map[string]ModelAccuracy
 }
 
 // TaskAccuracy tracks classification accuracy per task type.
@@ -42,20 +42,20 @@ type TaskAccuracy struct {
 
 // ModelAccuracy tracks model success rates for specific tasks.
 type ModelAccuracy struct {
-	TaskType     TaskType
-	Model        string
-	SuccessCount int
-	TotalCount   int
-	SuccessRate  float64
+	TaskType      TaskType
+	Model         string
+	SuccessCount  int
+	TotalCount    int
+	SuccessRate   float64
 	AvgTokenError float64
 }
 
 // LearningStats summarizes learning activity.
 type LearningStats struct {
-	TotalEvents          int
-	MisclassifiedCount   int
-	MisclassificationRate float64
-	UpdatedAtTaskTypes   int
+	TotalEvents               int
+	MisclassifiedCount        int
+	MisclassificationRate     float64
+	UpdatedAtTaskTypes        int
 	RecentAccuracyImprovement float64
 }
 
@@ -137,7 +137,7 @@ func (l *Learner) UpdateFromBatch() LearningStats {
 	defer l.mu.Unlock()
 
 	stats := LearningStats{
-		TotalEvents: len(l.recentEvents),
+		TotalEvents:        len(l.recentEvents),
 		UpdatedAtTaskTypes: len(l.accuracyByTask),
 	}
 

@@ -126,13 +126,13 @@ func TestQueueStats(t *testing.T) {
 	// Add some requests
 	for i := 1; i <= 3; i++ {
 		req := BatchRequest{
-			ID:                "test-" + string(rune(i)),
-			PromptLength:      2000,
-			EstimatedOutput:   1000,
-			Model:             "sonnet",
-			MaxWaitTime:       1 * time.Minute,
-			CreatedAt:         time.Now().Add(-time.Duration(i) * time.Second),
-			EstimatedCost:     0.05,
+			ID:                    "test-" + string(rune(i)),
+			PromptLength:          2000,
+			EstimatedOutput:       1000,
+			Model:                 "sonnet",
+			MaxWaitTime:           1 * time.Minute,
+			CreatedAt:             time.Now().Add(-time.Duration(i) * time.Second),
+			EstimatedCost:         0.05,
 			EstimatedBatchSavings: 0.025,
 		}
 		router.MakeRoutingDecision(req)

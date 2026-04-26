@@ -11,14 +11,14 @@ import (
 
 // MetricsPublisher publishes metrics to multiple targets
 type MetricsPublisher struct {
-	collector        *MetricsCollector
-	exporter         *PrometheusExporter
-	targets          []PublishTarget
-	interval         time.Duration
-	done             chan bool
-	wg               sync.WaitGroup
-	mu               sync.RWMutex
-	lastPublishTime  time.Time
+	collector       *MetricsCollector
+	exporter        *PrometheusExporter
+	targets         []PublishTarget
+	interval        time.Duration
+	done            chan bool
+	wg              sync.WaitGroup
+	mu              sync.RWMutex
+	lastPublishTime time.Time
 }
 
 // PublishTarget represents a metrics publishing target

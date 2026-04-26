@@ -39,13 +39,13 @@ type ToolAdapter interface {
 
 // ToolRequest represents a request to execute a tool
 type ToolRequest struct {
-	ID       string                 `json:"id"`
-	Tool     string                 `json:"tool"`
-	Method   string                 `json:"method,omitempty"`
-	Params   map[string]interface{} `json:"params"`
-	Input    string                 `json:"input,omitempty"`
-	Metadata map[string]string      `json:"metadata,omitempty"`
-	NoCacheBypassed bool              `json:"no_cache,omitempty"`
+	ID              string                 `json:"id"`
+	Tool            string                 `json:"tool"`
+	Method          string                 `json:"method,omitempty"`
+	Params          map[string]interface{} `json:"params"`
+	Input           string                 `json:"input,omitempty"`
+	Metadata        map[string]string      `json:"metadata,omitempty"`
+	NoCacheBypassed bool                   `json:"no_cache,omitempty"`
 }
 
 // ToolResponse represents a response from a tool
@@ -60,10 +60,10 @@ type ToolResponse struct {
 
 // ResponseTiming tracks response timing information
 type ResponseTiming struct {
-	TotalMs       int64  `json:"total_ms"`
-	ToolExecMs    int64  `json:"tool_exec_ms"`
-	ParsingMs     int64  `json:"parsing_ms"`
-	SerializingMs int64  `json:"serializing_ms"`
+	TotalMs       int64 `json:"total_ms"`
+	ToolExecMs    int64 `json:"tool_exec_ms"`
+	ParsingMs     int64 `json:"parsing_ms"`
+	SerializingMs int64 `json:"serializing_ms"`
 }
 
 // ToolSignature describes a tool's interface
@@ -89,10 +89,10 @@ type ParamSchema struct {
 
 // ToolExample shows an example of using a tool
 type ToolExample struct {
-	Name    string                 `json:"name"`
-	Input   map[string]interface{} `json:"input"`
-	Output  interface{}            `json:"output"`
-	Error   string                 `json:"error,omitempty"`
+	Name   string                 `json:"name"`
+	Input  map[string]interface{} `json:"input"`
+	Output interface{}            `json:"output"`
+	Error  string                 `json:"error,omitempty"`
 }
 
 // GatewayRequest represents a request to the gateway
@@ -107,35 +107,35 @@ type GatewayRequest struct {
 
 // GatewayResponse represents a response from the gateway
 type GatewayResponse struct {
-	Data              interface{}
-	Error             string
-	TokensSaved       int64
-	TotalTokens       int64
-	CachedResponse    bool
+	Data                 interface{}
+	Error                string
+	TokensSaved          int64
+	TotalTokens          int64
+	CachedResponse       bool
 	OptimizationsApplied []string
-	Quality           ResponseQuality
-	Transparency      TransparencyInfo
+	Quality              ResponseQuality
+	Transparency         TransparencyInfo
 }
 
 // ResponseQuality tracks response quality metrics
 type ResponseQuality struct {
-	Fresh               bool
-	CacheConfidence     float64
-	AccuracyEstimate    float64
+	Fresh                bool
+	CacheConfidence      float64
+	AccuracyEstimate     float64
 	RecommendedFreshness bool
 }
 
 // TransparencyInfo provides transparency about optimizations
 type TransparencyInfo struct {
-	Optimizations       []string  `json:"optimizations"`
-	CachedResponse      bool      `json:"cached_response"`
-	TokensSaved         int64     `json:"tokens_saved"`
-	TotalTokens         int64     `json:"total_tokens"`
-	SavingsPercent      float64   `json:"savings_percent"`
-	CacheHitConfidence  float64   `json:"cache_confidence,omitempty"`
-	CostWithout         string    `json:"cost_without_optimization"`
-	CostWith            string    `json:"cost_with_optimization"`
-	Message             string    `json:"message"`
+	Optimizations      []string `json:"optimizations"`
+	CachedResponse     bool     `json:"cached_response"`
+	TokensSaved        int64    `json:"tokens_saved"`
+	TotalTokens        int64    `json:"total_tokens"`
+	SavingsPercent     float64  `json:"savings_percent"`
+	CacheHitConfidence float64  `json:"cache_confidence,omitempty"`
+	CostWithout        string   `json:"cost_without_optimization"`
+	CostWith           string   `json:"cost_with_optimization"`
+	Message            string   `json:"message"`
 }
 
 // ExecutionError represents an error during tool execution

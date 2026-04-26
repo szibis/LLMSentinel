@@ -9,7 +9,7 @@ import (
 
 // PercentileMetrics represents distribution metrics for a data set.
 type PercentileMetrics struct {
-	P50         float64 `json:"p50"`     // Median
+	P50         float64 `json:"p50"` // Median
 	P75         float64 `json:"p75"`
 	P90         float64 `json:"p90"`
 	P95         float64 `json:"p95"`
@@ -23,9 +23,9 @@ type PercentileMetrics struct {
 
 // LatencyPercentiles provides latency distribution by model and task.
 type LatencyPercentiles struct {
-	Overall    PercentileMetrics            `json:"overall"`
-	ByModel    map[string]PercentileMetrics `json:"by_model"`
-	ByTask     map[string]PercentileMetrics `json:"by_task"`
+	Overall     PercentileMetrics            `json:"overall"`
+	ByModel     map[string]PercentileMetrics `json:"by_model"`
+	ByTask      map[string]PercentileMetrics `json:"by_task"`
 	ByTaskModel map[string]PercentileMetrics `json:"by_task_model"` // "task:model" key
 }
 

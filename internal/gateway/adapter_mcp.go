@@ -111,7 +111,7 @@ func (a *MCPAdapter) Close() error {
 }
 
 // executeScraping handles web scraping via scrapling
-func (a *MCPAdapter) executeScraping(ctx context.Context, params map[string]interface{}) (interface{}, error) {
+func (a *MCPAdapter) executeScraping(_ context.Context, params map[string]interface{}) (interface{}, error) {
 	// Extract parameters
 	url, ok := params["url"].(string)
 	if !ok {
@@ -138,7 +138,7 @@ func (a *MCPAdapter) executeScraping(ctx context.Context, params map[string]inte
 }
 
 // executeLSP handles code analysis via LSP
-func (a *MCPAdapter) executeLSP(ctx context.Context, params map[string]interface{}) (interface{}, error) {
+func (a *MCPAdapter) executeLSP(_ context.Context, params map[string]interface{}) (interface{}, error) {
 	// Extract parameters
 	file, ok := params["file"].(string)
 	if !ok {
@@ -169,7 +169,7 @@ func (a *MCPAdapter) executeLSP(ctx context.Context, params map[string]interface
 }
 
 // executeDatabase handles database queries
-func (a *MCPAdapter) executeDatabase(ctx context.Context, params map[string]interface{}) (interface{}, error) {
+func (a *MCPAdapter) executeDatabase(_ context.Context, params map[string]interface{}) (interface{}, error) {
 	// Extract parameters
 	query, ok := params["query"].(string)
 	if !ok {
