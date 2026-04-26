@@ -106,6 +106,10 @@ func (o *Optimizer) Optimize(prompt, model string, estimatedOutput int) Optimiza
 		directCost := o.estimateCost(prompt, model, estimatedOutput)
 		if directCost > 0 {
 			decision.SavingsPercent = (batchDecision.EstimatedSavings / directCost) * 100
+			// Cap savings at 100% (logical maximum)
+			if decision.SavingsPercent > 100.0 {
+				decision.SavingsPercent = 100.0
+			}
 		}
 		decision.Rationale = batchDecision.Reason
 		decision.BatchQueueSize = o.router.QueueSize()
@@ -121,6 +125,10 @@ func (o *Optimizer) Optimize(prompt, model string, estimatedOutput int) Optimiza
 		directCost := o.estimateCost(prompt, model, estimatedOutput)
 		if directCost > 0 {
 			decision.SavingsPercent = (batchDecision.AlternativeSavings / directCost) * 100
+			// Cap savings at 100%
+			if decision.SavingsPercent > 100.0 {
+				decision.SavingsPercent = 100.0
+			}
 		}
 		decision.Rationale = fmt.Sprintf("switch to %s: save %.1f%% ($%.4f)",
 			batchDecision.AlternativeModel, decision.SavingsPercent, decision.TotalSavings)
