@@ -49,7 +49,7 @@ func compileCommandPatterns() []*regexp.Regexp {
 	patterns := []string{
 		`[|&;$><\n\r]`,                                      // Shell metacharacters
 		`\$\(.*\)`,                                          // Command substitution $()
-		`\`.*\``,                                            // Command substitution backticks
+		"`.*`",                                              // Command substitution backticks (as string, not raw)
 		`(?i)eval\s*\(`,                                     // eval()
 		`(?i)system\s*\(`,                                   // system()
 		`(?i)exec\s*\(`,                                     // exec()
