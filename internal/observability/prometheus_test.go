@@ -9,7 +9,7 @@ func TestNewPrometheusMetrics(t *testing.T) {
 	pm := NewPrometheusMetrics()
 
 	if pm == nil {
-		t.Error("expected non-nil metrics")
+		t.Fatal("expected non-nil metrics")
 	}
 
 	pm.Initialize()

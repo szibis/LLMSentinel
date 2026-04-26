@@ -17,6 +17,13 @@ type TaskModelAccuracy struct {
 	AvgLatencyMs  float64 `json:"avg_latency_ms"`
 }
 
+// TaskDifficulty ranks tasks by success rate.
+type TaskDifficulty struct {
+	TaskType    string  `json:"task_type"`
+	SuccessRate float64 `json:"success_rate"`
+	TotalCount  int     `json:"total_count"`
+}
+
 // TaskAccuracyAnalyzer computes task-model accuracy metrics.
 type TaskAccuracyAnalyzer struct {
 	db *sql.DB
@@ -141,11 +148,7 @@ func (taa *TaskAccuracyAnalyzer) GetBestModelForTask(taskType string, days int) 
 }
 
 // GetTaskDifficulty ranks tasks by success rate (lower rate = harder).
-func (taa *TaskAccuracyAnalyzer) GetTaskDifficulty(days int) ([]struct {
-	TaskType    string
-	SuccessRate float64
-	TotalCount  int
-}, error) {
+func (taa *TaskAccuracyAnalyzer) GetTaskDifficulty(days int) ([]TaskDifficulty, error) {
 	query := fmt.Sprintf(`
 		SELECT
 			task_type,
@@ -163,15 +166,9 @@ func (taa *TaskAccuracyAnalyzer) GetTaskDifficulty(days int) ([]struct {
 	}
 	defer rows.Close()
 
-	type taskDifficulty struct {
-		TaskType    string
-		SuccessRate float64
-		TotalCount  int
-	}
-
-	var results []taskDifficulty
+	var results []TaskDifficulty
 	for rows.Next() {
-		var td taskDifficulty
+		var td TaskDifficulty
 
 		if err := rows.Scan(&td.TaskType, &td.SuccessRate, &td.TotalCount); err != nil {
 			continue

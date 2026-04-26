@@ -48,7 +48,7 @@ func (pc *PercentileCalculator) CalculateLatencyPercentiles(days int) (*LatencyP
 	}
 
 	// Get overall latency percentiles
-	overall, err := pc.queryLatencyPercentiles("validation_metrics", "", days)
+	overall, err := pc.queryLatencyPercentiles("", days)
 	if err == nil {
 		lp.Overall = overall
 	}
@@ -58,7 +58,7 @@ func (pc *PercentileCalculator) CalculateLatencyPercentiles(days int) (*LatencyP
 	if err == nil {
 		for _, model := range models {
 			where := fmt.Sprintf("model = '%s'", model)
-			metrics, err := pc.queryLatencyPercentiles("validation_metrics", where, days)
+			metrics, err := pc.queryLatencyPercentiles(where, days)
 			if err == nil {
 				lp.ByModel[model] = metrics
 			}
@@ -70,7 +70,7 @@ func (pc *PercentileCalculator) CalculateLatencyPercentiles(days int) (*LatencyP
 	if err == nil {
 		for _, task := range tasks {
 			where := fmt.Sprintf("task_type = '%s'", task)
-			metrics, err := pc.queryLatencyPercentiles("validation_metrics", where, days)
+			metrics, err := pc.queryLatencyPercentiles(where, days)
 			if err == nil {
 				lp.ByTask[task] = metrics
 			}
@@ -81,7 +81,7 @@ func (pc *PercentileCalculator) CalculateLatencyPercentiles(days int) (*LatencyP
 }
 
 // queryLatencyPercentiles computes percentiles for a specific query condition.
-func (pc *PercentileCalculator) queryLatencyPercentiles(table, where string, days int) (PercentileMetrics, error) {
+func (pc *PercentileCalculator) queryLatencyPercentiles(where string, days int) (PercentileMetrics, error) {
 	pm := PercentileMetrics{}
 
 	// Build WHERE clause
@@ -92,8 +92,8 @@ func (pc *PercentileCalculator) queryLatencyPercentiles(table, where string, day
 
 	// Get all latency values
 	query := fmt.Sprintf(`
-		SELECT latency_ms FROM %s WHERE %s ORDER BY latency_ms
-	`, table, whereClause)
+		SELECT latency_ms FROM validation_metrics WHERE %s ORDER BY latency_ms
+	`, whereClause)
 
 	rows, err := pc.db.Query(query)
 	if err != nil {
@@ -135,8 +135,8 @@ func (pc *PercentileCalculator) queryLatencyPercentiles(table, where string, day
 }
 
 // CalculateTokenErrorPercentiles computes token error distribution metrics.
-func (pc *PercentileCalculator) CalculateTokenErrorPercentiles(days int) (*PercentileMetrics, error) {
-	return pc.queryLatencyPercentiles("validation_metrics", "", days)
+func (pc *PercentileCalculator) CalculateTokenErrorPercentiles(days int) (PercentileMetrics, error) {
+	return pc.queryLatencyPercentiles("", days)
 }
 
 // getDistinctValues retrieves distinct values for a column.

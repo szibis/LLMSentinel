@@ -105,7 +105,7 @@ func (ca *CorrelationAnalyzer) computePearsonCorrelation(var1, var2 string, days
 
 	// Compute p-value using t-distribution approximation
 	tStat := r * math.Sqrt((nf-2)/(1-r*r))
-	pValue := calculatePValue(tStat, n-2)
+	pValue := calculatePValue(tStat)
 
 	return &Correlation{
 		Variable1:   var1,
@@ -150,7 +150,7 @@ func (ca *CorrelationAnalyzer) TaskModelCorrelation(days int) (map[string]float6
 }
 
 // calculatePValue computes approximate p-value from t-statistic using normal approximation.
-func calculatePValue(tStat float64, df int64) float64 {
+func calculatePValue(tStat float64) float64 {
 	// Simplified p-value calculation using normal approximation
 	// For exact p-value, would need t-distribution CDF
 	absT := math.Abs(tStat)

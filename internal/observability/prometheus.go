@@ -119,11 +119,7 @@ func (pm *PrometheusMetrics) RecordRequest(model, taskType string, latencyMs flo
 	}
 
 	// Track task type usage
-	if _, ok := pm.TaskTypeUsage[taskType]; ok {
-		pm.TaskTypeUsage[taskType]++
-	} else {
-		pm.TaskTypeUsage[taskType] = 1
-	}
+	pm.TaskTypeUsage[taskType]++
 
 	// Track cost per request
 	pm.CostPerRequestSum += costUSD

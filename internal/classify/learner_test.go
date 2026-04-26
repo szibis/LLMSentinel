@@ -9,7 +9,7 @@ func TestNewLearner(t *testing.T) {
 	learner := NewLearner(100, 1*time.Hour)
 
 	if learner == nil {
-		t.Error("expected non-nil learner")
+		t.Fatal("expected non-nil learner")
 	}
 	if learner.maxHistorySize != 100 {
 		t.Errorf("expected max history 100, got %d", learner.maxHistorySize)

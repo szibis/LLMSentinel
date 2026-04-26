@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"testing"
 	"time"
 )
@@ -199,12 +200,22 @@ func (suite *E2ETestSuite) RegressionTest(t *testing.T) {
 
 // TestIntegrationE2E runs all E2E tests
 func TestIntegrationE2E(t *testing.T) {
+	// Skip E2E tests unless explicitly enabled (set RUN_E2E=1)
+	if os.Getenv("RUN_E2E") == "" {
+		t.Skip("skipping E2E tests (set RUN_E2E=1 to enable)")
+	}
+
 	suite := NewE2ETestSuite("http://localhost:9000")
 	suite.RegressionTest(t)
 }
 
 // TestHealthCheckLoop verifies continuous service availability
 func TestHealthCheckLoop(t *testing.T) {
+	// Skip E2E tests unless explicitly enabled (set RUN_E2E=1)
+	if os.Getenv("RUN_E2E") == "" {
+		t.Skip("skipping E2E tests (set RUN_E2E=1 to enable)")
+	}
+
 	client := &http.Client{Timeout: 5 * time.Second}
 	failures := 0
 

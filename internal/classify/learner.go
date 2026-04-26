@@ -65,7 +65,7 @@ func NewLearner(maxHistory int, updateFreq time.Duration) *Learner {
 		recentEvents:    make([]LearningEvent, 0, maxHistory),
 		maxHistorySize:  maxHistory,
 		updateFrequency: updateFreq,
-		lastUpdate:      time.Now(),
+		lastUpdate:      time.Now().Add(-updateFreq), // Allow immediate update on creation
 		accuracyByTask:  make(map[TaskType]TaskAccuracy),
 		accuracyByModel: make(map[string]ModelAccuracy),
 	}

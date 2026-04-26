@@ -2,7 +2,6 @@
 package classify
 
 import (
-	"fmt"
 	"math"
 	"sort"
 	"strings"
