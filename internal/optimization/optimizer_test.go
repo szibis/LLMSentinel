@@ -238,7 +238,7 @@ func TestRealWorldScenario_WorkflowIntensity(t *testing.T) {
 				workflowSavings += estimatedCost * 0.60
 			}
 
-			opt.CacheResponse(prompt, workflow.model, fmt.Sprintf("response"), 400)
+			opt.CacheResponse(prompt, workflow.model, "response", 400)
 		}
 
 		breakdownByDifficulty[workflow.difficulty] = map[string]interface{}{
@@ -486,7 +486,7 @@ func TestOptimizationROI(t *testing.T) {
 
 		// Cache periodically
 		if i%10 == 0 {
-			opt.CacheResponse(prompt, model, fmt.Sprintf("response"), 300)
+			opt.CacheResponse(prompt, model, "response", 300)
 		}
 	}
 

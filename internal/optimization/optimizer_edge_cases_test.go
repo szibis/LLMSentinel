@@ -479,10 +479,6 @@ func TestFlushBatch_NoError(t *testing.T) {
 	if requests == nil {
 		t.Errorf("flush should return non-nil slice, even if empty")
 	}
-
-	if len(requests) < 0 {
-		t.Errorf("flush result should be valid")
-	}
 }
 
 // TestCostEstimation_ValidCosts tests cost estimation doesn't panic

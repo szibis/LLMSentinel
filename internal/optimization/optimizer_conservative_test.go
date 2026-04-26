@@ -43,7 +43,6 @@ func TestConservative_LargeScaleWeeklyWorkload(t *testing.T) {
 
 		for req := 0; req < dailyRequests; req++ {
 			var prompt string
-			rand.Seed(time.Now().UnixNano() + int64(day*1000+req))
 
 			// 10% chance of repeating a previous day's prompt
 			if rng.Float64() < 0.10 && len(seenPrompts) > 0 {
@@ -288,7 +287,7 @@ func TestConservative_MultiWeekCacheDegradation(t *testing.T) {
 				// 40% chance of new pattern
 				isRepeat := rand.Float64() < 0.60
 
-				prompt := fmt.Sprintf("Week%d-Pattern", weekIdx+1)
+				var prompt string
 				if isRepeat {
 					prompt = fmt.Sprintf("Common-%d", (req % 10))
 				} else {
@@ -428,7 +427,7 @@ func TestConservative_BudgetVariance(t *testing.T) {
 			}
 
 			if req%20 == 0 {
-				opt.CacheResponse(prompt, "sonnet", fmt.Sprintf("resp"), 300)
+				opt.CacheResponse(prompt, "sonnet", "resp", 300)
 			}
 		}
 
@@ -523,7 +522,7 @@ func TestConservative_ConcurrentLoad(t *testing.T) {
 
 		// Pre-populate cache for patterns
 		if i < len(patterns)*2 {
-			opt.CacheResponse(prompt, "sonnet", fmt.Sprintf("response"), 300)
+			opt.CacheResponse(prompt, "sonnet", "response", 300)
 		}
 	}
 
