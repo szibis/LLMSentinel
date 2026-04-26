@@ -67,15 +67,8 @@ jobs:
           go-version-file: go.mod
           cache: true
 
-      - name: Build golangci-lint from source
-        run: |
-          git clone --depth 1 https://github.com/golangci/golangci-lint.git /tmp/golangci-lint
-          cd /tmp/golangci-lint
-          make build
-          chmod +x ./golangci-lint
-
       - name: Run golangci-lint
-        run: /tmp/golangci-lint/golangci-lint run ./...
+        run: go run github.com/golangci/golangci-lint/cmd/golangci-lint@latest run ./... --timeout 5m
 
   security:
     runs-on: ubuntu-latest
