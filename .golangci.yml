@@ -13,9 +13,9 @@ linters:
     - nolintlint
     - unparam
     - whitespace
+    - gosec
   disable:
     - errcheck
-    - gosec
     - unused
 
 linters-settings:

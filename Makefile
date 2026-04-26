@@ -25,6 +25,50 @@ test-cover:
 bench:
 	go test -bench=. -benchmem ./...
 
+## Profiling & Memory Leak Detection
+
+profile-cpu:
+	mkdir -p profiles
+	go test -bench=. -cpuprofile=profiles/cpu.prof ./... 2>&1 | tee profiles/bench.txt
+	@echo "CPU profile generated: profiles/cpu.prof"
+	@echo "View with: go tool pprof -http=:8080 profiles/cpu.prof"
+
+profile-mem:
+	mkdir -p profiles
+	go test -bench=. -memprofile=profiles/mem.prof ./...
+	@echo "Memory profile generated: profiles/mem.prof"
+	@echo "View with: go tool pprof -http=:8080 profiles/mem.prof"
+
+profile-all: profile-cpu profile-mem
+	@echo "✓ Profiles generated in ./profiles/"
+
+memory-leak-test:
+	go test -v -run TestMemoryLeak ./internal/test/...
+
+profiling-test:
+	go test -v -run "TestCPU|TestHeap|TestGoroutine|TestAllocation" ./internal/test/...
+
+slo-test:
+	go test -v -run "TestSLO" ./internal/test/...
+
+## Security Testing
+
+security-lint:
+	go run github.com/golangci/golangci-lint/cmd/golangci-lint@latest run ./... --enable gosec --timeout 10m
+
+security-test:
+	go test -v ./internal/security/...
+
+security-scan:
+	trivy fs .
+	go list -json -m all | nancy sleuth
+
+fuzz-all:
+	go test -fuzz=Fuzz ./internal/fuzz/... -fuzztime=5m -timeout=15m
+
+ci-local: security-lint memory-leak-test slo-test
+	@echo "✓ Full CI simulation passed locally"
+
 ## Lint
 
 lint:
@@ -65,12 +109,33 @@ dev: build
 help:
 	@echo "claude-escalate - Intelligent model escalation for Claude Code"
 	@echo ""
-	@echo "Targets:"
+	@echo "Build Targets:"
 	@echo "  build         Build binary"
-	@echo "  test          Run tests"
-	@echo "  test-cover    Run tests with coverage"
-	@echo "  lint          Run linters"
 	@echo "  install       Build and install to ~/.local/bin"
 	@echo "  install-hook  Install + configure Claude Code hook"
 	@echo "  dev           Start dashboard in development mode"
+	@echo ""
+	@echo "Testing Targets:"
+	@echo "  test          Run tests with race detection"
+	@echo "  test-cover    Run tests with coverage report"
+	@echo "  bench         Run benchmarks"
+	@echo "  memory-leak-test  Run memory leak detection tests"
+	@echo "  profiling-test    Run profiling tests"
+	@echo "  slo-test      Run SLO enforcement tests"
+	@echo ""
+	@echo "Profiling Targets:"
+	@echo "  profile-cpu   Generate CPU profile"
+	@echo "  profile-mem   Generate memory profile"
+	@echo "  profile-all   Generate all profiles"
+	@echo ""
+	@echo "Security Targets:"
+	@echo "  security-lint Run gosec + golangci-lint"
+	@echo "  security-test Run security test suite"
+	@echo "  security-scan Scan dependencies with Trivy/Nancy"
+	@echo "  fuzz-all      Run fuzzing tests"
+	@echo "  ci-local      Simulate full CI locally"
+	@echo ""
+	@echo "Other Targets:"
+	@echo "  lint          Run linters"
+	@echo "  fmt           Format code"
 	@echo "  clean         Remove build artifacts"
