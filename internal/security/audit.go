@@ -47,8 +47,10 @@ func (al *AuditLogger) LogSecurityEvent(eventType, severity string, details map[
 	logEntry := fmt.Sprintf("[%s] [%s] [%s] #%d", timestamp, eventType, severity, al.eventCounter)
 
 	// Add details
-	for key, value := range details {
-		logEntry += fmt.Sprintf(" %s=%v", key, value)
+	if details != nil {
+		for key, value := range details {
+			logEntry += fmt.Sprintf(" %s=%v", key, value)
+		}
 	}
 
 	logEntry += "\n"
@@ -69,10 +71,10 @@ func (al *AuditLogger) LogSecurityEvent(eventType, severity string, details map[
 // LogInjectionAttempt logs an injection attack attempt
 func (al *AuditLogger) LogInjectionAttempt(ip, patternType, input string) error {
 	details := map[string]interface{}{
-		"ip":           ip,
-		"pattern_type": patternType,
-		"input_sample": truncateString(input, 100),
-		"timestamp":    time.Now().Unix(),
+		"ip":            ip,
+		"pattern_type":  patternType,
+		"input_sample":  truncateString(input, 100),
+		"timestamp":     time.Now().Unix(),
 	}
 
 	return al.LogSecurityEvent("INJECTION_ATTEMPT", "HIGH", details)

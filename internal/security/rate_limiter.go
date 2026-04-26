@@ -16,9 +16,9 @@ type RateLimiter struct {
 
 // tokenBucket represents a token bucket for rate limiting
 type tokenBucket struct {
-	tokens     float64
+	tokens    float64
 	lastRefill time.Time
-	mu         sync.Mutex
+	mu        sync.Mutex
 }
 
 // NewRateLimiter creates a new rate limiter
@@ -46,7 +46,7 @@ func (rl *RateLimiter) Allow(ip string) bool {
 	bucket, exists := rl.ipBuckets[ip]
 	if !exists {
 		bucket = &tokenBucket{
-			tokens:     float64(rl.requestsPerMinute),
+			tokens:    float64(rl.requestsPerMinute),
 			lastRefill: time.Now(),
 		}
 		rl.ipBuckets[ip] = bucket

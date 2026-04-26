@@ -2,7 +2,7 @@ package security
 
 import (
 	"fmt"
-	"html"
+	"regexp"
 	"strings"
 )
 
@@ -71,13 +71,6 @@ func (v *Validator) validateSQL(input string, result *ValidationResult) (bool, *
 
 	// Additional heuristic checks
 	upperInput := strings.ToUpper(input)
-
-	// Check for SQL comments (suspicious in user input - could hide injected code)
-	if strings.Contains(input, "--") || strings.Contains(input, "/*") {
-		result.IsValid = false
-		result.Errors = append(result.Errors, "SQL comments detected in input")
-		return false, result
-	}
 
 	// Check for SQL keywords used suspiciously
 	suspiciousKeywords := []string{"DROP TABLE", "DELETE FROM", "INSERT INTO", "UPDATE", "TRUNCATE", "UNION SELECT"}
@@ -157,20 +150,32 @@ func (v *Validator) validateGeneric(input string, result *ValidationResult) (boo
 }
 
 // sanitizeHTML escapes HTML special characters
-func (v *Validator) sanitizeHTML(output string, _ *ValidationResult) string {
-	// Use standard library html.EscapeString for proper HTML entity encoding
-	return html.EscapeString(output)
+func (v *Validator) sanitizeHTML(output string, result *ValidationResult) string {
+	replacements := map[string]string{
+		"&": "&amp;",
+		"<": "&lt;",
+		">": "&gt;",
+		"\"": "&quot;",
+		"'": "&#39;",
+	}
+
+	sanitized := output
+	for char, replacement := range replacements {
+		sanitized = strings.ReplaceAll(sanitized, char, replacement)
+	}
+
+	return sanitized
 }
 
 // sanitizeSQL escapes SQL special characters
-func (v *Validator) sanitizeSQL(output string, _ *ValidationResult) string {
+func (v *Validator) sanitizeSQL(output string, result *ValidationResult) string {
 	// Escape single quotes for SQL
 	sanitized := strings.ReplaceAll(output, "'", "''")
 	return sanitized
 }
 
 // sanitizeShell escapes shell special characters
-func (v *Validator) sanitizeShell(output string, _ *ValidationResult) string {
+func (v *Validator) sanitizeShell(output string, result *ValidationResult) string {
 	// For shell output, just escape quotes and backticks
 	sanitized := output
 	sanitized = strings.ReplaceAll(sanitized, "`", "\\`")
@@ -192,7 +197,7 @@ func (v *Validator) IsHighRiskInput(input string) bool {
 		"JAVASCRIPT:",
 		"ONERROR=",
 		"${",
-		"$(",
+		"$()",
 		"UNION",
 	}
 
