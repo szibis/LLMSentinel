@@ -1,4 +1,4 @@
-# Claude Escalate v0.7.0 - API Specification
+# Claude Escalate v0.8.0 - API Specification
 
 ## Overview
 
@@ -647,6 +647,134 @@ paths:
 
 ---
 
+## Tool Management API (v0.8.0+)
+
+### GET /tools
+List all configured tools with health status.
+
+**Response** (200 OK):
+```json
+{
+  "tools": [
+    {
+      "name": "my_script",
+      "type": "cli",
+      "path": "/usr/local/bin/my_script",
+      "health": "ok",
+      "settings": {}
+    },
+    {
+      "name": "custom_mcp",
+      "type": "mcp",
+      "path": "~/.sockets/custom.sock",
+      "health": "ok",
+      "settings": {"timeout": 30}
+    }
+  ]
+}
+```
+
+### POST /tools/add
+Add a new custom tool (CLI, MCP, REST, Database, or Binary).
+
+**Request**:
+```json
+{
+  "name": "new_tool",
+  "type": "cli",
+  "path": "/usr/local/bin/new_tool",
+  "settings": {}
+}
+```
+
+**Response** (200 OK):
+```json
+{
+  "status": "created",
+  "message": "Tool added successfully",
+  "tool": {
+    "name": "new_tool",
+    "type": "cli",
+    "path": "/usr/local/bin/new_tool",
+    "health": "ok",
+    "settings": {}
+  }
+}
+```
+
+**Validation**:
+- Tool name: alphanumeric + underscore only
+- Path must exist for CLI tools
+- Type must be one of: cli, mcp, rest, database, binary
+- Duplicate tool names are rejected
+
+### PUT /tools/{name}
+Update existing tool configuration.
+
+**Request**:
+```json
+{
+  "path": "/new/path/to/tool",
+  "settings": {"timeout": 60}
+}
+```
+
+**Response** (200 OK):
+```json
+{
+  "status": "updated",
+  "message": "Tool updated successfully"
+}
+```
+
+### DELETE /tools/{name}
+Remove a tool from configuration.
+
+**Response** (200 OK):
+```json
+{
+  "status": "deleted",
+  "message": "Tool removed successfully"
+}
+```
+
+### POST /tools/{name}/test
+Test tool connectivity and health status.
+
+**Response** (200 OK - Healthy):
+```json
+{
+  "status": "healthy",
+  "message": "Tool is responding"
+}
+```
+
+**Response** (200 OK - Unhealthy):
+```json
+{
+  "status": "unhealthy",
+  "error": "Connection refused on socket"
+}
+```
+
+### GET /tools/types
+List available tool types and descriptions.
+
+**Response** (200 OK):
+```json
+{
+  "types": [
+    {"type": "cli", "description": "Shell command or script"},
+    {"type": "mcp", "description": "MCP (Model Context Protocol) server"},
+    {"type": "rest", "description": "HTTP REST API"},
+    {"type": "database", "description": "SQL database"},
+    {"type": "binary", "description": "Standalone executable"}
+  ]
+}
+```
+
+---
+
 ## SDK & Client Libraries
 
 ### Go Client
@@ -670,6 +798,6 @@ See `web/src/api.js` for reference implementation.
 
 ---
 
-**Last Updated**: 2026-04-26  
-**Status**: Stable (v4.0.0)  
-**Next Review**: 2026-06-26
+**Last Updated**: 2026-04-27  
+**Status**: Stable (v0.8.0)  
+**Next Review**: 2026-06-27

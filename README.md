@@ -1,6 +1,6 @@
-# Claude Escalate v0.7.0
+# Claude Escalate v0.8.0
 
-> **Token optimization gateway for Claude API — 60-75% cost savings with Batch API, knowledge graphs, semantic caching, and intelligent input compression.**
+> **Token optimization gateway for Claude API — 60-75% cost savings with Batch API, knowledge graphs, semantic caching, intelligent input compression, and visual tool management.**
 
 [![Go](https://img.shields.io/badge/Go-1.26-blue)](https://golang.org)
 [![License](https://img.shields.io/badge/license-Apache%202.0-green)](LICENSE)
@@ -11,7 +11,7 @@
 
 ## 🎯 What Is Claude Escalate?
 
-Claude Escalate v0.7.0 is a gateway-layer token optimization engine for Claude API. It runs locally between your application and Claude, automatically reducing token usage by **60-75%** through:
+Claude Escalate v0.8.0 is a gateway-layer token optimization engine for Claude API. It runs locally between your application and Claude, automatically reducing token usage by **60-75%** through:
 
 - **⚡ Batch API** (50% savings) — Anthropic Batch API integration for non-interactive workloads
 - **🔍 Knowledge Graph Queries** (99% savings) — Answer relationship questions from indexed code
@@ -26,7 +26,7 @@ Claude Escalate v0.7.0 is a gateway-layer token optimization engine for Claude A
 
 ---
 
-## ✨ Key Features (v0.7.0)
+## ✨ Key Features (v0.8.0)
 
 ### Feature 0: Batch API Integration (50% Savings)
 
@@ -236,6 +236,37 @@ Security Validations (ALWAYS applied):
 ```
 
 **Test Coverage**: 50+ attack patterns detected with 0 false positives
+
+### Feature 8: Visual Tool Configuration (v0.8.0)
+
+Dashboard-based tool management for CLI, MCP, REST, and database tools without YAML editing:
+
+```
+Dashboard → Tools Tab → Add Tool Form
+                      ↓
+                    Type: [CLI / MCP / REST / Database / Binary]
+                    Name: [my_tool]
+                    Path: [/usr/local/bin/tool]
+                    Settings: {json: "values"}
+                      ↓
+                    Test Connection → Health Check
+                      ↓
+                    Save → Config persisted to YAML
+                    
+Features:
+✅ Add, edit, delete tools via web UI
+✅ Tool health status indicators
+✅ Type-specific path validation (CLI vs MCP socket)
+✅ Real-time tool list with current status
+✅ Config auto-saves to disk (survives restart)
+✅ No YAML editing required (non-technical users supported)
+```
+
+**Use Cases**:
+- Add custom scripts without modifying config files
+- Manage MCP server sockets through UI
+- Test tool connectivity with one click
+- Audit all configured tools in one place
 
 ---
 

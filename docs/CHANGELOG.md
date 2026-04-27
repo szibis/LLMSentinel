@@ -5,7 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.8.0] - 2026-04-27
+
+### Added
+- Visual tool configuration dashboard tab (🔧 Tools)
+  - Add, edit, delete custom CLI/MCP/REST/Database/Binary tools via web UI
+  - Tool health status indicators with real-time checks
+  - Type-specific path validation (CLI vs MCP socket vs REST API)
+  - Settings editor with JSON support
+  - Config auto-save with YAML persistence (survives restart)
+- Tool management API endpoints
+  - GET /api/tools — List configured tools
+  - POST /api/tools/add — Add new tool
+  - PUT /api/tools/{name} — Update tool configuration
+  - DELETE /api/tools/{name} — Remove tool
+  - POST /api/tools/{name}/test — Health check
+  - GET /api/tools/types — Available tool types
+
+### Changed
+- Dashboard now includes 6 tabs: Metrics, Configuration, Security, Tools (NEW), Feedback, Analytics
+- Tool configuration no longer requires YAML editing for end users
+- Version bumped from v0.7.0 to v0.8.0
+
+### Fixed
+- Tool management route ordering for proper HTTP method dispatch
+
+## [0.7.0] - 2026-04-15
 
 ### Added
 - Five-layer intelligent model escalation system
