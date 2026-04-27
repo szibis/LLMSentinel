@@ -100,6 +100,10 @@ func (s *Service) Start(addr string) error {
 	// mux.HandleFunc("/api/analytics/frustration-events", s.handleFrustrationEvents)
 	// mux.HandleFunc("/api/analytics/cost-optimization", s.handleCostOptimization)
 
+	// Feedback endpoints (v0.7.0+)
+	mux.HandleFunc("/api/feedback", s.handleFeedback)
+	mux.HandleFunc("/api/analytics/personal", s.handleUserAnalytics)
+
 	// Dashboard endpoints
 	mux.HandleFunc("/", s.handleDashboard)
 

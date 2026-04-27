@@ -365,6 +365,8 @@ func getDashboardHTML() []byte {
 			<button class="tab active" onclick="switchTab('metrics')">📊 Metrics</button>
 			<button class="tab" onclick="switchTab('config')">⚙️ Configuration</button>
 			<button class="tab" onclick="switchTab('security')">🛡️ Security</button>
+			<button class="tab" onclick="switchTab('feedback')">👍 Feedback</button>
+			<button class="tab" onclick="switchTab('analytics')">📈 Analytics</button>
 		</div>
 
 		<div id="metrics" class="tab-content active">
@@ -430,6 +432,87 @@ func getDashboardHTML() []byte {
 				</div>
 			</div>
 		</div>
+
+		<div id="feedback" class="tab-content">
+			<h3>Response Feedback</h3>
+			<p style="color: #666; margin: 15px 0;">Help us improve by rating your responses (1-5 stars)</p>
+			<div style="background: #f7f8fa; padding: 20px; border-radius: 8px; max-width: 400px;">
+				<div style="margin-bottom: 15px;">
+					<label style="display: block; margin-bottom: 8px; font-weight: 500;">Request ID:</label>
+					<input type="text" id="feedback-request-id" placeholder="Enter request ID" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+				</div>
+				<div style="margin-bottom: 15px;">
+					<label style="display: block; margin-bottom: 8px; font-weight: 500;">Rating (1-5):</label>
+					<div style="display: flex; gap: 10px;">
+						<button class="star-btn" onclick="setRating(1)">⭐</button>
+						<button class="star-btn" onclick="setRating(2)">⭐⭐</button>
+						<button class="star-btn" onclick="setRating(3)">⭐⭐⭐</button>
+						<button class="star-btn" onclick="setRating(4)">⭐⭐⭐⭐</button>
+						<button class="star-btn" onclick="setRating(5)">⭐⭐⭐⭐⭐</button>
+					</div>
+					<input type="hidden" id="feedback-rating" value="0">
+				</div>
+				<div style="margin-bottom: 15px;">
+					<label style="display: block; margin-bottom: 8px; font-weight: 500;">
+						<input type="checkbox" id="feedback-helpful"> Was this helpful?
+					</label>
+					<label style="display: block; margin-bottom: 8px; font-weight: 500;">
+						<input type="checkbox" id="feedback-accurate"> Was this accurate?
+					</label>
+				</div>
+				<div style="margin-bottom: 15px;">
+					<label style="display: block; margin-bottom: 8px; font-weight: 500;">Comment (optional):</label>
+					<textarea id="feedback-comment" placeholder="Any additional feedback..." style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; resize: vertical; height: 100px;"></textarea>
+				</div>
+				<button class="btn btn-primary" onclick="submitFeedback()" style="width: 100%;">Submit Feedback</button>
+				<div id="feedback-status" style="margin-top: 10px; color: #666;"></div>
+			</div>
+		</div>
+
+		<div id="analytics" class="tab-content">
+			<h3>Your Analytics & Preferences</h3>
+			<p style="color: #666; margin: 15px 0;">Personalized insights based on your feedback and usage patterns</p>
+			<div class="grid">
+				<div class="metric-card">
+					<h3>Average Rating</h3>
+					<div><span class="value" id="analytics-rating">-</span><span class="unit">/5.0</span></div>
+				</div>
+				<div class="metric-card">
+					<h3>Helpful Responses</h3>
+					<div><span class="value" id="analytics-helpful">-</span><span class="unit">%</span></div>
+				</div>
+				<div class="metric-card">
+					<h3>Accuracy</h3>
+					<div><span class="value" id="analytics-accuracy">-</span><span class="unit">%</span></div>
+				</div>
+				<div class="metric-card">
+					<h3>Total Feedback</h3>
+					<div><span class="value" id="analytics-count">-</span></div>
+				</div>
+			</div>
+			<div style="padding: 20px; background: #f7f8fa; border-radius: 8px; margin-top: 20px;">
+				<h4 style="margin-bottom: 10px;">Your Preferences Learned:</h4>
+				<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px;">
+					<div>
+						<label style="display: block; margin-bottom: 8px;">
+							<input type="checkbox" id="pref-freshness" disabled> Prefers fresh responses
+						</label>
+						<label style="display: block; margin-bottom: 8px;">
+							<input type="checkbox" id="pref-opus" disabled> Prefers detailed (Opus)
+						</label>
+					</div>
+					<div>
+						<label style="display: block; margin-bottom: 8px;">
+							<input type="checkbox" id="pref-brief" disabled> Prefers brief responses
+						</label>
+						<label style="display: block; margin-bottom: 8px;">
+							<input type="checkbox" id="pref-model" disabled> Preferred Model: <span id="pref-model-text">-</span>
+						</label>
+					</div>
+				</div>
+			</div>
+			<button class="btn btn-primary" onclick="loadAnalytics()" style="margin-top: 20px;">Refresh Analytics</button>
+		</div>
 	</div>
 
 	<script>
@@ -494,6 +577,91 @@ func getDashboardHTML() []byte {
 			document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
 			document.getElementById(tabName).classList.add('active');
 			event.target.classList.add('active');
+			if (tabName === 'analytics') {
+				loadAnalytics();
+			}
+		}
+
+		// Feedback UI functions
+		let currentRating = 0;
+
+		function setRating(rating) {
+			currentRating = rating;
+			document.getElementById('feedback-rating').value = rating;
+			document.querySelectorAll('.star-btn').forEach((btn, idx) => {
+				if (idx < rating) {
+					btn.style.opacity = '1';
+				} else {
+					btn.style.opacity = '0.4';
+				}
+			});
+		}
+
+		async function submitFeedback() {
+			const requestId = document.getElementById('feedback-request-id').value;
+			const rating = parseInt(document.getElementById('feedback-rating').value);
+			const helpful = document.getElementById('feedback-helpful').checked;
+			const accurate = document.getElementById('feedback-accurate').checked;
+			const comment = document.getElementById('feedback-comment').value;
+
+			if (!requestId) {
+				alert('Please enter a request ID');
+				return;
+			}
+			if (rating === 0) {
+				alert('Please select a rating');
+				return;
+			}
+
+			try {
+				const response = await fetch('/api/feedback', {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({
+						request_id: requestId,
+						rating: rating,
+						helpful: helpful,
+						accurate: accurate,
+						comment: comment
+					})
+				});
+				const data = await response.json();
+				document.getElementById('feedback-status').innerHTML = '<span style="color: #16a34a;">✓ Thank you for your feedback!</span>';
+
+				// Reset form after 2 seconds
+				setTimeout(() => {
+					document.getElementById('feedback-request-id').value = '';
+					document.getElementById('feedback-rating').value = 0;
+					document.getElementById('feedback-helpful').checked = false;
+					document.getElementById('feedback-accurate').checked = false;
+					document.getElementById('feedback-comment').value = '';
+					document.getElementById('feedback-status').innerHTML = '';
+					document.querySelectorAll('.star-btn').forEach(btn => btn.style.opacity = '0.4');
+				}, 2000);
+			} catch (err) {
+				document.getElementById('feedback-status').innerHTML = '<span style="color: #dc2626;">✗ Error submitting feedback</span>';
+				console.error('Error submitting feedback:', err);
+			}
+		}
+
+		async function loadAnalytics() {
+			try {
+				const response = await fetch('/api/analytics/personal');
+				const data = await response.json();
+
+				document.getElementById('analytics-rating').textContent = (data.average_rating || 0).toFixed(1);
+				document.getElementById('analytics-helpful').textContent = (data.helpful_percentage || 0).toFixed(0);
+				document.getElementById('analytics-accuracy').textContent = (data.accuracy_percentage || 0).toFixed(0);
+				document.getElementById('analytics-count').textContent = data.total_feedback_count || 0;
+
+				// Update preferences
+				document.getElementById('pref-freshness').checked = data.prefers_freshness || false;
+				document.getElementById('pref-opus').checked = data.prefers_opus || false;
+				document.getElementById('pref-brief').checked = data.prefers_briefness || false;
+				document.getElementById('pref-model-text').textContent = data.preferred_model || 'none';
+			} catch (err) {
+				console.error('Error loading analytics:', err);
+			}
 		}
 
 		// Load metrics every second
