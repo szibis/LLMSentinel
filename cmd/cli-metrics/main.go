@@ -6,7 +6,6 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"strconv"
 	"strings"
 	"text/tabwriter"
 	"time"
@@ -314,8 +313,7 @@ func cmdStatus() {
 }
 
 func printUsage() {
-	fmt.Println(`
-Claude Escalate Metrics CLI - View token tracking and savings
+	fmt.Print(`Claude Escalate Metrics CLI - View token tracking and savings
 
 USAGE:
   claude-escalate-metrics <command> [flags]

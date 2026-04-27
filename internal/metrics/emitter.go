@@ -29,11 +29,11 @@ func (me *MetricsEmitter) CacheOperation(layer string, operation string) {
 	if me.collector != nil {
 		switch operation {
 		case "hit":
-			me.collector.IncrementCacheHits()
+			me.collector.RecordCacheHit()
 		case "miss":
-			me.collector.IncrementCacheMisses()
+			me.collector.RecordCacheMiss()
 		case "false_positive":
-			me.collector.IncrementFalsePositives()
+			me.collector.RecordFalsePositive()
 		}
 	}
 }
@@ -51,14 +51,12 @@ func (me *MetricsEmitter) RecordTokens(tokenType string, count int64, layer stri
 
 	switch tokenType {
 	case "input":
-		me.collector.RecordInputTokens(count)
+		me.collector.RecordTokens(count, 0)
 	case "output":
-		me.collector.RecordOutputTokens(count)
+		me.collector.RecordTokens(0, count)
 	case "saved":
-		// Tokens saved is recorded per-optimization
-		if layer != "" {
-			me.collector.RecordOptimizationSaving(layer, count, float64(count)*0.001, 1)
-		}
+		// Tokens saved is recorded as savings
+		me.collector.RecordTokenSavings(count)
 	}
 }
 
@@ -71,8 +69,9 @@ func (me *MetricsEmitter) RecordCost(costType string, amountUSD float64, model s
 
 	if me.collector != nil {
 		if costType == "burned" {
-			// Record via token metrics (scaled to cost)
-			me.collector.RecordInputTokens(int64(amountUSD * 1000))
+			// Record via token metrics (estimate: ~670 tokens per $0.001 at Haiku pricing)
+			estimatedTokens := int64(amountUSD * 670000)
+			me.collector.RecordTokens(estimatedTokens, 0)
 		}
 	}
 }
@@ -102,7 +101,8 @@ func (me *MetricsEmitter) RecordRequest(status string, intent string, model stri
 	defer me.mu.Unlock()
 
 	if me.collector != nil {
-		me.collector.IncrementRequestCount()
+		success := status != "error"
+		me.collector.RecordRequest(success)
 		// Status and intent labels would be tracked separately in production
 	}
 }
@@ -120,11 +120,13 @@ func (me *MetricsEmitter) RecordSecurityEvent(eventType string, pattern string) 
 
 	switch eventType {
 	case "injection_blocked":
-		me.collector.IncrementSecurityBlocked()
+		me.collector.RecordSecurityEvent("injection_attempt")
 	case "rate_limit":
-		me.collector.IncrementRateLimitTriggered()
+		me.collector.RecordSecurityEvent("rate_limit")
 	case "validation_failure":
-		me.collector.IncrementValidationFailures()
+		me.collector.RecordSecurityEvent("validation_failure")
+	case "unauthorized":
+		me.collector.RecordSecurityEvent("unauthorized_access")
 	}
 }
 
