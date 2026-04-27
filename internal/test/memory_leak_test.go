@@ -54,7 +54,13 @@ func TestMemoryLeakBatchQueue(t *testing.T) {
 	runtime.ReadMemStats(&m2)
 
 	finalGoroutines := runtime.NumGoroutine()
-	heapGrowth := int64(m2.HeapAlloc) - int64(m1.HeapAlloc)
+	var heapGrowth int64
+	heapDiff := m2.HeapAlloc - m1.HeapAlloc
+	if heapDiff > uint64(^uint64(0)>>1) {
+		heapGrowth = 0 // cap to prevent overflow
+	} else {
+		heapGrowth = int64(heapDiff)
+	}
 	var heapGrowthPercent float64
 	if m1.HeapAlloc > 0 {
 		heapGrowthPercent = (float64(heapGrowth) / float64(m1.HeapAlloc)) * 100
@@ -113,7 +119,13 @@ func TestMemoryLeakBatchPoller(t *testing.T) {
 	runtime.ReadMemStats(&m2)
 
 	finalGoroutines := runtime.NumGoroutine()
-	heapGrowth := int64(m2.HeapAlloc) - int64(m1.HeapAlloc)
+	var heapGrowth int64
+	heapDiff := m2.HeapAlloc - m1.HeapAlloc
+	if heapDiff > uint64(^uint64(0)>>1) {
+		heapGrowth = 0 // cap to prevent overflow
+	} else {
+		heapGrowth = int64(heapDiff)
+	}
 	var heapGrowthPercent float64
 	if m1.HeapAlloc > 0 {
 		heapGrowthPercent = (float64(heapGrowth) / float64(m1.HeapAlloc)) * 100
@@ -164,7 +176,13 @@ func TestMemoryLeakRouterDecisions(t *testing.T) {
 	runtime.ReadMemStats(&m2)
 
 	finalGoroutines := runtime.NumGoroutine()
-	heapGrowth := int64(m2.HeapAlloc) - int64(m1.HeapAlloc)
+	var heapGrowth int64
+	heapDiff := m2.HeapAlloc - m1.HeapAlloc
+	if heapDiff > uint64(^uint64(0)>>1) {
+		heapGrowth = 0 // cap to prevent overflow
+	} else {
+		heapGrowth = int64(heapDiff)
+	}
 	var heapGrowthPercent float64
 	if m1.HeapAlloc > 0 {
 		heapGrowthPercent = (float64(heapGrowth) / float64(m1.HeapAlloc)) * 100
@@ -230,7 +248,13 @@ func TestMemoryLeak100kConcurrentRequests(t *testing.T) {
 	runtime.ReadMemStats(&m2)
 
 	finalGoroutines := runtime.NumGoroutine()
-	heapGrowth := int64(m2.HeapAlloc) - int64(m1.HeapAlloc)
+	var heapGrowth int64
+	heapDiff := m2.HeapAlloc - m1.HeapAlloc
+	if heapDiff > uint64(^uint64(0)>>1) {
+		heapGrowth = 0 // cap to prevent overflow
+	} else {
+		heapGrowth = int64(heapDiff)
+	}
 	var heapGrowthPercent float64
 	if m1.HeapAlloc > 0 {
 		heapGrowthPercent = (float64(heapGrowth) / float64(m1.HeapAlloc)) * 100

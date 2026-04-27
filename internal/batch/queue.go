@@ -104,11 +104,7 @@ func (bq *BatchQueue) IsReady() bool {
 
 	// Flush if idle timeout exceeded
 	idleTime := time.Since(bq.lastFlushTime)
-	if idleTime > bq.idleTimeoutDuration {
-		return true
-	}
-
-	return false
+	return idleTime > bq.idleTimeoutDuration
 }
 
 // Flush returns all queued requests and clears the queue
