@@ -1,6 +1,7 @@
 package batch
 
 import (
+	"context"
 	"fmt"
 	"sync"
 	"time"
@@ -155,7 +156,7 @@ func (r *Router) MakeRoutingDecision(req BatchRequest) (BatchDecision, error) {
 		// Run workload analysis
 		detectionResult = &WorkloadDetectionResult{}
 		*detectionResult = r.analyzer.AnalyzeRequest(
-			nil, // context.Background() would be better, but we don't have it here
+			context.Background(),
 			query,
 			intent,
 			req.PromptLength+req.EstimatedOutput,

@@ -62,11 +62,11 @@ func main() {
 	fmt.Printf("  Ramp-down: %v\n", config.RampDownDuration)
 	fmt.Printf("  Report Interval: %v\n\n", config.ReportInterval)
 
-	metrics := runLoadTest(config, *verbose)
+	metrics := runLoadTest(config)
 	printFinalReport(metrics, config)
 }
 
-func runLoadTest(config LoadTestConfig, verbose bool) *LoadTestMetrics {
+func runLoadTest(config LoadTestConfig) *LoadTestMetrics {
 	metrics := &LoadTestMetrics{
 		StartTime:    time.Now(),
 		LatencyValues: make([]int64, 0),
@@ -92,9 +92,12 @@ func runLoadTest(config LoadTestConfig, verbose bool) *LoadTestMetrics {
 			for range requestChan {
 				start := time.Now()
 
+				// Safe read of TotalRequests using atomic load
+				requestNum := atomic.LoadInt64(&metrics.TotalRequests)
+
 				// Simulate request processing
 				req := batch.BatchRequest{
-					ID:              fmt.Sprintf("req_%d_%d", workerID, metrics.TotalRequests),
+					ID:              fmt.Sprintf("req_%d_%d", workerID, requestNum),
 					PromptLength:    5000 + workerID*100,
 					EstimatedOutput: 2000 + workerID*50,
 					Model:           "sonnet",

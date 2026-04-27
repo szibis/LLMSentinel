@@ -189,7 +189,7 @@ func TestCostCalculationLatency(t *testing.T) {
 	// Benchmark: Calculate ROI scores 1000 times
 	start = time.Now()
 	for i := 0; i < 1000; i++ {
-		costs.CalculateBatchROI(0.001, 30.0)
+		_ = costs.CalculateBatchROI(0.001, 30.0)
 	}
 	roiTime := time.Since(start).Milliseconds()
 
@@ -217,7 +217,7 @@ func TestDetectorPerformance(t *testing.T) {
 	totalTime := time.Since(start)
 	avgTimeMs := totalTime.Milliseconds() / 100
 
-	t.Logf("Detector performance: 100 analyses in %dms (avg: %dms per request)", totalTime.Milliseconds(), avgTimeMs)
+	t.Logf("Detector performance: 100 tests in %dms (avg: %dms per request)", totalTime.Milliseconds(), avgTimeMs)
 
 	if avgTimeMs > int64(IntentDetectionTargetMs) {
 		t.Errorf("detector too slow: %dms, target is <%dms", avgTimeMs, IntentDetectionTargetMs)

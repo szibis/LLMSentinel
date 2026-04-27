@@ -340,8 +340,11 @@ func runLoadTestInternal(config *LoadTestConfig, router *batch.Router, verbose b
 			for range requestChan {
 				start := time.Now()
 
+				// Safe read of TotalRequests using atomic load
+				requestNum := atomic.LoadInt64(&metrics.TotalRequests)
+
 				req := batch.BatchRequest{
-					ID:              fmt.Sprintf("test_req_%d_%d", workerID, metrics.TotalRequests),
+					ID:              fmt.Sprintf("test_req_%d_%d", workerID, requestNum),
 					PromptLength:    5000 + workerID*100,
 					EstimatedOutput: 2000 + workerID*50,
 					Model:           "sonnet",

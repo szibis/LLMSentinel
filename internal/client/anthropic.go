@@ -283,7 +283,8 @@ func (c *AnthropicClient) doWithRetry(req *http.Request) (*http.Response, error)
 		if err != nil {
 			lastErr = err
 			if attempt < c.retryMax {
-				time.Sleep(c.retryDelay * time.Duration(1<<uint(attempt))) // exponential backoff
+				backoffMs := time.Duration(1 << attempt)
+				time.Sleep(c.retryDelay * backoffMs) // exponential backoff
 				continue
 			}
 			return nil, fmt.Errorf("HTTP error: %w", err)
@@ -293,7 +294,8 @@ func (c *AnthropicClient) doWithRetry(req *http.Request) (*http.Response, error)
 		if resp.StatusCode == http.StatusTooManyRequests || resp.StatusCode >= 500 {
 			resp.Body.Close()
 			if attempt < c.retryMax {
-				time.Sleep(c.retryDelay * time.Duration(1<<uint(attempt)))
+				backoffMs := time.Duration(1 << attempt)
+				time.Sleep(c.retryDelay * backoffMs)
 				continue
 			}
 			return nil, fmt.Errorf("API error: status %d", resp.StatusCode)
