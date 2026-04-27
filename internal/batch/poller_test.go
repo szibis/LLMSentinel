@@ -13,7 +13,7 @@ func TestNewBatchPoller(t *testing.T) {
 	bp := NewBatchPoller(ac)
 
 	if bp == nil {
-		t.Error("expected non-nil poller")
+		t.Fatal("expected non-nil poller")
 	}
 	if bp.isRunning {
 		t.Error("poller should not be running initially")

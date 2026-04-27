@@ -7,7 +7,7 @@ import (
 func TestNewBatchCalculator(t *testing.T) {
 	bc := NewBatchCalculator()
 	if bc == nil {
-		t.Error("expected non-nil calculator")
+		t.Fatal("expected non-nil calculator")
 	}
 	if bc.batchDiscountPercent != 0.5 {
 		t.Errorf("expected 50%% discount, got %f%%", bc.batchDiscountPercent*100)
