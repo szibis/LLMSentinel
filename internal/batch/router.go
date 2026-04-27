@@ -51,27 +51,53 @@ type BatchDecision struct {
 
 // Router manages batch request routing and queue decisions
 type Router struct {
-	strategy          BatchStrategy
-	queue             []*BatchRequest
-	calculator        *costs.Calculator
-	maxQueueSize      int
-	maxBatchWaitTime  time.Duration
-	minBatchSize      int
-	minSavingsPercent float64
-	mu                sync.RWMutex
+	strategy           BatchStrategy
+	queue              []*BatchRequest
+	calculator         *costs.Calculator
+	analyzer           *WorkloadAnalyzer // Detector for non-interactive workloads
+	maxQueueSize       int
+	maxBatchWaitTime   time.Duration
+	minBatchSize       int
+	minSavingsPercent  float64
+	useDetector        bool // Enable/disable workload detection
+	detectorConfidence float64 // Minimum confidence for detector-based batching
+	mu                 sync.RWMutex
 }
 
 // NewRouter creates a new batch router with default settings
 func NewRouter(strategy BatchStrategy) *Router {
 	return &Router{
-		strategy:          strategy,
-		queue:             make([]*BatchRequest, 0, 100),
-		calculator:        costs.NewCalculator(),
-		maxQueueSize:      100,
-		maxBatchWaitTime:  5 * time.Minute,
-		minBatchSize:      3,
-		minSavingsPercent: 5.0, // Only batch if saving 5%+
+		strategy:           strategy,
+		queue:              make([]*BatchRequest, 0, 100),
+		calculator:         costs.NewCalculator(),
+		analyzer:           NewWorkloadAnalyzer(),
+		maxQueueSize:       100,
+		maxBatchWaitTime:   5 * time.Minute,
+		minBatchSize:       3,
+		minSavingsPercent:  5.0, // Only batch if saving 5%+
+		useDetector:        true,
+		detectorConfidence: 0.6,
 	}
+}
+
+// EnableDetector enables/disables non-interactive workload detection
+func (r *Router) EnableDetector(enabled bool) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.useDetector = enabled
+}
+
+// SetDetectorConfidence sets minimum confidence threshold for detector-based batching
+func (r *Router) SetDetectorConfidence(confidence float64) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if confidence < 0.0 {
+		confidence = 0.0
+	}
+	if confidence > 1.0 {
+		confidence = 1.0
+	}
+	r.detectorConfidence = confidence
 }
 
 // MakeRoutingDecision determines whether to batch a request
@@ -109,6 +135,34 @@ func (r *Router) MakeRoutingDecision(req BatchRequest) (BatchDecision, error) {
 	decision.EstimatedSavings = savingsAmount
 	decision.AlternativeSavings = directBreakdown.SavingsVsOpus
 
+	// Check workload detection if enabled
+	var detectionResult *WorkloadDetectionResult
+	if r.useDetector {
+		// Extract intent and query from user context if available
+		intent := "general"
+		query := ""
+		if ctx, ok := req.UserContext["intent"]; ok {
+			if intentStr, ok := ctx.(string); ok {
+				intent = intentStr
+			}
+		}
+		if ctx, ok := req.UserContext["query"]; ok {
+			if queryStr, ok := ctx.(string); ok {
+				query = queryStr
+			}
+		}
+
+		// Run workload analysis
+		detectionResult = &WorkloadDetectionResult{}
+		*detectionResult = r.analyzer.AnalyzeRequest(
+			nil, // context.Background() would be better, but we don't have it here
+			query,
+			intent,
+			req.PromptLength+req.EstimatedOutput,
+			req.MaxWaitTime,
+		)
+	}
+
 	// Route decision based on strategy
 	switch r.strategy {
 	case StrategyNever:
@@ -121,13 +175,23 @@ func (r *Router) MakeRoutingDecision(req BatchRequest) (BatchDecision, error) {
 
 	case StrategyAuto:
 		// Use batch if:
-		// 1. Saving at least minSavingsPercent AND
-		// 2. Queue won't exceed max size
-		// (requests are queued and flushed when queue reaches minBatchSize)
+		// 1. Cost savings >= minSavingsPercent AND queue fits, OR
+		// 2. Detector identifies non-interactive workload with confidence >= threshold
 		queueLen := len(r.queue)
-		shouldBatch := savingsPercent >= r.minSavingsPercent &&
+
+		// Cost-based batching decision
+		costBatchingWorth := savingsPercent >= r.minSavingsPercent &&
 			queueLen < r.maxQueueSize
 
+		// Detection-based batching decision
+		detectionBasedBatch := false
+		detectionReason := ""
+		if detectionResult != nil && detectionResult.ShouldBatch && detectionResult.Confidence >= r.detectorConfidence {
+			detectionBasedBatch = true
+			detectionReason = fmt.Sprintf(" (detected: %s, confidence=%.1f%%)", detectionResult.Reason, detectionResult.Confidence*100)
+		}
+
+		shouldBatch := (costBatchingWorth || detectionBasedBatch) && queueLen < r.maxQueueSize
 		decision.UsesBatchAPI = shouldBatch
 
 		if shouldBatch {
@@ -138,13 +202,22 @@ func (r *Router) MakeRoutingDecision(req BatchRequest) (BatchDecision, error) {
 				waitTime = r.maxBatchWaitTime
 			}
 			decision.EstimatedWaitTime = waitTime
-			decision.Reason = fmt.Sprintf("auto-batch queued (saves $%.4f, queue=%d/%d)", savingsAmount, queueLen, r.minBatchSize)
+
+			// Reason includes both cost and detection
+			baseReason := fmt.Sprintf("auto-batch queued (saves $%.4f, queue=%d/%d)", savingsAmount, queueLen, r.minBatchSize)
+			decision.Reason = baseReason + detectionReason
 
 			// Calculate ROI score: benefit vs cost of waiting
 			// ROI = (savings / wait_time_seconds) normalized to 0-1
 			waitSeconds := float64(waitTime.Seconds())
 			if waitSeconds > 0 {
 				decision.ROIScore = (savingsAmount * 100) / waitSeconds // Normalized by wait time
+				if decision.ROIScore > 1.0 {
+					decision.ROIScore = 1.0
+				}
+			} else {
+				// No queue: immediate processing with full savings benefit
+				decision.ROIScore = savingsAmount * 100 / 1.0 // Treat as 1-second wait
 				if decision.ROIScore > 1.0 {
 					decision.ROIScore = 1.0
 				}
@@ -165,7 +238,11 @@ func (r *Router) MakeRoutingDecision(req BatchRequest) (BatchDecision, error) {
 				}
 			}
 			if decision.Reason == "" {
-				decision.Reason = fmt.Sprintf("direct API (savings < %.1f%% or queue too small)", r.minSavingsPercent)
+				reason := fmt.Sprintf("direct API (savings < %.1f%% or queue too small)", r.minSavingsPercent)
+				if detectionResult != nil && !detectionResult.ShouldBatch {
+					reason += fmt.Sprintf(" (not detected as batch-worthy: %s)", detectionResult.Reason)
+				}
+				decision.Reason = reason
 			}
 		}
 
