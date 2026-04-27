@@ -41,7 +41,7 @@ func (pe *PrometheusExporter) Export() string {
 	buf.WriteString("# TYPE claude_escalate_cache_hit_rate gauge\n")
 	buf.WriteString(fmt.Sprintf("claude_escalate_cache_hit_rate{layer=\"overall\"} %f\n", snapshot.CacheMetrics.HitRate))
 	buf.WriteString(fmt.Sprintf("claude_escalate_cache_hit_rate{layer=\"semantic\"} %f\n", snapshot.CacheMetrics.HitRate*0.9))
-	buf.WriteString(fmt.Sprintf("claude_escalate_cache_hit_rate{layer=\"exact\"} 1.0\n"))
+	buf.WriteString("claude_escalate_cache_hit_rate{layer=\"exact\"} 1.0\n")
 
 	buf.WriteString("# HELP claude_escalate_cache_false_positive_rate False positive rate for semantic cache (0.0-1.0)\n")
 	buf.WriteString("# TYPE claude_escalate_cache_false_positive_rate gauge\n")
@@ -59,9 +59,9 @@ func (pe *PrometheusExporter) Export() string {
 	buf.WriteString("# HELP claude_escalate_token_savings_percent Token savings percentage (0-100) by layer\n")
 	buf.WriteString("# TYPE claude_escalate_token_savings_percent gauge\n")
 	buf.WriteString(fmt.Sprintf("claude_escalate_token_savings_percent{aggregation=\"overall\"} %f\n", snapshot.TokenMetrics.SavingsPercent))
-	buf.WriteString(fmt.Sprintf("claude_escalate_token_savings_percent{aggregation=\"layer\",layer=\"semantic\"} 12.8\n"))
-	buf.WriteString(fmt.Sprintf("claude_escalate_token_savings_percent{aggregation=\"layer\",layer=\"exact\"} 6.4\n"))
-	buf.WriteString(fmt.Sprintf("claude_escalate_token_savings_percent{aggregation=\"layer\",layer=\"rtk\"} 25.0\n"))
+	buf.WriteString("claude_escalate_token_savings_percent{aggregation=\"layer\",layer=\"semantic\"} 12.8\n")
+	buf.WriteString("claude_escalate_token_savings_percent{aggregation=\"layer\",layer=\"exact\"} 6.4\n")
+	buf.WriteString("claude_escalate_token_savings_percent{aggregation=\"layer\",layer=\"rtk\"} 25.0\n")
 
 	// Cost metrics with model labels
 	buf.WriteString("# HELP claude_escalate_cost_usd_total Cost in USD (burned or saved) by type and model\n")
@@ -104,9 +104,9 @@ func (pe *PrometheusExporter) Export() string {
 	// Quality metrics
 	buf.WriteString("# HELP claude_escalate_quality_score Quality score (0.0-1.0) by dimension\n")
 	buf.WriteString("# TYPE claude_escalate_quality_score gauge\n")
-	buf.WriteString(fmt.Sprintf("claude_escalate_quality_score{dimension=\"accuracy\"} 0.996\n"))
-	buf.WriteString(fmt.Sprintf("claude_escalate_quality_score{dimension=\"false_positives\"} 0.999\n"))
-	buf.WriteString(fmt.Sprintf("claude_escalate_quality_score{dimension=\"user_satisfaction\"} 0.94\n"))
+	buf.WriteString("claude_escalate_quality_score{dimension=\"accuracy\"} 0.996\n")
+	buf.WriteString("claude_escalate_quality_score{dimension=\"false_positives\"} 0.999\n")
+	buf.WriteString("claude_escalate_quality_score{dimension=\"user_satisfaction\"} 0.94\n")
 
 	// Operational metrics
 	buf.WriteString("# HELP claude_escalate_gateway_status Gateway component status (0=down, 1=up)\n")
