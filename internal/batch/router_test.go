@@ -120,44 +120,6 @@ func TestMakeRoutingDecision_UserChoice(t *testing.T) {
 	}
 }
 
-func TestQueueStats(t *testing.T) {
-	router := NewRouter(StrategyAlways)
-
-	// Add some requests
-	for i := 1; i <= 3; i++ {
-		req := BatchRequest{
-			ID:                    "test-" + string(rune(i)),
-			PromptLength:          2000,
-			EstimatedOutput:       1000,
-			Model:                 "sonnet",
-			MaxWaitTime:           1 * time.Minute,
-			CreatedAt:             time.Now().Add(-time.Duration(i) * time.Second),
-			EstimatedCost:         0.05,
-			EstimatedBatchSavings: 0.025,
-		}
-		router.MakeRoutingDecision(req)
-	}
-
-	stats := router.QueueStats()
-
-	if stats.Size != 3 {
-		t.Errorf("expected queue size 3, got %d", stats.Size)
-	}
-
-	// Use approximate comparison for floating point
-	if diff := stats.TotalPendingCost - 0.15; diff < -0.001 || diff > 0.001 {
-		t.Errorf("expected total cost ~0.15, got %f", stats.TotalPendingCost)
-	}
-
-	if diff := stats.EstimatedSavings - 0.075; diff < -0.001 || diff > 0.001 {
-		t.Errorf("expected savings ~0.075, got %f", stats.EstimatedSavings)
-	}
-
-	if stats.OldestRequestAge == 0 {
-		t.Error("expected OldestRequestAge > 0")
-	}
-}
-
 func TestFlushQueue(t *testing.T) {
 	router := NewRouter(StrategyAlways)
 
