@@ -89,17 +89,17 @@ func (f *InputFormatter) ShortenCommonTerms(input string) (string, error) {
 
 	// Replace common verbose patterns
 	replacements := map[string]string{
-		"Find all":          "All",
-		"List all":          "All",
-		"Show all":          "All",
-		"Get all":           "All",
-		"Find":              "Get",
-		"functions that":    "funcs w/",
-		"classes that":      "classes w/",
+		"Find all":           "All",
+		"List all":           "All",
+		"Show all":           "All",
+		"Get all":            "All",
+		"Find":               "Get",
+		"functions that":     "funcs w/",
+		"classes that":       "classes w/",
 		"with documentation": "w/ docs",
-		"including":         "w/",
-		"not including":     "w/o",
-		"and also":          "&",
+		"including":          "w/",
+		"not including":      "w/o",
+		"and also":           "&",
 	}
 
 	for verbose, short := range replacements {
@@ -112,11 +112,11 @@ func (f *InputFormatter) ShortenCommonTerms(input string) (string, error) {
 // parseStructuredInput extracts structured fields from verbose input
 func parseStructuredInput(input string) map[string]interface{} {
 	result := map[string]interface{}{
-		"task":       "",
-		"lang":       "",
-		"filter":     "",
-		"context":    "",
-		"output":     "",
+		"task":    "",
+		"lang":    "",
+		"filter":  "",
+		"context": "",
+		"output":  "",
 	}
 
 	// Extract task (verb in first few words)
@@ -155,8 +155,8 @@ func parseStructuredInput(input string) map[string]interface{} {
 
 // FormatterStats represents formatting statistics
 type FormatterStats struct {
-	OriginalSize  int
-	CompactedSize int
+	OriginalSize   int
+	CompactedSize  int
 	SavingsPercent float64
 }
 

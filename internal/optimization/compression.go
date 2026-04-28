@@ -194,10 +194,10 @@ func defaultParameterValues() map[string]interface{} {
 
 // CompressionStats tracks compression performance
 type CompressionStats struct {
-	OriginalSize  int
+	OriginalSize   int
 	CompressedSize int
 	SavingsPercent float64
-	BytesSaved    int
+	BytesSaved     int
 }
 
 // GetStats calculates compression statistics
@@ -219,7 +219,7 @@ func GetCompressionStats(original, compressed string) CompressionStats {
 		OriginalSize:   origSize,
 		CompressedSize: compSize,
 		SavingsPercent: savings,
-		BytesSaved:    bytesSaved,
+		BytesSaved:     bytesSaved,
 	}
 }
 

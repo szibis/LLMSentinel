@@ -12,12 +12,12 @@ import (
 
 // PipelineRequest represents a request flowing through the optimization pipeline
 type PipelineRequest struct {
-	Query       string            // User query/prompt
-	Intent      string            // Classified intent (quick_answer, detailed_analysis, etc)
-	Tool        string            // Tool type (mcp, cli, rest, db, binary)
-	Params      map[string]interface{}
-	Context     context.Context
-	Timestamp   time.Time
+	Query     string // User query/prompt
+	Intent    string // Classified intent (quick_answer, detailed_analysis, etc)
+	Tool      string // Tool type (mcp, cli, rest, db, binary)
+	Params    map[string]interface{}
+	Context   context.Context
+	Timestamp time.Time
 }
 
 // PipelineResponse represents the response from the optimization pipeline
@@ -26,13 +26,13 @@ type PipelineResponse struct {
 	Content string
 
 	// Pipeline metadata
-	Source           string              // Which layer returned this (cache, graph, claude)
-	Layer            int                 // Layer number (1-7)
-	Confidence       float32             // Confidence in response (0-1)
-	TokensSaved      int64               // Tokens saved by optimization
-	EstimatedTokens  int                 // Tokens used for this response
-	Latency          time.Duration       // Time to get response
-	Error            error               // Any errors during processing
+	Source          string        // Which layer returned this (cache, graph, claude)
+	Layer           int           // Layer number (1-7)
+	Confidence      float32       // Confidence in response (0-1)
+	TokensSaved     int64         // Tokens saved by optimization
+	EstimatedTokens int           // Tokens used for this response
+	Latency         time.Duration // Time to get response
+	Error           error         // Any errors during processing
 
 	// Graph context (if applicable)
 	GraphContext *GraphContext
@@ -43,11 +43,11 @@ type PipelineResponse struct {
 
 // GraphContext contains information about graph-based responses
 type GraphContext struct {
-	GraphHit     bool                  // True if response came from graph
-	Nodes        []graph.Node          // Related nodes
-	RelationshipType string             // Type of relationship (calls, imports, etc)
-	Depth        int                   // Graph traversal depth
-	ConfidenceScore float32            // Graph query confidence (0-1)
+	GraphHit         bool         // True if response came from graph
+	Nodes            []graph.Node // Related nodes
+	RelationshipType string       // Type of relationship (calls, imports, etc)
+	Depth            int          // Graph traversal depth
+	ConfidenceScore  float32      // Graph query confidence (0-1)
 }
 
 // OptimizationPipeline implements the 7+ layer optimization pipeline
@@ -68,10 +68,10 @@ type OptimizationPipeline struct {
 
 // PipelineConfig holds configuration for the optimization pipeline
 type PipelineConfig struct {
-	MaxLatency              time.Duration
-	GraphLookupEnabled      bool
-	SemanticCacheEnabled    bool
-	InputOptimizationEnabled bool
+	MaxLatency                time.Duration
+	GraphLookupEnabled        bool
+	SemanticCacheEnabled      bool
+	InputOptimizationEnabled  bool
 	OutputOptimizationEnabled bool
 }
 
@@ -182,8 +182,8 @@ func (p *OptimizationPipeline) buildResponse(
 		nodes := make([]graph.Node, len(cacheResult.RelatedNodes))
 		copy(nodes, cacheResult.RelatedNodes)
 		resp.GraphContext = &GraphContext{
-			GraphHit:    true,
-			Nodes:       nodes,
+			GraphHit:        true,
+			Nodes:           nodes,
 			ConfidenceScore: cacheResult.Confidence,
 		}
 	}

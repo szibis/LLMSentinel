@@ -11,21 +11,21 @@ import (
 // CacheGraphLayer integrates semantic cache with knowledge graph lookups
 // Lookup order: Exact Cache → Semantic Cache → Graph Lookup → Claude (fallback)
 type CacheGraphLayer struct {
-	cache    *Layer
-	graphDB  *graph.GraphDB
-	metrics  *metrics.MetricsCollector
-	enabled  bool
+	cache   *Layer
+	graphDB *graph.GraphDB
+	metrics *metrics.MetricsCollector
+	enabled bool
 }
 
 // GraphQueryResult represents the result of a unified cache+graph lookup
 type GraphQueryResult struct {
-	Source            string                  // "exact_cache", "semantic_cache", "graph", "claude"
-	Content           string                  // Response content
-	Confidence        float32                 // 0.0-1.0 confidence in answer
-	IsGraphMatch      bool                    // True if answer came from graph
-	RelatedNodes      []graph.Node            // Related nodes from graph (if applicable)
-	TokenSavings      int64                   // Estimated tokens saved
-	Error             error                   // Any errors during lookup
+	Source       string       // "exact_cache", "semantic_cache", "graph", "claude"
+	Content      string       // Response content
+	Confidence   float32      // 0.0-1.0 confidence in answer
+	IsGraphMatch bool         // True if answer came from graph
+	RelatedNodes []graph.Node // Related nodes from graph (if applicable)
+	TokenSavings int64        // Estimated tokens saved
+	Error        error        // Any errors during lookup
 }
 
 // NewCacheGraphLayer creates a unified cache+graph lookup layer
@@ -70,7 +70,7 @@ func (cgl *CacheGraphLayer) Lookup(ctx context.Context, query string, intent str
 			return &GraphQueryResult{
 				Source:       "semantic_cache",
 				Content:      semResp,
-				Confidence:   similarity, // Cosine similarity score
+				Confidence:   similarity,                  // Cosine similarity score
 				TokenSavings: int64(float32(2500) * 0.98), // 98% savings minus embedding cost
 			}
 		}

@@ -331,16 +331,16 @@ func (bp *BatchPoller) PollerStats() PollerStatistics {
 	}
 
 	return PollerStatistics{
-		IsRunning:          bp.isRunning,
-		TotalJobsPolled:    bp.totalJobsPolled,
-		TotalJobsComplete:  bp.totalJobsComplete,
-		TotalJobsFailed:    bp.totalJobsFailed,
-		ActiveJobs:         int64(activeJobs),
-		InProgressJobs:     int64(inProgressJobs),
-		CompletedJobs:      int64(completedJobs),
-		FailedJobs:         int64(failedJobs),
-		PollingInterval:    bp.pollingInterval,
-		TrackedJobs:        activeJobs,
+		IsRunning:         bp.isRunning,
+		TotalJobsPolled:   bp.totalJobsPolled,
+		TotalJobsComplete: bp.totalJobsComplete,
+		TotalJobsFailed:   bp.totalJobsFailed,
+		ActiveJobs:        int64(activeJobs),
+		InProgressJobs:    int64(inProgressJobs),
+		CompletedJobs:     int64(completedJobs),
+		FailedJobs:        int64(failedJobs),
+		PollingInterval:   bp.pollingInterval,
+		TrackedJobs:       activeJobs,
 	}
 }
 

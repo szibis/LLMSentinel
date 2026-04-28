@@ -40,7 +40,7 @@ func main() {
 }
 
 func printHelp() {
-	fmt.Println(`Claude Escalate Tools Utility
+	fmt.Print(`Claude Escalate Tools Utility
 
 USAGE:
   escalate-tools <command> [options]
@@ -79,7 +79,7 @@ func cmdDiscover(args []string) {
 	if tools.RTKPath != "" {
 		fmt.Printf("  ✓ Found at: %s\n", tools.RTKPath)
 		if *verbose {
-			fmt.Printf("  Purpose: Command output optimization (99.4% savings)\n")
+			fmt.Printf("  Purpose: Command output optimization (99.4%% savings)\n")
 			fmt.Printf("  Usage: rtk <command>\n")
 		}
 	} else {

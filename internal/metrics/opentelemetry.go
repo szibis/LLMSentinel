@@ -27,7 +27,7 @@ type OpenTelemetryExporter struct {
 // OTelMetric represents a single OpenTelemetry metric
 type OTelMetric struct {
 	Name       string            `json:"name"`
-	Type       string            `json:"type"`       // counter, gauge, histogram
+	Type       string            `json:"type"` // counter, gauge, histogram
 	Value      float64           `json:"value"`
 	Timestamp  int64             `json:"timestamp_ms"`
 	Attributes map[string]string `json:"attributes,omitempty"`
@@ -173,9 +173,9 @@ func (oe *OpenTelemetryExporter) snapshotToMetrics(snapshot MetricSnapshot) []OT
 			Value:     float64(snapshot.CacheMetrics.TotalHits),
 			Timestamp: now,
 			Attributes: map[string]string{
-				"layer":      "overall",
-				"operation":  "hit",
-				"unit":       "count",
+				"layer":     "overall",
+				"operation": "hit",
+				"unit":      "count",
 			},
 		})
 
@@ -197,9 +197,9 @@ func (oe *OpenTelemetryExporter) snapshotToMetrics(snapshot MetricSnapshot) []OT
 			Value:     float64(snapshot.CacheMetrics.TotalMisses),
 			Timestamp: now,
 			Attributes: map[string]string{
-				"layer":      "overall",
-				"operation":  "miss",
-				"unit":       "count",
+				"layer":     "overall",
+				"operation": "miss",
+				"unit":      "count",
 			},
 		})
 	}
@@ -340,9 +340,9 @@ func (oe *OpenTelemetryExporter) snapshotToMetrics(snapshot MetricSnapshot) []OT
 			Value:     snapshot.LatencyMetrics.CacheLookupMs / 1000 * 0.5,
 			Timestamp: now,
 			Attributes: map[string]string{
-				"stage":     "cache_lookup",
-				"quantile":  "0.50",
-				"unit":      "seconds",
+				"stage":    "cache_lookup",
+				"quantile": "0.50",
+				"unit":     "seconds",
 			},
 		})
 
@@ -352,9 +352,9 @@ func (oe *OpenTelemetryExporter) snapshotToMetrics(snapshot MetricSnapshot) []OT
 			Value:     snapshot.LatencyMetrics.CacheLookupMs / 1000,
 			Timestamp: now,
 			Attributes: map[string]string{
-				"stage":     "cache_lookup",
-				"quantile":  "0.99",
-				"unit":      "seconds",
+				"stage":    "cache_lookup",
+				"quantile": "0.99",
+				"unit":     "seconds",
 			},
 		})
 
@@ -365,9 +365,9 @@ func (oe *OpenTelemetryExporter) snapshotToMetrics(snapshot MetricSnapshot) []OT
 			Value:     snapshot.LatencyMetrics.SecurityValidationMs / 1000 * 0.5,
 			Timestamp: now,
 			Attributes: map[string]string{
-				"stage":     "security_validation",
-				"quantile":  "0.50",
-				"unit":      "seconds",
+				"stage":    "security_validation",
+				"quantile": "0.50",
+				"unit":     "seconds",
 			},
 		})
 
@@ -377,9 +377,9 @@ func (oe *OpenTelemetryExporter) snapshotToMetrics(snapshot MetricSnapshot) []OT
 			Value:     snapshot.LatencyMetrics.SecurityValidationMs / 1000,
 			Timestamp: now,
 			Attributes: map[string]string{
-				"stage":     "security_validation",
-				"quantile":  "0.99",
-				"unit":      "seconds",
+				"stage":    "security_validation",
+				"quantile": "0.99",
+				"unit":     "seconds",
 			},
 		})
 
@@ -390,9 +390,9 @@ func (oe *OpenTelemetryExporter) snapshotToMetrics(snapshot MetricSnapshot) []OT
 			Value:     snapshot.LatencyMetrics.TotalMs / 1000 * 0.5,
 			Timestamp: now,
 			Attributes: map[string]string{
-				"stage":     "total",
-				"quantile":  "0.50",
-				"unit":      "seconds",
+				"stage":    "total",
+				"quantile": "0.50",
+				"unit":     "seconds",
 			},
 		})
 
@@ -402,9 +402,9 @@ func (oe *OpenTelemetryExporter) snapshotToMetrics(snapshot MetricSnapshot) []OT
 			Value:     snapshot.LatencyMetrics.TotalMs / 1000,
 			Timestamp: now,
 			Attributes: map[string]string{
-				"stage":     "total",
-				"quantile":  "0.99",
-				"unit":      "seconds",
+				"stage":    "total",
+				"quantile": "0.99",
+				"unit":     "seconds",
 			},
 		})
 	}

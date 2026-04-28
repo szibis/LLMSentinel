@@ -39,22 +39,22 @@ func (mh *MetricsHandler) handleOverview(w http.ResponseWriter, r *http.Request)
 	savingsPercent := mh.sessionMetrics.CalculateSavingsPercent()
 	response := map[string]interface{}{
 		"tokens_burned": map[string]interface{}{
-			"input":             mh.sessionMetrics.TotalBurned.InputTokens,
-			"output":            mh.sessionMetrics.TotalBurned.OutputTokens,
-			"cache_read":        mh.sessionMetrics.TotalBurned.CacheReadTokens,
-			"cache_write":       mh.sessionMetrics.TotalBurned.CacheWriteTokens,
-			"total":             mh.sessionMetrics.TotalBurned.TotalTokens,
-			"estimated_cost":    mh.sessionMetrics.TotalBurned.EstimatedCostUSD,
+			"input":          mh.sessionMetrics.TotalBurned.InputTokens,
+			"output":         mh.sessionMetrics.TotalBurned.OutputTokens,
+			"cache_read":     mh.sessionMetrics.TotalBurned.CacheReadTokens,
+			"cache_write":    mh.sessionMetrics.TotalBurned.CacheWriteTokens,
+			"total":          mh.sessionMetrics.TotalBurned.TotalTokens,
+			"estimated_cost": mh.sessionMetrics.TotalBurned.EstimatedCostUSD,
 		},
 		"tokens_saved": map[string]interface{}{
 			"total":             mh.sessionMetrics.TotalSaved.TotalTokensSaved,
 			"savings_percent":   savingsPercent,
 			"estimated_savings": mh.sessionMetrics.TotalSaved.EstimatedCostSavedUSD,
 		},
-		"requests": mh.sessionMetrics.TotalRequests,
-		"cache_hit_rate": mh.sessionMetrics.AverageCacheHitRate,
+		"requests":            mh.sessionMetrics.TotalRequests,
+		"cache_hit_rate":      mh.sessionMetrics.AverageCacheHitRate,
 		"false_positive_rate": mh.sessionMetrics.AvgFalsePositiveRate,
-		"timestamp": time.Now(),
+		"timestamp":           time.Now(),
 	}
 
 	json.NewEncoder(w).Encode(response)
@@ -93,7 +93,7 @@ func (mh *MetricsHandler) handleDaily(w http.ResponseWriter, r *http.Request) {
 				"total":             daily.Saved.TotalTokensSaved,
 				"estimated_savings": daily.Saved.EstimatedCostSavedUSD,
 			},
-			"requests": daily.RequestCount,
+			"requests":       daily.RequestCount,
 			"cache_hit_rate": daily.CacheHitRate,
 		})
 	}
@@ -158,13 +158,13 @@ func (mh *MetricsHandler) handleProjections(w http.ResponseWriter, r *http.Reque
 
 	response := map[string]interface{}{
 		"projections_7day": map[string]interface{}{
-			"projected_tokens_burned":  proj7.ProjectedTokensBurned,
-			"projected_tokens_saved":   proj7.ProjectedTokensSaved,
-			"projected_cost":           proj7.ProjectedCostUSD,
-			"projected_savings":        proj7.ProjectedSavingsUSD,
+			"projected_tokens_burned":   proj7.ProjectedTokensBurned,
+			"projected_tokens_saved":    proj7.ProjectedTokensSaved,
+			"projected_cost":            proj7.ProjectedCostUSD,
+			"projected_savings":         proj7.ProjectedSavingsUSD,
 			"projected_savings_percent": proj7.ProjectedSavingsPercent,
-			"based_on_days":            proj7.BasedOnDays,
-			"confidence":               proj7.ProjectionConfidence,
+			"based_on_days":             proj7.BasedOnDays,
+			"confidence":                proj7.ProjectionConfidence,
 		},
 		"projections_30day": map[string]interface{}{
 			"projected_tokens_burned":   proj30.ProjectedTokensBurned,

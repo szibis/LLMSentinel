@@ -273,10 +273,10 @@ func (s *Server) handleToolsDiscover(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"success": true,
 		"tools": map[string]interface{}{
-			"rtk":        detectedTools.RTKPath,
-			"scrapling":  detectedTools.ScraplingPath,
-			"git":        detectedTools.GitPath,
-			"lsp_count":  len(detectedTools.LSPServers),
+			"rtk":       detectedTools.RTKPath,
+			"scrapling": detectedTools.ScraplingPath,
+			"git":       detectedTools.GitPath,
+			"lsp_count": len(detectedTools.LSPServers),
 		},
 	})
 }

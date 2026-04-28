@@ -60,7 +60,7 @@ type Router struct {
 	maxBatchWaitTime   time.Duration
 	minBatchSize       int
 	minSavingsPercent  float64
-	useDetector        bool // Enable/disable workload detection
+	useDetector        bool    // Enable/disable workload detection
 	detectorConfidence float64 // Minimum confidence for detector-based batching
 	mu                 sync.RWMutex
 }

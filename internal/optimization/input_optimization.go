@@ -175,6 +175,6 @@ func (io *InputOptimizer) OptimizeInputBatch(ctx context.Context, requests []*Pi
 // GetOptimizationMetrics returns current optimization statistics
 func (io *InputOptimizer) GetOptimizationMetrics() map[string]interface{} {
 	return map[string]interface{}{
-		"dedup":     io.dedup.GetStats(),
+		"dedup": io.dedup.GetStats(),
 	}
 }

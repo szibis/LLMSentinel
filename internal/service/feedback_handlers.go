@@ -12,10 +12,10 @@ import (
 // FeedbackRequest represents user feedback on a response
 type FeedbackRequest struct {
 	RequestID string `json:"request_id"`
-	Rating    int    `json:"rating"`    // 1-5 stars
-	Helpful   bool   `json:"helpful"`   // Simplified: thumbs up/down
-	Comment   string `json:"comment"`   // Optional comment
-	Accurate  bool   `json:"accurate"`  // Was the answer correct?
+	Rating    int    `json:"rating"`   // 1-5 stars
+	Helpful   bool   `json:"helpful"`  // Simplified: thumbs up/down
+	Comment   string `json:"comment"`  // Optional comment
+	Accurate  bool   `json:"accurate"` // Was the answer correct?
 }
 
 // FeedbackResponse represents stored feedback
@@ -32,21 +32,21 @@ type FeedbackResponse struct {
 
 // UserAnalytics represents per-user analytics and preferences
 type UserAnalytics struct {
-	UserID                   string  `json:"user_id"`
-	TotalFeedbackCount       int     `json:"total_feedback_count"`
-	PositiveFeedbackCount    int     `json:"positive_feedback_count"`
-	NegativeFeedbackCount    int     `json:"negative_feedback_count"`
-	AverageRating            float64 `json:"average_rating"`
-	HelpfulPercentage        float64 `json:"helpful_percentage"`
-	AccuracyPercentage       float64 `json:"accuracy_percentage"`
-	PrefersFreshness         bool    `json:"prefers_freshness"`   // User rates cached responses low
-	PrefersOpus              bool    `json:"prefers_opus"`        // User wants detailed Opus responses
-	PrefersBriefness         bool    `json:"prefers_briefness"`   // User rates verbose responses low
-	CacheHitRating           float64 `json:"cache_hit_rating"`    // How user rates cached vs fresh
-	AverageResponseTime      float64 `json:"avg_response_time_ms"`
-	LastFeedbackTime         time.Time `json:"last_feedback_time"`
-	AverageResponseSatisfaction float64 `json:"avg_response_satisfaction"`
-	PreferredModel           string  `json:"preferred_model"` // haiku, sonnet, opus
+	UserID                      string    `json:"user_id"`
+	TotalFeedbackCount          int       `json:"total_feedback_count"`
+	PositiveFeedbackCount       int       `json:"positive_feedback_count"`
+	NegativeFeedbackCount       int       `json:"negative_feedback_count"`
+	AverageRating               float64   `json:"average_rating"`
+	HelpfulPercentage           float64   `json:"helpful_percentage"`
+	AccuracyPercentage          float64   `json:"accuracy_percentage"`
+	PrefersFreshness            bool      `json:"prefers_freshness"` // User rates cached responses low
+	PrefersOpus                 bool      `json:"prefers_opus"`      // User wants detailed Opus responses
+	PrefersBriefness            bool      `json:"prefers_briefness"` // User rates verbose responses low
+	CacheHitRating              float64   `json:"cache_hit_rating"`  // How user rates cached vs fresh
+	AverageResponseTime         float64   `json:"avg_response_time_ms"`
+	LastFeedbackTime            time.Time `json:"last_feedback_time"`
+	AverageResponseSatisfaction float64   `json:"avg_response_satisfaction"`
+	PreferredModel              string    `json:"preferred_model"` // haiku, sonnet, opus
 }
 
 // handleFeedback processes user feedback on responses
@@ -89,11 +89,11 @@ func (s *Service) handleFeedback(w http.ResponseWriter, r *http.Request) {
 	// Return confirmation
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"status":      "recorded",
-		"request_id":  feedbackReq.RequestID,
-		"rating":      feedbackReq.Rating,
+		"status":       "recorded",
+		"request_id":   feedbackReq.RequestID,
+		"rating":       feedbackReq.Rating,
 		"acknowledged": true,
-		"message":     "Thank you for your feedback!",
+		"message":      "Thank you for your feedback!",
 	})
 }
 
@@ -114,18 +114,18 @@ func (s *Service) handleUserAnalytics(w http.ResponseWriter, r *http.Request) {
 
 	// Calculate aggregated analytics
 	analytics := &UserAnalytics{
-		UserID:                  userID,
-		PositiveFeedbackCount:   pattern.PositiveFeedbackCount,
-		NegativeFeedbackCount:   pattern.NegativeFeedbackCount,
-		AverageRating:           calculateAverageRating(pattern),
-		HelpfulPercentage:       calculateHelpfulPercentage(pattern),
-		AccuracyPercentage:      calculateAccuracyPercentage(pattern),
-		PrefersFreshness:        pattern.PrefersFreshness,
-		PrefersOpus:             pattern.PrefersOpus,
-		PrefersBriefness:        pattern.PrefersBriefness,
-		CacheHitRating:          pattern.CacheHitRating,
+		UserID:                      userID,
+		PositiveFeedbackCount:       pattern.PositiveFeedbackCount,
+		NegativeFeedbackCount:       pattern.NegativeFeedbackCount,
+		AverageRating:               calculateAverageRating(pattern),
+		HelpfulPercentage:           calculateHelpfulPercentage(pattern),
+		AccuracyPercentage:          calculateAccuracyPercentage(pattern),
+		PrefersFreshness:            pattern.PrefersFreshness,
+		PrefersOpus:                 pattern.PrefersOpus,
+		PrefersBriefness:            pattern.PrefersBriefness,
+		CacheHitRating:              pattern.CacheHitRating,
 		AverageResponseSatisfaction: pattern.AverageResponseSatisfaction,
-		LastFeedbackTime:        pattern.LastFeedbackTime,
+		LastFeedbackTime:            pattern.LastFeedbackTime,
 	}
 
 	w.Header().Set("Content-Type", "application/json")

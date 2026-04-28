@@ -15,20 +15,20 @@ type CacheEntry struct {
 	Response   string    // Cached response
 	Timestamp  time.Time // When cached
 	TTL        time.Duration
-	HitCount   int // Number of cache hits on this entry
+	HitCount   int  // Number of cache hits on this entry
 	ExactMatch bool // Was this an exact dedup match or semantic match?
 }
 
 // SemanticCache implements similarity-based response caching
 type SemanticCache struct {
-	entries              map[string]*CacheEntry // key -> entry
-	embedder             *EmbeddingModel
-	similarityThreshold  float32 // >0.85 = hit (strict threshold)
-	falsePositiveLimit   float32 // Kill cache if false positive rate >0.5%
-	falsePositiveCount   int
-	totalSemanticHits    int
-	mu                   sync.RWMutex
-	maxCacheSize         int       // Max entries in cache
+	entries                     map[string]*CacheEntry // key -> entry
+	embedder                    *EmbeddingModel
+	similarityThreshold         float32 // >0.85 = hit (strict threshold)
+	falsePositiveLimit          float32 // Kill cache if false positive rate >0.5%
+	falsePositiveCount          int
+	totalSemanticHits           int
+	mu                          sync.RWMutex
+	maxCacheSize                int // Max entries in cache
 	falsePositiveReportInterval int // Report every N hits
 }
 
@@ -37,10 +37,10 @@ func NewSemanticCache(embedder *EmbeddingModel, opts ...CacheOption) *SemanticCa
 	cache := &SemanticCache{
 		entries:                     make(map[string]*CacheEntry),
 		embedder:                    embedder,
-		similarityThreshold:         0.85,      // Strict threshold (default)
-		falsePositiveLimit:          0.005,     // 0.5% limit (default)
-		maxCacheSize:                10000,     // Max entries
-		falsePositiveReportInterval: 1000,      // Report every 1000 hits
+		similarityThreshold:         0.85,  // Strict threshold (default)
+		falsePositiveLimit:          0.005, // 0.5% limit (default)
+		maxCacheSize:                10000, // Max entries
+		falsePositiveReportInterval: 1000,  // Report every 1000 hits
 	}
 
 	// Apply options
@@ -96,13 +96,13 @@ func (c *SemanticCache) Store(ctx context.Context, key, query, response string) 
 	}
 
 	entry := &CacheEntry{
-		Key:       key,
-		Query:     query,
-		Embedding: embedding,
-		Response:  response,
-		Timestamp: time.Now(),
-		TTL:       24 * time.Hour,    // Default 24-hour TTL
-		HitCount:  0,
+		Key:        key,
+		Query:      query,
+		Embedding:  embedding,
+		Response:   response,
+		Timestamp:  time.Now(),
+		TTL:        24 * time.Hour, // Default 24-hour TTL
+		HitCount:   0,
 		ExactMatch: false,
 	}
 

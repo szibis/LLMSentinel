@@ -12,8 +12,8 @@ import (
 
 // Layer represents the cache layer in the 7-layer optimization pipeline
 type Layer struct {
-	exactCache      map[string]string        // Exact dedup cache (Layer 1)
-	semanticCache   *SemanticCache           // Semantic cache (Layer 5)
+	exactCache      map[string]string         // Exact dedup cache (Layer 1)
+	semanticCache   *SemanticCache            // Semantic cache (Layer 5)
 	metrics         *metrics.MetricsCollector // Metrics tracking
 	config          *config.Config
 	enabled         bool
@@ -61,9 +61,9 @@ type Request struct {
 
 // Response represents a response to be cached
 type Response struct {
-	Content string        // Response content
+	Content string // Response content
 	Error   error
-	Tokens  int           // Tokens used
+	Tokens  int // Tokens used
 	Latency time.Duration
 }
 
@@ -186,8 +186,8 @@ func (l *Layer) hashRequest(req *Request) string {
 
 // CacheSafetyDecision determines if caching is safe for a query based on intent
 type CacheSafetyDecision struct {
-	Safe      bool
-	Reason    string
+	Safe       bool
+	Reason     string
 	Confidence float32
 }
 

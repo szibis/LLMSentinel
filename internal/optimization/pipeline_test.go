@@ -24,7 +24,7 @@ func setupTestPipeline(t *testing.T) (*OptimizationPipeline, *graph.GraphDB, fun
 	cfg := &config.Config{
 		Optimizations: config.OptimizationsConfig{
 			SemanticCache: config.SemanticCacheConfig{
-				Enabled:            true,
+				Enabled:             true,
 				SimilarityThreshold: 0.85,
 				FalsePositiveLimit:  0.005,
 				MaxCacheSize:        10000,
@@ -236,9 +236,9 @@ func TestOptimizationPipeline_TransparencyFooter_Graph(t *testing.T) {
 		EstimatedTokens: 25,
 		Latency:         8 * time.Millisecond,
 		GraphContext: &GraphContext{
-			GraphHit:    true,
-			Nodes:       []graph.Node{{Name: "func1"}, {Name: "func2"}},
-			Depth:       2,
+			GraphHit:        true,
+			Nodes:           []graph.Node{{Name: "func1"}, {Name: "func2"}},
+			Depth:           2,
 			ConfidenceScore: 0.99,
 		},
 	}

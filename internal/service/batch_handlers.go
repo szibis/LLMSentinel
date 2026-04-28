@@ -33,12 +33,12 @@ type SubmitBatchRequest struct {
 
 // SubmitBatchResponse represents response from batch submission
 type SubmitBatchResponse struct {
-	JobID           string `json:"job_id"`
-	RequestCount    int    `json:"request_count"`
-	SubmittedAt     string `json:"submitted_at"`
-	EstimatedCost   float64 `json:"estimated_cost"`
+	JobID            string  `json:"job_id"`
+	RequestCount     int     `json:"request_count"`
+	SubmittedAt      string  `json:"submitted_at"`
+	EstimatedCost    float64 `json:"estimated_cost"`
 	EstimatedSavings float64 `json:"estimated_savings"`
-	Message         string `json:"message"`
+	Message          string  `json:"message"`
 }
 
 // HandleSubmitBatch submits queued requests as a batch job
@@ -169,10 +169,10 @@ func (bh *BatchHandlers) HandleBatchStatus(w http.ResponseWriter, r *http.Reques
 
 // BatchResultsResponse represents results from a completed batch
 type BatchResultsResponse struct {
-	JobID    string                 `json:"job_id"`
-	Status   string                 `json:"status"`
-	Results  []map[string]interface{} `json:"results"`
-	Message  string                 `json:"message"`
+	JobID   string                   `json:"job_id"`
+	Status  string                   `json:"status"`
+	Results []map[string]interface{} `json:"results"`
+	Message string                   `json:"message"`
 }
 
 // HandleBatchResults returns results from a completed batch job
@@ -268,14 +268,14 @@ func (bh *BatchHandlers) HandleQueueStatus(w http.ResponseWriter, r *http.Reques
 	stats := bh.batchQueue.QueueStats()
 
 	response := map[string]interface{}{
-		"size":                stats.Size,
-		"max_size":            stats.MaxSize,
-		"min_size":            stats.MinSize,
-		"total_processed":     stats.TotalProcessed,
+		"size":                  stats.Size,
+		"max_size":              stats.MaxSize,
+		"min_size":              stats.MinSize,
+		"total_processed":       stats.TotalProcessed,
 		"total_estimated_saved": stats.EstimatedSaved,
-		"idle_time":           stats.IdleTime.String(),
-		"oldest_request_age":  stats.OldestRequestAge.String(),
-		"average_request_age": stats.AverageAge.String(),
+		"idle_time":             stats.IdleTime.String(),
+		"oldest_request_age":    stats.OldestRequestAge.String(),
+		"average_request_age":   stats.AverageAge.String(),
 	}
 
 	w.Header().Set("Content-Type", "application/json")

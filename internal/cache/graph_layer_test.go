@@ -16,7 +16,7 @@ func setupTestCacheGraphLayer(t *testing.T) (*CacheGraphLayer, *graph.GraphDB, f
 	cfg := &config.Config{
 		Optimizations: config.OptimizationsConfig{
 			SemanticCache: config.SemanticCacheConfig{
-				Enabled:            true,
+				Enabled:             true,
 				SimilarityThreshold: 0.85,
 				FalsePositiveLimit:  0.005,
 				MaxCacheSize:        10000,
@@ -132,7 +132,7 @@ func TestCacheGraphLayer_CacheSafetyDecision(t *testing.T) {
 	defer cleanup()
 
 	tests := []struct {
-		intent   string
+		intent    string
 		shouldUse bool
 	}{
 		{"quick_answer", true},
@@ -156,7 +156,7 @@ func TestCacheGraphLayer_GraphQueryDetection(t *testing.T) {
 	defer cleanup()
 
 	tests := []struct {
-		query     string
+		query        string
 		isGraphQuery bool
 	}{
 		{"find all functions calling authenticate", true},
@@ -203,8 +203,8 @@ func TestCacheGraphLayer_FindCallersQuery(t *testing.T) {
 	defer cleanup()
 
 	tests := []struct {
-		query          string
-		isFindCallers  bool
+		query         string
+		isFindCallers bool
 	}{
 		{"find all functions calling authenticate", true},
 		{"functions that call authenticate", true},
