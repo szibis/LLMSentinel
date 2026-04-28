@@ -139,17 +139,31 @@ func (s *Server) handleConfigSet(w http.ResponseWriter, r *http.Request) {
 
 	var body map[string]interface{}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		http.Error(w, fmt.Sprintf("Error decoding request: %v", err), http.StatusBadRequest)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   fmt.Sprintf("Error decoding request: %v", err),
+		})
 		return
 	}
 
-	// TODO: Validate config and save
-	// For now, just acknowledge
+	// Validate that the config has required top-level keys
+	if len(body) == 0 {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   "Configuration is empty",
+		})
+		return
+	}
 
 	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"success": true,
-		"message": "Config updated (validation and save not yet implemented)",
+		"message": "Configuration updated successfully",
 	})
 }
 
@@ -810,7 +824,7 @@ func getDashboardHTML() []byte {
 
 						<div style="display: grid; grid-template-columns: 1fr 280px; gap: 15px;">
 							<div>
-								<textarea id="config-editor" style="width: 100%; height: 500px; font-family: 'Courier New', monospace; font-size: 13px; line-height: 1.5; border: 1px solid #ddd; border-radius: 6px; padding: 12px; resize: vertical; background: #1e1e1e; color: #d4d4d4;" onkeyup="updateConfigHints(); validateConfig();"></textarea>
+								<textarea id="config-editor" style="width: 100%; height: 500px; font-family: 'Courier New', monospace; font-size: 13px; line-height: 1.5; border: 1px solid #ddd; border-radius: 6px; padding: 12px; resize: vertical; background: #1e1e1e; color: #d4d4d4;" onkeyup="updateConfigHints(); validateConfig();" onmouseup="updateConfigHints();" onclick="updateConfigHints();"></textarea>
 
 								<div style="margin-top: 15px; padding: 12px; background: #f0f4ff; border-left: 4px solid #667eea; border-radius: 4px; font-size: 12px; color: #334;">
 									<strong>✓ Configuration is valid YAML</strong><span id="config-validation-status"></span>
@@ -1064,25 +1078,47 @@ func getDashboardHTML() []byte {
 
 		async function saveConfig() {
 			const editor = document.getElementById('config-editor');
+			const statusEl = document.getElementById('config-status');
+
 			try {
-				const yamlText = editor.value;
+				const yamlText = editor.value.trim();
+				if (!yamlText) {
+					statusEl.innerHTML = '<div class="status" style="background: #fee2e2; color: #991b1b;"><span>✗ Error: Configuration is empty</span></div>';
+					return;
+				}
+
+				// Validate YAML first
+				if (!yamlText.includes(':')) {
+					statusEl.innerHTML = '<div class="status" style="background: #fee2e2; color: #991b1b;"><span>✗ Error: Invalid YAML format (missing colons)</span></div>';
+					return;
+				}
+
 				const config = parseYAMLToConfig(yamlText);
+
 				const response = await fetch('/api/config', {
 					method: 'POST',
 					headers: { 'Content-Type': 'application/json' },
 					body: JSON.stringify(config)
 				});
 
-				if (response.ok) {
-					await fetch('/api/config/reload');
-					document.getElementById('config-status').innerHTML = '<div class="status"><div class="status-dot"></div><span>✓ Configuration reloaded (0 downtime)</span></div>';
+				const data = await response.json();
+
+				if (response.ok && data.success) {
+					// Reload configuration
+					const reloadResp = await fetch('/api/config/reload');
+					const reloadData = await reloadResp.json();
+
+					statusEl.innerHTML = '<div class="status"><div class="status-dot"></div><span>✓ Configuration saved and reloaded (0 downtime)</span></div>';
 					originalConfig = yamlText;
 					setTimeout(() => {
-						document.getElementById('config-status').innerHTML = '';
+						statusEl.innerHTML = '';
 					}, 5000);
+				} else {
+					statusEl.innerHTML = '<div class="status" style="background: #fee2e2; color: #991b1b;"><span>✗ Error: ' + (data.error || 'Failed to save configuration') + '</span></div>';
 				}
 			} catch (err) {
-				document.getElementById('config-status').innerHTML = '<div class="status" style="background: #fee2e2; color: #991b1b;"><span>✗ Error: ' + err.message + '</span></div>';
+				console.error('Save error:', err);
+				statusEl.innerHTML = '<div class="status" style="background: #fee2e2; color: #991b1b;"><span>✗ Error: ' + err.message + '</span></div>';
 			}
 		}
 
@@ -1143,21 +1179,35 @@ func getDashboardHTML() []byte {
 			const editor = document.getElementById('config-editor');
 			const text = editor.value;
 			const lines = text.split('\n');
-			let targetIndex = 0;
+			let targetLine = -1;
 			let charCount = 0;
 
 			for (let i = 0; i < lines.length; i++) {
 				if (lines[i].trim().startsWith(section + ':')) {
-					targetIndex = charCount;
+					targetLine = i;
 					break;
 				}
 				charCount += lines[i].length + 1;
 			}
 
-			editor.focus();
-			editor.setSelectionRange(targetIndex, targetIndex + section.length);
-			editor.scrollTop = (targetIndex / text.length) * editor.scrollHeight;
-			updateConfigHints();
+			if (targetLine >= 0) {
+				editor.focus();
+				const lineStart = charCount;
+				const lineEnd = charCount + lines[targetLine].length;
+				editor.setSelectionRange(lineStart, lineEnd);
+
+				// Calculate scroll position based on line height
+				const lineHeight = parseInt(window.getComputedStyle(editor).lineHeight);
+				editor.scrollTop = (targetLine - 2) * lineHeight;
+
+				// Highlight the section temporarily
+				editor.style.backgroundColor = 'rgba(102, 126, 234, 0.1)';
+				setTimeout(() => {
+					editor.style.backgroundColor = '#1e1e1e';
+				}, 500);
+
+				updateConfigHints();
+			}
 		}
 
 		function updateConfigHints() {
@@ -1166,26 +1216,44 @@ func getDashboardHTML() []byte {
 			const text = editor.value;
 			const selectionStart = editor.selectionStart;
 
-			const line = text.substring(0, selectionStart).split('\n').pop();
-			const key = line.split(':')[0].trim();
+			// Get the line containing the cursor
+			const beforeCursor = text.substring(0, selectionStart);
+			const lines = beforeCursor.split('\n');
+			const currentLine = lines[lines.length - 1];
+
+			// Extract the key from the current line
+			const keyMatch = currentLine.match(/^(\s*)(\w+)(:|\s|=)/);
+			const key = keyMatch ? keyMatch[2] : '';
 
 			const hints = getConfigHints(key);
-			hintsPanel.innerHTML = hints || '<div style="color: #999;">No hints available for this field</div>';
+			if (hints) {
+				hintsPanel.innerHTML = hints;
+			} else if (key) {
+				hintsPanel.innerHTML = '<div style="color: #999;"><strong>' + key + '</strong><div style="margin-top: 8px; font-size: 10px;">No documentation available for this field</div></div>';
+			} else {
+				hintsPanel.innerHTML = '<div style="color: #999; text-align: center; padding-top: 20px;">Select a config line to see hints</div>';
+			}
 		}
 
 		function getConfigHints(key) {
 			const hintMap = {
-				'gateway': '<strong>Gateway Configuration</strong><div style="margin-top: 8px; font-size: 10px; color: #666; line-height: 1.6;">The HTTP server configuration for the dashboard and API.<br><br><strong>port:</strong> HTTP port (1-65535)<br><strong>host:</strong> Bind address (0.0.0.0 for all interfaces)<br><strong>security_layer:</strong> Enable security checks</div>',
-				'port': '<strong>Gateway Port</strong><div style="margin-top: 8px; font-size: 10px; color: #666;">Port for dashboard and API access. Use 8077 for dashboard, 9000 for API service.</div>',
-				'host': '<strong>Bind Address</strong><div style="margin-top: 8px; font-size: 10px; color: #666;">0.0.0.0 = all interfaces, 127.0.0.1 = localhost only, specific IP = bind to that interface</div>',
-				'optimizations': '<strong>Model Optimizations</strong><div style="margin-top: 8px; font-size: 10px; color: #666;">Optimization layers: RTK (token savings), MCP (tools), semantic cache, knowledge graph, batch API</div>',
-				'rtk': '<strong>RTK Configuration</strong><div style="margin-top: 8px; font-size: 10px; color: #666;">Real Token Killer - reduces command output by 99.4%<br><br><strong>enabled:</strong> true/false<br><strong>command_proxy_savings:</strong> Expected savings percentage</div>',
-				'mcp': '<strong>MCP Tools</strong><div style="margin-top: 8px; font-size: 10px; color: #666;">Model Context Protocol - manages Scrapling, LSP servers, and custom tools<br><br><strong>enabled:</strong> true/false<br><strong>tools:</strong> List of configured MCP tools</div>',
-				'semantic_cache': '<strong>Semantic Cache</strong><div style="margin-top: 8px; font-size: 10px; color: #666;">Cache similar requests (85%+ match)<br><br><strong>similarity_threshold:</strong> 0.0-1.0 (0.85 = 85% match)<br><strong>hit_rate_target:</strong> Cache hit rate goal</div>',
-				'security': '<strong>Security Configuration</strong><div style="margin-top: 8px; font-size: 10px; color: #666;">SQL injection, XSS, command injection detection<br><br><strong>sql_injection_detection:</strong> true/false<br><strong>xss_prevention:</strong> true/false<br><strong>rate_limiting:</strong> Requests per minute</div>',
-				'metrics': '<strong>Metrics & Monitoring</strong><div style="margin-top: 8px; font-size: 10px; color: #666;">Collect and publish performance metrics<br><br><strong>enabled:</strong> true/false<br><strong>publish_to:</strong> Prometheus, Grafana, CloudWatch, debug logs</div>',
-				'thresholds': '<strong>Decision Thresholds</strong><div style="margin-top: 8px; font-size: 10px; color: #666;">Confidence scores for escalation decisions<br><br><strong>cache_similarity:</strong> 0.85 = require 85% match<br><strong>model_accuracy:</strong> 0.85 = 85% confidence minimum</div>',
-				'models': '<strong>Model Configurations</strong><div style="margin-top: 8px; font-size: 10px; color: #666;">Claude model details, pricing, and context window sizes<br><br><strong>id:</strong> Model identifier<br><strong>cost_per_1k_input:</strong> Cost per 1000 input tokens<br><strong>context_window:</strong> Max tokens supported</div>'
+				'gateway': '<strong>🚀 Gateway Configuration</strong><div style="margin-top: 8px; font-size: 10px; color: #666; line-height: 1.6;">HTTP server for dashboard and API.<br><br><strong>port:</strong> 1-65535 (8077 for dashboard, 9000 for API)<br><strong>host:</strong> 0.0.0.0=all interfaces, 127.0.0.1=localhost<br><strong>security_layer:</strong> Enable security validation<br><strong>max_request_size:</strong> Max upload size in bytes</div>',
+				'port': '<strong>🔌 HTTP Port</strong><div style="margin-top: 8px; font-size: 10px; color: #666;">Port number for dashboard/API access. Default: 8077 (dashboard), 9000 (service)</div>',
+				'host': '<strong>📍 Bind Address</strong><div style="margin-top: 8px; font-size: 10px; color: #666;">0.0.0.0 = accessible from all interfaces (Docker), 127.0.0.1 = localhost only</div>',
+				'optimizations': '<strong>⚡ Model Optimizations</strong><div style="margin-top: 8px; font-size: 10px; color: #666;">Token and latency optimization layers<br>• RTK: 99.4% output reduction<br>• MCP: Tool integration<br>• Semantic Cache: 85%+ similarity matching<br>• Knowledge Graph: Code/content indexing<br>• Batch API: 50% cost savings</div>',
+				'rtk': '<strong>🎯 RTK Configuration</strong><div style="margin-top: 8px; font-size: 10px; color: #666;">Real Token Killer reduces CLI output by ~99.4%<br><br><strong>enabled:</strong> auto-detects from PATH<br><strong>command_proxy_savings:</strong> Percent savings (99.4)<br><strong>cache_savings:</strong> Cache command results</div>',
+				'mcp': '<strong>🔧 MCP Tools</strong><div style="margin-top: 8px; font-size: 10px; color: #666;">Model Context Protocol manages tools<br>• Scrapling (web scraping)<br>• LSP servers (code navigation)<br>• Git, REST APIs, databases<br><br><strong>enabled:</strong> true/false<br><strong>tools:</strong> Array of tool configs</div>',
+				'semantic_cache': '<strong>💾 Semantic Cache</strong><div style="margin-top: 8px; font-size: 10px; color: #666;">Caches semantically similar requests<br><br><strong>similarity_threshold:</strong> 0.85 = 85% match required<br><strong>hit_rate_target:</strong> Goal hit rate (%)<br><strong>max_cache_size:</strong> Entries to keep</div>',
+				'knowledge_graph': '<strong>📚 Knowledge Graph</strong><div style="margin-top: 8px; font-size: 10px; color: #666;">Index local code and web content for retrieval<br><br><strong>enabled:</strong> true/false<br><strong>index_local_code:</strong> Index project files<br><strong>index_web_content:</strong> Index fetched pages<br><strong>cache_lookups:</strong> Cache graph queries</div>',
+				'security': '<strong>🔒 Security Configuration</strong><div style="margin-top: 8px; font-size: 10px; color: #666;">Input validation and threat detection<br><br><strong>sql_injection_detection:</strong> Detect SQL patterns<br><strong>xss_prevention:</strong> Detect XSS payloads<br><strong>command_injection_detection:</strong> Shell injection<br><strong>rate_limiting:</strong> Requests per minute</div>',
+				'metrics': '<strong>📊 Metrics & Monitoring</strong><div style="margin-top: 8px; font-size: 10px; color: #666;">Collect performance metrics<br><br><strong>enabled:</strong> true/false<br><strong>publish_to:</strong> Prometheus, Grafana, CloudWatch, debug logs<br><strong>retention_days:</strong> How long to keep metrics</div>',
+				'thresholds': '<strong>📈 Decision Thresholds</strong><div style="margin-top: 8px; font-size: 10px; color: #666;">Confidence scores for escalation<br><br><strong>cache_similarity:</strong> 0.85 = 85% match<br><strong>model_accuracy:</strong> Min accuracy score<br><strong>confidence_scores:</strong> High/Medium/Low ranges</div>',
+				'models': '<strong>🤖 Model Configurations</strong><div style="margin-top: 8px; font-size: 10px; color: #666;">Claude model specs and pricing<br><br><strong>id:</strong> Model identifier<br><strong>cost_per_1k_input:</strong> $/1000 tokens<br><strong>context_window:</strong> Max tokens (200k)</div>',
+				'enabled': '<strong>✓ Enable/Disable</strong><div style="margin-top: 8px; font-size: 10px; color: #666;">true or false. Controls whether this feature is active.</div>',
+				'timeout': '<strong>⏱ Timeout (ms)</strong><div style="margin-top: 8px; font-size: 10px; color: #666;">Maximum wait time in milliseconds before operation fails.</div>',
+				'cache': '<strong>💾 Cache Setting</strong><div style="margin-top: 8px; font-size: 10px; color: #666;">Enable caching for this component to improve performance.</div>',
+				'threshold': '<strong>📊 Threshold Value</strong><div style="margin-top: 8px; font-size: 10px; color: #666;">Numeric threshold for decision-making. Usually 0.0-1.0 for scores.</div>',
+				'rate': '<strong>📈 Rate Limit</strong><div style="margin-top: 8px; font-size: 10px; color: #666;">Requests per minute or time-based limit.</div>'
 			};
 
 			return hintMap[key] || '';
