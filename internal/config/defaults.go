@@ -10,14 +10,16 @@ import (
 
 // DefaultConfig returns a base configuration with auto-detected tools
 func DefaultConfig() *Config {
+	tools := detectAndCreateTools()
+
 	cfg := &Config{
 		Gateway: GatewayConfig{
-			Port:            9000,
+			Port:            8080,
 			Host:            "0.0.0.0",
 			SecurityLayer:   true,
 			ShutdownTimeout: 30,
 			MaxRequestSize:  10485760, // 10MB
-			DataDir:         expandHome("~/.claude/data/escalate"),
+			DataDir:         expandHome("~/.claude-escalate/data"),
 		},
 		Optimizations: OptimizationsConfig{
 			RTK: RTKConfig{
@@ -27,22 +29,22 @@ func DefaultConfig() *Config {
 			},
 			MCP: MCPConfig{
 				Enabled: true,
-				Tools:   detectAndCreateTools(),
+				Tools:   tools,
 			},
 			SemanticCache: SemanticCacheConfig{
 				Enabled:             true,
-				EmbeddingModel:      "text-embedding-3-small",
+				EmbeddingModel:      "onnx-mini-l6",
 				SimilarityThreshold: 0.85,
-				HitRateTarget:       0.90,
-				FalsePositiveLimit:  0.01,
+				HitRateTarget:       60,
+				FalsePositiveLimit:  0.5,
 				MaxCacheSize:        500,
 			},
 			KnowledgeGraph: KnowledgeGraphConfig{
-				Enabled:         true,
-				IndexLocalCode:  true,
-				IndexWebContent: true,
-				CacheLookups:    true,
-				DBPath:          expandHome("~/.claude/data/escalate/kg.db"),
+				Enabled:         false,
+				IndexLocalCode:  false,
+				IndexWebContent: false,
+				CacheLookups:    false,
+				DBPath:          expandHome("~/.claude-escalate/graph.db"),
 			},
 			InputOptimization: InputOptimizationConfig{
 				Enabled:                  true,
@@ -57,20 +59,42 @@ func DefaultConfig() *Config {
 				DeltaDetection:      true,
 			},
 			BatchAPI: BatchAPIConfig{
-				Enabled: true,
+				Enabled:          false,
+				MinBatchSize:     10,
+				MaxBatchSize:     100,
+				AutoBatchSimilar: true,
 			},
 		},
 		Security: SecurityConfig{
-			Enabled:                  true,
-			MaxRatePerMinute:         1000,
-			BlockSuspiciousPatterns:  true,
-			RequireSecureConnection:  false,
-			AllowedOrigins:           []string{"localhost", "127.0.0.1"},
+			Enabled:                   true,
+			SQLInjectionDetection:     true,
+			XSSPrevention:             true,
+			CommandInjectionDetection: true,
+			RateLimiting: RateLimitConfig{
+				RequestsPerMinute: 1000,
+				PerIP:             true,
+			},
+			AuditLogging: true,
 		},
 		Metrics: MetricsConfig{
-			Enabled:           true,
-			RetentionDays:     30,
-			SamplingInterval:  1,
+			Enabled: true,
+			PublishTo: PublishTargets{
+				Prometheus: PrometheusTarget{
+					Enabled: true,
+					Port:    9090,
+					Path:    "/metrics",
+				},
+				Grafana: GrafanaTarget{
+					Enabled: false,
+				},
+				CloudWatch: CloudWatchTarget{
+					Enabled: false,
+				},
+				DebugLogs: DebugLogsTarget{
+					Enabled: true,
+					Dir:     expandHome("~/.claude-escalate/metrics"),
+				},
+			},
 		},
 	}
 
