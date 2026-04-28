@@ -358,7 +358,19 @@ graph LR
 
 ## 🚀 Quick Start (5 minutes)
 
-### 1. Build Binary
+### Option A: Docker (Recommended)
+
+```bash
+docker build -t claude-escalate .
+docker run -d -p 9000:8077 -v escalate-data:/data \
+  claude-escalate:latest dashboard --port 8077
+# Access: http://localhost:9000/dashboard
+```
+
+See **[DOCKER_SETUP.md](docs/DOCKER_SETUP.md)** for full guide.
+
+### Option B: Build Locally
+
 ```bash
 git clone https://github.com/szibis/claude-escalate.git
 cd claude-escalate
@@ -367,14 +379,14 @@ make build
 ```
 
 ### 2. Start Service
+
 ```bash
-./bin/claude-escalate service --port 8080
-# Or with Docker:
-docker-compose up
+./bin/claude-escalate dashboard --port 8077
+# Service listens on all interfaces (0.0.0.0:8077)
 ```
 
 ### 3. Access Dashboard
-Open **http://localhost:8080** in your browser
+Open **http://localhost:8077/dashboard** in your browser
 - Real-time metrics
 - Task classification results
 - Budget status
