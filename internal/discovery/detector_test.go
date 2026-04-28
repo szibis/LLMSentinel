@@ -49,6 +49,7 @@ func TestDetectTools_ReturnsDetectedToolsStruct(t *testing.T) {
 	tools := DetectTools()
 	if tools == nil {
 		t.Error("DetectTools returned nil")
+		return
 	}
 	if tools.LSPServers == nil {
 		t.Error("DetectTools LSPServers is nil")

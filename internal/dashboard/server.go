@@ -302,7 +302,7 @@ func (s *Server) handleTools(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (s *Server) handleToolsList(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleToolsList(w http.ResponseWriter, _ *http.Request) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -479,7 +479,7 @@ func (s *Server) handleToolsDynamic(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (s *Server) handleToolTest(w http.ResponseWriter, r *http.Request, toolName string) {
+func (s *Server) handleToolTest(w http.ResponseWriter, _ *http.Request, _ string) {
 	// TODO: Implement tool health check
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
@@ -1813,7 +1813,7 @@ func getDashboardHTML() []byte {
 			const settingsStr = JSON.stringify(tool.settings || {});
 			const newPath = prompt('Edit path/socket for "' + name + '":', tool.path || '');
 
-			if (newPath === null) return; // User cancelled
+			if (newPath === null) return; // User canceled
 
 			if (!newPath.trim()) {
 				alert('Path cannot be empty');

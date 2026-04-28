@@ -14,7 +14,7 @@ import (
 )
 
 // Test helpers
-func setupTestServer(t *testing.T) *Server {
+func setupTestServer(_ *testing.T) *Server {
 	loader := config.NewLoader("")
 	collector := metrics.NewMetricsCollector()
 	publisher := metrics.NewMetricsPublisher(collector, 1*time.Minute)
@@ -446,7 +446,7 @@ func TestToolsDelete_Returns200OnSuccess(t *testing.T) {
 
 	// Will fail because tool doesn't exist, but handler should respond with 404
 	if w.Code != http.StatusNotFound && w.Code != http.StatusOK {
-		// Either is acceptable for this test
+		t.Errorf("expected 404 or 200, got %d", w.Code)
 	}
 }
 
