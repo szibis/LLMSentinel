@@ -323,3 +323,80 @@ func DetectInstalledLanguages() []string {
 
 	return langs
 }
+
+// ToolInfo represents a discovered tool with its metadata
+type ToolInfo struct {
+	Name        string                 `json:"name"`
+	Type        string                 `json:"type"` // cli, mcp, rest, database, binary
+	Path        string                 `json:"path"`
+	Executable  bool                   `json:"executable"`
+	Description string                 `json:"description"`
+	Params      map[string]interface{} `json:"params"`
+	Available   bool                   `json:"available"`
+}
+
+// GetKnownTools returns information about known/discoverable tools
+func GetKnownTools() []ToolInfo {
+	return []ToolInfo{
+		{
+			Name:        "rtk",
+			Type:        "cli",
+			Description: "Real Token Killer - reduces command output by 99.4%",
+			Path:        findTool([]string{filepath.Join(os.Getenv("HOME"), ".local", "bin", "rtk"), "/usr/local/bin/rtk", "/opt/homebrew/bin/rtk"}),
+			Available:   findTool([]string{filepath.Join(os.Getenv("HOME"), ".local", "bin", "rtk"), "/usr/local/bin/rtk", "/opt/homebrew/bin/rtk"}) != "",
+			Params: map[string]interface{}{
+				"enabled":               true,
+				"command_proxy_savings": 99.4,
+				"cache_savings":         true,
+			},
+		},
+		{
+			Name:        "scrapling",
+			Type:        "mcp",
+			Description: "Web scraping and content extraction (85-94% savings)",
+			Path:        findTool([]string{filepath.Join(os.Getenv("HOME"), ".local", "bin", "scrapling"), "/usr/local/bin/scrapling"}),
+			Available:   findTool([]string{filepath.Join(os.Getenv("HOME"), ".local", "bin", "scrapling"), "/usr/local/bin/scrapling"}) != "",
+			Params: map[string]interface{}{
+				"css_selector":    true,
+				"markdown_only":   true,
+				"cache_responses": true,
+			},
+		},
+		{
+			Name:        "git",
+			Type:        "cli",
+			Description: "Version control and diff operations",
+			Path:        findTool([]string{"/usr/bin/git", "/usr/local/bin/git", "/opt/homebrew/bin/git"}),
+			Available:   findTool([]string{"/usr/bin/git", "/usr/local/bin/git", "/opt/homebrew/bin/git"}) != "",
+			Params: map[string]interface{}{
+				"enabled": true,
+			},
+		},
+	}
+}
+
+// GetAvailableToolTypes returns the list of tool types
+func GetAvailableToolTypes() []map[string]string {
+	return []map[string]string{
+		{
+			"type":        "cli",
+			"description": "Shell command or script executable",
+		},
+		{
+			"type":        "mcp",
+			"description": "Model Context Protocol server",
+		},
+		{
+			"type":        "rest",
+			"description": "HTTP REST API endpoint",
+		},
+		{
+			"type":        "database",
+			"description": "SQL or NoSQL database connection",
+		},
+		{
+			"type":        "binary",
+			"description": "Standalone executable binary",
+		},
+	}
+}

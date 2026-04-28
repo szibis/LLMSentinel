@@ -15,6 +15,7 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/szibis/claude-escalate/internal/config"
+	"github.com/szibis/claude-escalate/internal/discovery"
 	"github.com/szibis/claude-escalate/internal/metrics"
 )
 
@@ -66,6 +67,8 @@ func NewServer(
 	mux.HandleFunc("/api/metrics/stream", s.handleMetricsStream)
 
 	// Tool management endpoints (v0.7.0+) - more specific routes first
+	mux.HandleFunc("/api/tools/discover", s.handleToolsDiscover)
+	mux.HandleFunc("/api/tools/known", s.handleToolsKnown)
 	mux.HandleFunc("/api/tools/add", s.handleToolsAdd)
 	mux.HandleFunc("/api/tools/types", s.handleToolsTypes)
 	mux.HandleFunc("/api/tools/", s.handleToolsDynamic)
@@ -260,6 +263,36 @@ func (s *Server) handleStatic(w http.ResponseWriter, r *http.Request) {
 }
 
 // Tool Management Handlers (v0.7.0+)
+
+func (s *Server) handleToolsDiscover(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	// Discover available tools in the system
+	detectedTools := discovery.DetectTools()
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success": true,
+		"tools": map[string]interface{}{
+			"rtk":        detectedTools.RTKPath,
+			"scrapling":  detectedTools.ScraplingPath,
+			"git":        detectedTools.GitPath,
+			"lsp_count":  len(detectedTools.LSPServers),
+		},
+	})
+}
+
+func (s *Server) handleToolsKnown(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	// Return known tools with their metadata
+	knownTools := discovery.GetKnownTools()
+
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success": true,
+		"tools":   knownTools,
+	})
+}
 
 func (s *Server) handleTools(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
@@ -842,8 +875,9 @@ func getDashboardHTML() []byte {
 						</div>
 
 						<div style="display: grid; grid-template-columns: 1fr 280px; gap: 15px;">
-							<div>
-								<textarea id="config-editor" style="width: 100%; height: 500px; font-family: 'Courier New', monospace; font-size: 13px; line-height: 1.5; border: 1px solid #ddd; border-radius: 6px; padding: 12px; resize: vertical; background: #1e1e1e; color: #d4d4d4;" onkeyup="updateConfigHints(); validateConfig();" onmouseup="updateConfigHints();" onclick="updateConfigHints();"></textarea>
+							<div style="position: relative;">
+								<textarea id="config-editor" style="width: 100%; height: 500px; font-family: 'Courier New', monospace; font-size: 13px; line-height: 1.5; border: 1px solid #ddd; border-radius: 6px; padding: 12px; resize: vertical; background: #1e1e1e; color: #d4d4d4; position: relative; z-index: 2;" onkeyup="updateConfigHints(); validateConfig(); highlightYAMLSyntax();" onmouseup="updateConfigHints();" onclick="updateConfigHints();"></textarea>
+								<pre id="config-highlight" style="width: 100%; height: 500px; font-family: 'Courier New', monospace; font-size: 13px; line-height: 1.5; border: 1px solid #ddd; border-radius: 6px; padding: 12px; background: #1e1e1e; color: #d4d4d4; position: absolute; top: 0; left: 0; margin: 0; pointer-events: none; z-index: 1; overflow: hidden; white-space: pre-wrap; word-wrap: break-word;"></pre>
 
 								<div style="margin-top: 15px; padding: 12px; background: #f0f4ff; border-left: 4px solid #667eea; border-radius: 4px; font-size: 12px; color: #334;">
 									<strong>✓ Configuration is valid YAML</strong><span id="config-validation-status"></span>
@@ -893,6 +927,10 @@ func getDashboardHTML() []byte {
 		<div id="tools" class="tab-content">
 			<h3>Tool Configuration</h3>
 			<p style="color: #666; margin: 15px 0;">Add, edit, and manage custom CLI, MCP, REST, and other tools</p>
+
+			<div id="available-tools" style="margin-bottom: 20px; padding: 15px; background: #f9fafb; border-radius: 8px; border: 1px solid #e5e7eb; font-size: 12px;">
+				Loading available tools...
+			</div>
 
 			<div style="margin-bottom: 30px;">
 				<h4 style="margin-bottom: 15px;">Configured Tools</h4>
@@ -1201,8 +1239,10 @@ func getDashboardHTML() []byte {
 			let targetLine = -1;
 			let charCount = 0;
 
+			// Find the section at root level (no leading spaces)
 			for (let i = 0; i < lines.length; i++) {
-				if (lines[i].trim().startsWith(section + ':')) {
+				const line = lines[i].trim();
+				if (line === section + ':' || line.startsWith(section + ':')) {
 					targetLine = i;
 					break;
 				}
@@ -1216,15 +1256,18 @@ func getDashboardHTML() []byte {
 				editor.setSelectionRange(lineStart, lineEnd);
 
 				// Calculate scroll position based on line height
-				const lineHeight = parseInt(window.getComputedStyle(editor).lineHeight);
-				editor.scrollTop = (targetLine - 2) * lineHeight;
+				const computedStyle = window.getComputedStyle(editor);
+				const lineHeight = parseInt(computedStyle.lineHeight) || 24;
+				editor.scrollTop = Math.max(0, (targetLine - 3) * lineHeight);
 
-				// Highlight the section temporarily
-				editor.style.backgroundColor = 'rgba(102, 126, 234, 0.1)';
+				// Flash highlight
+				const originalBg = editor.style.background;
+				editor.style.background = '#2d4a3c';
 				setTimeout(() => {
-					editor.style.backgroundColor = '#1e1e1e';
-				}, 500);
+					editor.style.background = originalBg;
+				}, 300);
 
+				// Update hints to show the section
 				updateConfigHints();
 			}
 		}
@@ -1235,23 +1278,93 @@ func getDashboardHTML() []byte {
 			const text = editor.value;
 			const selectionStart = editor.selectionStart;
 
-			// Get the line containing the cursor
-			const beforeCursor = text.substring(0, selectionStart);
-			const lines = beforeCursor.split('\n');
-			const currentLine = lines[lines.length - 1];
+			// Get the full YAML path from root to current line
+			const yamlPath = getYAMLPath(text, selectionStart);
+			const hints = getNestedConfigHints(yamlPath);
 
-			// Extract the key from the current line
-			const keyMatch = currentLine.match(/^(\s*)(\w+)(:|\s|=)/);
-			const key = keyMatch ? keyMatch[2] : '';
-
-			const hints = getConfigHints(key);
 			if (hints) {
 				hintsPanel.innerHTML = hints;
-			} else if (key) {
-				hintsPanel.innerHTML = '<div style="color: #999;"><strong>' + key + '</strong><div style="margin-top: 8px; font-size: 10px;">No documentation available for this field</div></div>';
 			} else {
-				hintsPanel.innerHTML = '<div style="color: #999; text-align: center; padding-top: 20px;">Select a config line to see hints</div>';
+				hintsPanel.innerHTML = '<div style="color: #999; text-align: center; padding-top: 20px;">Select a config line to see hints<br><small>' + (yamlPath || '') + '</small></div>';
 			}
+		}
+
+		function getYAMLPath(text, cursorPos) {
+			const beforeCursor = text.substring(0, cursorPos);
+			const lines = beforeCursor.split('\n');
+			const currentLineIdx = lines.length - 1;
+
+			// Build path from indentation levels
+			const path = [];
+			for (let i = 0; i <= currentLineIdx; i++) {
+				const line = lines[i];
+				if (!line.trim() || line.trim().startsWith('#')) continue;
+
+				const match = line.match(/^(\s*)([^:]+):/);
+				if (match) {
+					const indent = match[1].length / 2;
+					const key = match[2].trim();
+
+					// Trim path to match current indent level
+					while (path.length > indent) {
+						path.pop();
+					}
+
+					if (i === currentLineIdx) {
+						path.push(key);
+						break;
+					} else if (path.length === indent) {
+						path.push(key);
+					} else if (path.length < indent) {
+						path.push(key);
+					}
+				}
+			}
+
+			return path.join('.');
+		}
+
+		function getNestedConfigHints(yamlPath) {
+			if (!configSpec || !configSpec.sections) {
+				return '';
+			}
+
+			const parts = yamlPath.split('.');
+			if (parts.length === 0) return '';
+
+			const rootKey = parts[0];
+			const section = configSpec.sections[rootKey];
+
+			if (!section) return '';
+
+			// If just root section
+			if (parts.length === 1) {
+				return '<strong>' + (section.icon || '📋') + ' ' + section.title + '</strong>' +
+					   '<div style="margin-top: 8px; font-size: 10px; color: #666; line-height: 1.6;">' +
+					   (section.description || '') +
+					   '<div style="margin-top: 12px; padding: 10px; background: #f0f0f0; border-radius: 4px; font-size: 9px; color: #555;">' +
+					   '📍 Section: ' + yamlPath + '</div></div>';
+			}
+
+			// Nested path - find the option
+			let current = section.options;
+			for (let i = 1; i < parts.length; i++) {
+				const part = parts[i];
+				if (current && current[part]) {
+					const option = current[part];
+					if (typeof option === 'object' && !option.type) {
+						// It's a nested section
+						current = option.options;
+					} else {
+						// It's the final option
+						return formatSpecOption(part, option) +
+							   '<div style="margin-top: 12px; padding: 10px; background: #f0f0f0; border-radius: 4px; font-size: 9px; color: #555;">' +
+							   '📍 Path: ' + yamlPath + '</div>';
+					}
+				}
+			}
+
+			return '';
 		}
 
 		function getConfigHints(key) {
@@ -1586,6 +1699,28 @@ func getDashboardHTML() []byte {
 			}
 		}
 
+		async function loadKnownTools() {
+			try {
+				const response = await fetch('/api/tools/known');
+				const data = await response.json();
+				if (data.success && data.tools) {
+					const availableTools = data.tools.filter(t => t.available);
+					if (availableTools.length > 0) {
+						const hints = availableTools.map(t =>
+							'<div style="padding: 8px; background: #f0f0f0; border-radius: 4px; margin-bottom: 8px; font-size: 11px;">' +
+							'<strong>' + t.name + '</strong> (' + t.type + ')<br>' +
+							'<small style="color: #666;">' + t.description + '</small><br>' +
+							'<small style="color: #999;">📍 ' + (t.path || 'Not found') + '</small></div>'
+						).join('');
+						document.getElementById('available-tools').innerHTML =
+							'<h4 style="margin-bottom: 10px;">📦 Available Tools</h4>' + hints;
+					}
+				}
+			} catch (err) {
+				console.error('Error loading known tools:', err);
+			}
+		}
+
 		async function addTool() {
 			if (!validateToolForm()) return;
 
@@ -1614,6 +1749,9 @@ func getDashboardHTML() []byte {
 
 				if (response.ok) {
 					document.getElementById('tool-status').innerHTML = '<span style="color: #16a34a;">✓ Tool added successfully</span>';
+					// Auto-reload config to reflect new tool
+					await loadConfig();
+					loadTools();
 					document.getElementById('tool-name').value = '';
 					document.getElementById('tool-type').value = '';
 					document.getElementById('tool-path').value = '';
@@ -1658,14 +1796,23 @@ func getDashboardHTML() []byte {
 
 		// Load metrics every second
 		// YAML Syntax Highlighting with live parsing
-		function highlightYAML(text) {
-			if (!text) return '';
+		function highlightYAMLSyntax() {
+			const editor = document.getElementById('config-editor');
+			const highlight = document.getElementById('config-highlight');
+			if (!editor || !highlight) return;
 
+			const text = editor.value;
 			const lines = text.split('\n');
+
 			const highlighted = lines.map(line => {
 				// Comments
 				if (line.trim().startsWith('#')) {
 					return '<span style="color: #608b4e;">' + escapeHTML(line) + '</span>';
+				}
+
+				// Empty lines
+				if (!line.trim()) {
+					return '';
 				}
 
 				// Keys and values
@@ -1676,17 +1823,22 @@ func getDashboardHTML() []byte {
 					const value = match[3];
 
 					let colored = '<span style="color: #d4d4d4;">' + escapeHTML(indent) + '</span>';
-					colored += '<span style="color: #9cdcfe;">' + escapeHTML(key) + '</span>';
+					colored += '<span style="color: #9cdcfe; font-weight: bold;">' + escapeHTML(key) + '</span>';
 					colored += '<span style="color: #d4d4d4;">: </span>';
 
 					if (value === 'true' || value === 'false') {
-						colored += '<span style="color: #569cd6;">' + value + '</span>';
-					} else if (!isNaN(value) && value !== '') {
+						colored += '<span style="color: #569cd6; font-weight: bold;">' + value + '</span>';
+					} else if (!isNaN(value) && value !== '' && value.trim() !== '') {
 						colored += '<span style="color: #b5cea8;">' + value + '</span>';
 					} else if (value.startsWith('[') && value.endsWith(']')) {
 						colored += '<span style="color: #ce9178;">' + escapeHTML(value) + '</span>';
-					} else if (value.startsWith('"') && value.endsWith('"')) {
+					} else if (value.startsWith('"') || value.startsWith("'")) {
 						colored += '<span style="color: #ce9178;">' + escapeHTML(value) + '</span>';
+					} else if (value === '') {
+						// Empty value, likely a parent key
+						colored = '<span style="color: #d4d4d4;">' + escapeHTML(indent) + '</span>';
+						colored += '<span style="color: #4ec9b0; font-weight: bold;">' + escapeHTML(key) + '</span>';
+						colored += '<span style="color: #d4d4d4;">:</span>';
 					} else {
 						colored += '<span style="color: #ce9178;">' + escapeHTML(value) + '</span>';
 					}
@@ -1695,23 +1847,39 @@ func getDashboardHTML() []byte {
 				}
 
 				return '<span style="color: #d4d4d4;">' + escapeHTML(line) + '</span>';
-			}).join('<br>');
+			}).join('\n');
 
-			return highlighted;
+			highlight.innerHTML = highlighted;
+
+			// Sync scroll position
+			highlight.scrollLeft = editor.scrollLeft;
+			highlight.scrollTop = editor.scrollTop;
 		}
 
 		function escapeHTML(text) {
-			const div = document.createElement('div');
-			div.textContent = text;
-			return div.innerHTML;
+			const map = {
+				'&': '&amp;',
+				'<': '&lt;',
+				'>': '&gt;',
+				'"': '&quot;',
+				"'": '&#039;'
+			};
+			return text.replace(/[&<>"']/g, m => map[m]);
 		}
 
-		// Apply syntax highlighting to editor
+		// Sync scroll between editor and highlight
 		const editor = document.getElementById('config-editor');
 		if (editor) {
-			editor.addEventListener('input', function() {
-				validateConfig();
+			editor.addEventListener('scroll', function() {
+				const highlight = document.getElementById('config-highlight');
+				if (highlight) {
+					highlight.scrollLeft = editor.scrollLeft;
+					highlight.scrollTop = editor.scrollTop;
+				}
 			});
+
+			// Initial highlight
+			highlightYAMLSyntax();
 		}
 
 		setInterval(loadMetrics, 1000);
@@ -1720,6 +1888,7 @@ func getDashboardHTML() []byte {
 		loadMetrics();
 		loadConfig();
 		loadTools();
+		loadKnownTools();
 	</script>
 </body>
 </html>`)
