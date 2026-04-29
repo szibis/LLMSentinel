@@ -9,16 +9,20 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/szibis/claude-escalate/internal/classify"
 	"github.com/szibis/claude-escalate/internal/config"
 	"github.com/szibis/claude-escalate/internal/dashboard"
 	"github.com/szibis/claude-escalate/internal/detect"
+	"github.com/szibis/claude-escalate/internal/execlog"
 	"github.com/szibis/claude-escalate/internal/gateway"
 	"github.com/szibis/claude-escalate/internal/hook"
+	"github.com/szibis/claude-escalate/internal/patterns"
 	"github.com/szibis/claude-escalate/internal/service"
 	"github.com/szibis/claude-escalate/internal/store"
 )
@@ -42,6 +46,12 @@ func main() {
 		runMonitor()
 	case "install-hook":
 		runInstallHook()
+	case "analytics":
+		runAnalytics()
+	case "generate-patterns":
+		runGeneratePatterns()
+	case "session-startup":
+		runSessionStartup()
 	case "version":
 		fmt.Printf("claude-escalate %s\n", config.Version)
 	default:
@@ -54,13 +64,16 @@ func printUsage() {
 	fmt.Fprintf(os.Stderr, `claude-escalate %s — Intelligent model escalation for Claude Code
 
 Usage:
-  claude-escalate service         Start HTTP service on localhost:9000
-  claude-escalate hook            Run as Claude Code UserPromptSubmit hook
-  claude-escalate monitor         Start token metrics monitoring daemon
-  claude-escalate dashboard       Start the local web dashboard
-  claude-escalate stats           Show escalation statistics
-  claude-escalate install-hook    Configure Claude Code to use this hook
-  claude-escalate version         Show version
+  claude-escalate service              Start HTTP service on localhost:9000
+  claude-escalate hook                 Run as Claude Code UserPromptSubmit hook
+  claude-escalate monitor              Start token metrics monitoring daemon
+  claude-escalate dashboard            Start the local web dashboard
+  claude-escalate stats                Show escalation statistics
+  claude-escalate install-hook         Configure Claude Code to use this hook
+  claude-escalate analytics            Query execution analytics (--summary, --slowest N, etc)
+  claude-escalate generate-patterns    Generate EXECUTION_PATTERNS.md from logs
+  claude-escalate session-startup      Initialize execution patterns at session start
+  claude-escalate version              Show version
 
 Service flags:
   --port PORT    Service port (default: 9000)
@@ -70,6 +83,22 @@ Monitor flags:
 
 Dashboard flags:
   --port PORT    Dashboard port (default: 8077)
+
+Analytics flags:
+  --log-file FILE    Path to execution log (default: .execution-log.jsonl)
+  --summary          Show session summary
+  --slowest N        Show N slowest operations
+  --duplicates N     Show operations repeated N+ times
+  --recommendations  Show optimization recommendations
+  --all              Show all analysis
+  --json             Output in JSON format
+
+Generate Patterns flags:
+  --log-file FILE    Path to execution log (default: .execution-log.jsonl)
+  --output FILE      Output file (default: EXECUTION_PATTERNS.md)
+
+Session Startup flags:
+  --project-root DIR Project root directory (default: current directory)
 
 Stats subcommands:
   stats summary      Overall statistics
@@ -501,4 +530,202 @@ func capitalize(s string) string {
 		return s
 	}
 	return strings.ToUpper(s[:1]) + s[1:]
+}
+
+// runAnalytics queries execution logs and displays metrics
+func runAnalytics() {
+	logFile := ".execution-log.jsonl"
+	slowestN := 10
+	duplicatesN := 3
+	showSummary := false
+	showRecommendations := false
+	showAll := false
+	jsonOutput := false
+
+	// Parse flags
+	for i := 2; i < len(os.Args); i++ {
+		switch os.Args[i] {
+		case "--log-file":
+			if i+1 < len(os.Args) {
+				logFile = os.Args[i+1]
+				i++
+			}
+		case "--summary":
+			showSummary = true
+		case "--slowest":
+			if i+1 < len(os.Args) {
+				slowestN = parseIntFlag(os.Args[i+1])
+				i++
+			}
+		case "--duplicates":
+			if i+1 < len(os.Args) {
+				duplicatesN = parseIntFlag(os.Args[i+1])
+				i++
+			}
+		case "--recommendations":
+			showRecommendations = true
+		case "--all":
+			showAll = true
+		case "--json":
+			jsonOutput = true
+		}
+	}
+
+	// Open execution log
+	reader, err := execlog.NewReader(logFile)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error reading execution log: %v\n", err)
+		os.Exit(1)
+	}
+
+	// Default: show summary if no specific flags
+	if !showSummary && !showRecommendations && slowestN == 10 && duplicatesN == 3 && !showAll {
+		showSummary = true
+	}
+
+	if showSummary || showAll {
+		metrics := reader.SessionMetrics("")
+		if jsonOutput {
+			data, _ := json.MarshalIndent(metrics, "", "  ")
+			fmt.Println(string(data))
+		} else {
+			fmt.Printf("Session: %s\n", metrics.SessionID)
+			fmt.Printf("Total Operations: %d\n", metrics.TotalOperations)
+			fmt.Printf("Total Duration: %dms\n", metrics.TotalDurationMS)
+			fmt.Printf("Avg Duration: %dms\n", metrics.AvgDurationMS)
+			fmt.Printf("Success Rate: %.1f%%\n", metrics.SuccessRate*100)
+		}
+	}
+
+	if slowestN > 0 || showAll {
+		slowest := reader.SlowestOperations(slowestN)
+		if jsonOutput {
+			data, _ := json.MarshalIndent(slowest, "", "  ")
+			fmt.Println(string(data))
+		} else {
+			fmt.Printf("\nTop %d Slowest Operations:\n", slowestN)
+			for i, op := range slowest {
+				fmt.Printf("  %d. %s\n", i+1, op.Operation)
+				fmt.Printf("     Avg: %dms, Max: %dms, Count: %d\n", op.AvgDurationMS, op.MaxDurationMS, op.ExecutionCount)
+				fmt.Printf("     Caching Potential: %s\n", op.CachingPotential)
+			}
+		}
+	}
+
+	if duplicatesN > 0 || showAll {
+		duplicates := reader.CachingOpportunities()
+		if jsonOutput {
+			data, _ := json.MarshalIndent(duplicates, "", "  ")
+			fmt.Println(string(data))
+		} else {
+			fmt.Printf("\nCaching Opportunities (repeated %d+ times):\n", duplicatesN)
+			for _, opp := range duplicates {
+				fmt.Printf("  %s\n", opp.Operation)
+				fmt.Printf("    Repetitions: %d, Avg: %dms\n", opp.Repetitions, opp.AvgDurationMS)
+				fmt.Printf("    Potential Savings: %dms\n", opp.PotentialSavings)
+			}
+		}
+	}
+}
+
+// runGeneratePatterns generates EXECUTION_PATTERNS.md from execution logs
+func runGeneratePatterns() {
+	logFile := ".execution-log.jsonl"
+	outputFile := "EXECUTION_PATTERNS.md"
+
+	// Parse flags
+	for i := 2; i < len(os.Args); i++ {
+		switch os.Args[i] {
+		case "--log-file":
+			if i+1 < len(os.Args) {
+				logFile = os.Args[i+1]
+				i++
+			}
+		case "--output":
+			if i+1 < len(os.Args) {
+				outputFile = os.Args[i+1]
+				i++
+			}
+		}
+	}
+
+	// Open execution log
+	reader, err := execlog.NewReader(logFile)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error reading execution log: %v\n", err)
+		os.Exit(1)
+	}
+
+	// Generate and write patterns
+	gen := patterns.New(reader)
+	if err := gen.WriteFile(outputFile); err != nil {
+		fmt.Fprintf(os.Stderr, "Error writing patterns: %v\n", err)
+		os.Exit(1)
+	}
+
+	fmt.Printf("✅ Generated %s from %d operations\n", outputFile, reader.Count())
+}
+
+// runSessionStartup initializes execution patterns at session start
+func runSessionStartup() {
+	projectRoot := "."
+
+	// Parse flags
+	for i := 2; i < len(os.Args); i++ {
+		switch os.Args[i] {
+		case "--project-root":
+			if i+1 < len(os.Args) {
+				projectRoot = os.Args[i+1]
+				i++
+			}
+		}
+	}
+
+	logFile := filepath.Join(projectRoot, ".execution-log.jsonl")
+	patternsFile := filepath.Join(projectRoot, "EXECUTION_PATTERNS.md")
+
+	// Try to open execution log
+	reader, err := execlog.NewReader(logFile)
+	if err != nil {
+		// Log file doesn't exist yet; create empty patterns file
+		content := `# Execution Patterns & Optimization Guide
+
+*Auto-generated from execution logs. Patterns will be updated as operations are logged.*
+
+**Status**: Waiting for execution data (0 operations logged)
+
+Once you've run operations in this project, patterns will be automatically generated.
+See CLAUDE.md for details on the execution feedback loop system.
+`
+		if err := os.WriteFile(patternsFile, []byte(content), 0644); err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: Could not create patterns file: %v\n", err)
+		}
+		fmt.Println("✅ Session initialized (no operations logged yet)")
+		return
+	}
+
+	// Check if patterns file needs regeneration
+	logStat, _ := os.Stat(logFile)
+	patternsStat, _ := os.Stat(patternsFile)
+
+	needsRegenerate := patternsStat == nil || logStat.ModTime().After(patternsStat.ModTime())
+
+	if needsRegenerate && reader.Count() > 0 {
+		gen := patterns.New(reader)
+		if err := gen.WriteFile(patternsFile); err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: Could not regenerate patterns: %v\n", err)
+		} else {
+			fmt.Printf("✅ Patterns regenerated from %d operations\n", reader.Count())
+		}
+	} else if reader.Count() > 0 {
+		fmt.Printf("✅ Execution patterns loaded (%d operations)\n", reader.Count())
+	} else {
+		fmt.Println("✅ Session initialized (patterns available when operations logged)")
+	}
+}
+
+func parseIntFlag(s string) int {
+	var n int
+	fmt.Sscanf(s, "%d", &n)
+	return n
 }

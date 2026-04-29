@@ -32,6 +32,7 @@ dist/
 
 # Prevent new root-level Markdown files (use docs/ folder instead)
 # Allowed root docs: README.md, CHANGELOG.md, CONTRIBUTING.md, SECURITY.md, LICENSE
+# Exception: EXECUTION_PATTERNS.md is auto-generated from execution logs and should be tracked
 /*.md
 !/README.md
 !/CHANGELOG.md
@@ -39,3 +40,4 @@ dist/
 !/SECURITY.md
 !/CLAUDE.md
 !/CODEOWNERS
+!/EXECUTION_PATTERNS.md

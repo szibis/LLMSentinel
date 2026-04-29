@@ -309,6 +309,94 @@ pkill -f "escalate service"
 ./escalate service --port 9000
 ```
 
+## Execution Feedback Loop: Patterns & Optimization
+
+### Auto-Generated Execution Patterns
+
+Claude automatically logs all direct operations (bash commands, Python scripts, web fetches, binary runs) to `.execution-log.jsonl`. This creates a project-specific optimization guide:
+
+**Auto-Generated Files:**
+- **`.execution-log.jsonl`** (gitignored) — Session execution log with command, duration, decision context, git metadata
+- **`EXECUTION_PATTERNS.md`** (checked in) — Project-specific optimization guide auto-generated from logs
+
+**Pattern Generation:**
+```bash
+# Auto-triggers after 50 operations or on-demand:
+escalate generate-patterns  # Reads .execution-log.jsonl, generates EXECUTION_PATTERNS.md
+```
+
+### Session Startup Integration
+
+At conversation start, Claude automatically:
+1. **Reads** `EXECUTION_PATTERNS.md` if it exists
+2. **Learns** project-specific patterns (fast operations, slow operations, caching opportunities)
+3. **Adapts** behavior based on learned patterns
+
+**Example patterns Claude learns:**
+- "go test ./... takes 3.5s; skip if code hasn't changed in /internal/tools"
+- "wc -l before Read saves 90% tokens; always check file size first"
+- "css_selector on golang.org/pkg works well; use instead of full page"
+- "grep -n + LSP combo is 3x faster than pure grep for symbol search"
+
+### Claude Behavior Adaptation Rules
+
+When `EXECUTION_PATTERNS.md` exists, Claude applies these optimizations:
+
+**Rule 1: Slow Operations — Cache or Batch**
+- Pattern says operation takes >3s and repeats: cache result if code unchanged, skip re-execution
+- Example: If pattern shows "go test takes 3.5s, run 7 times per session", check git status first
+
+**Rule 2: Fast Web Patterns — Use CSS Selectors**
+- Pattern says "css_selector on docs.python.org accurate": use selector instead of full page
+- Reduces token output 90%, still gets accurate information
+
+**Rule 3: Token Savings — Apply Proven Optimizations**
+- Pattern says "wc -l saves 90% tokens": always run `wc -l` before Read on large files
+- Pattern says "grep -n to locate, then Read with offset": use for code search
+
+**Rule 4: Decision Context Efficiency**
+- Pattern says "explore_codebase leads to 8+ operations": use Agent tool instead
+- Pattern says "verify_tests_compile efficient": 1-2 go test runs average
+
+**Rule 5: Web Caching Opportunities**
+- Pattern says "URL fetched 3+ times": mention to user that caching could save tokens
+- Example: Documentation URLs that don't change often
+
+### Analytics Dashboard
+
+Execution analytics available at `http://localhost:9000/analytics`:
+- Real-time operation metrics (counts, duration, success rate)
+- Slowest operations by type
+- Optimization opportunities (caching candidates, token waste)
+- Session-level performance trends
+
+### Analytics CLI
+
+```bash
+# Session summary
+escalate analytics --summary
+
+# Show slowest 10 operations (all time)
+escalate analytics --slowest 10
+
+# Show operations that repeat 3+ times (caching candidates)
+escalate analytics --duplicates 3
+
+# Show optimization recommendations
+escalate analytics --recommendations
+
+# Export as JSON
+escalate analytics --slowest 10 --json
+```
+
+### Privacy & Security
+
+Execution logging respects user privacy:
+- **Auto-filtered**: Commands with API keys, tokens, passwords are redacted
+- **Path normalization**: File paths normalized to `<path>` to prevent leaking directory structure
+- **Gitignore**: `.execution-log.jsonl` is gitignored by default (contains runtime data)
+- **User control**: Configure exclusion patterns in environment variables if needed
+
 ## Resources
 
 - [Claude Escalate README](README.md) - Project overview

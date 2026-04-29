@@ -172,8 +172,12 @@ func TestErrorHandler_Fuzz_ConcurrentErrorHandling(t *testing.T) {
 		<-done
 	}
 
-	// Verify error counts are tracked
-	if len(handler.policy.ConsecutiveErrors) == 0 {
+	// Verify error counts are tracked (safe read with lock)
+	handler.mu.Lock()
+	errorCount := len(handler.policy.ConsecutiveErrors)
+	handler.mu.Unlock()
+
+	if errorCount == 0 {
 		t.Error("No concurrent errors tracked")
 	}
 }
