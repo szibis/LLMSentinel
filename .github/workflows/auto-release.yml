@@ -108,13 +108,14 @@ jobs:
           VERSION=${{ steps.new_version.outputs.version }}
           LDFLAGS="-s -w -X github.com/szibis/claude-escalate/internal/config.Version=${VERSION}"
 
+          mkdir -p dist
           for PAIR in linux/amd64 linux/arm64 darwin/amd64 darwin/arm64; do
             GOOS=${PAIR%/*}
             GOARCH=${PAIR#*/}
-            OUTPUT="claude-escalate-${VERSION}-${GOOS}-${GOARCH}"
+            OUTPUT="llm-sentinel-${VERSION}-${GOOS}-${GOARCH}"
             echo "Building ${OUTPUT}..."
             CGO_ENABLED=0 GOOS=$GOOS GOARCH=$GOARCH go build \
-              -ldflags "$LDFLAGS" -o dist/${OUTPUT} ./cmd/claude-escalate
+              -ldflags "$LDFLAGS" -o dist/${OUTPUT} ./cmd/llm-sentinel
             chmod +x dist/${OUTPUT}
           done
           ls -la dist/
