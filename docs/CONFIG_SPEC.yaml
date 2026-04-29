@@ -576,6 +576,570 @@ sections:
             score: 0.85
             desc: "User feels stuck"
 
+  tools:
+    title: "Tool Configuration System"
+    description: "Tool discovery, configuration, health monitoring, and invocation"
+    icon: "🔧"
+
+    tool_invocation:
+      title: "Tool Invocation & Execution"
+      description: "How tools are executed during escalation workflows"
+      options:
+        enabled:
+          type: "boolean"
+          default: true
+          description: "Enable tool invocation system"
+
+        selection_strategy:
+          type: "string"
+          default: "intent_matching"
+          enum: ["intent_matching", "manual", "weight_based"]
+          description: "Strategy for selecting which tools to invoke"
+
+        execution_models:
+          type: "object"
+          description: "Execution method per tool type"
+          options:
+            cli:
+              type: "string"
+              value: "subprocess"
+              timeout_seconds: 30
+              max_output_bytes: 1048576
+              description: "Fork subprocess, capture stdout/stderr (1MB max)"
+            mcp:
+              type: "string"
+              value: "socket"
+              timeout_seconds: 60
+              max_output_bytes: 10485760
+              description: "Connect via Unix socket (10MB max)"
+            rest:
+              type: "string"
+              value: "http"
+              timeout_seconds: 45
+              max_output_bytes: 5242880
+              description: "HTTP requests (5MB max)"
+            database:
+              type: "string"
+              value: "query"
+              timeout_seconds: 120
+              max_output_bytes: 5242880
+              description: "Execute database queries"
+            binary:
+              type: "string"
+              value: "subprocess"
+              timeout_seconds: 45
+              max_output_bytes: 1048576
+              description: "Execute standalone binary"
+
+        output_handling:
+          type: "object"
+          description: "How tool output is processed"
+          options:
+            max_context_tokens:
+              type: "integer"
+              default: 2000
+              description: "Maximum tokens for tool output in context"
+            strip_ansi_codes:
+              type: "boolean"
+              default: true
+              description: "Remove ANSI color codes from output"
+            parse_json:
+              type: "boolean"
+              default: true
+              description: "Attempt to parse JSON output"
+            truncate_on_limit:
+              type: "boolean"
+              default: true
+              description: "Truncate output if exceeds token limit"
+
+    health_checks:
+      title: "Health Monitoring"
+      description: "Periodic health checks for configured tools"
+      options:
+        enabled:
+          type: "boolean"
+          default: true
+          description: "Enable health check system"
+
+        default_interval_seconds:
+          type: "integer"
+          default: 300
+          unit: "seconds"
+          description: "Health check interval (5 minutes default)"
+
+        implementations:
+          type: "object"
+          description: "Health check method per tool type"
+          options:
+            cli:
+              command: "{tool_path} --health-check"
+              expected_exit_code: 0
+              timeout_seconds: 5
+              description: "Run command with --health-check flag"
+            mcp:
+              method: "ping"
+              expected_response: "pong"
+              timeout_seconds: 5
+              description: "Send MCP protocol ping"
+            rest:
+              endpoint: "{tool_url}/health"
+              method: "GET"
+              expected_status_code: 200
+              timeout_seconds: 10
+              description: "GET /health endpoint"
+            database:
+              query: "SELECT 1"
+              timeout_seconds: 10
+              description: "Simple validation query"
+            binary:
+              command: "{tool_path} --health"
+              expected_exit_code: 0
+              timeout_seconds: 5
+              description: "Binary health check flag"
+
+        actions_on_unhealthy:
+          type: "object"
+          description: "Actions when tool becomes unhealthy"
+          options:
+            remove_from_pool:
+              type: "boolean"
+              default: true
+              description: "Temporarily stop using unhealthy tool"
+            alert:
+              type: "boolean"
+              default: true
+              description: "Log warning when tool unhealthy"
+            retry_count:
+              type: "integer"
+              default: 3
+              description: "Retry attempts before declaring unhealthy"
+            retry_delay_seconds:
+              type: "integer"
+              default: 5
+              description: "Delay between retry attempts"
+
+    tool_selection:
+      title: "Tool Selection & Routing"
+      description: "Intent-based tool mapping and selection rules"
+      options:
+        intent_tool_mapping:
+          type: "object"
+          description: "Which tools to prefer for each intent"
+          examples:
+            quick_answer: ["scrapling_web", "rtk_git"]
+            detailed_analysis: ["custom_analyzer"]
+            security_check: ["security_scanner"]
+            code_search: ["lsp_lookup", "rtk_grep"]
+
+        tool_preferences:
+          type: "object"
+          description: "Tool type preferences and weights"
+          options:
+            custom_tools:
+              weight: 0.9
+              fallback_enabled: true
+              description: "Prefer custom tools if available"
+            builtin_tools:
+              weight: 0.7
+              fallback_enabled: false
+              description: "Built-in tool preference weight"
+
+        invocation_rules:
+          type: "array"
+          description: "Conditional rules for tool invocation"
+          examples:
+            - condition: "cache_safe == false"
+              disable_tools: ["scrapling_web"]
+              reason: "Prevent caching of external tool output"
+            - condition: "intent == security_check"
+              require_tool_type: "rest"
+              reason: "Security checks must use REST API"
+            - condition: "model == haiku"
+              timeout_override_seconds: 10
+              reason: "Shorter timeout for lightweight model"
+
+    settings_validation:
+      title: "Settings Validation Schemas"
+      description: "Per-tool-type configuration validation rules"
+      options:
+        cli:
+          required_fields: ["path"]
+          optional_fields: ["args", "env_vars", "working_dir", "timeout_override"]
+          schema:
+            path:
+              type: "string"
+              pattern: "^/.*|~.*"
+              description: "Path to executable (absolute or home-relative)"
+            args:
+              type: "array"
+              items: "string"
+              description: "Default command-line arguments"
+            env_vars:
+              type: "object"
+              pattern: "^[A-Z_]+$"
+              description: "Environment variables to pass"
+            working_dir:
+              type: "string"
+              description: "Working directory for subprocess"
+
+        mcp:
+          required_fields: ["socket_path"]
+          optional_fields: ["protocol_version", "capabilities", "auth_token"]
+          schema:
+            socket_path:
+              type: "string"
+              pattern: "^/.*\\.sock$|^~.*\\.sock$"
+              description: "Unix socket path to MCP server"
+            protocol_version:
+              type: "string"
+              enum: ["1.0"]
+              description: "MCP protocol version"
+            capabilities:
+              type: "array"
+              description: "Declared MCP capabilities (auto-detected)"
+            auth_token:
+              type: "string"
+              description: "Bearer token for authentication"
+
+        rest:
+          required_fields: ["base_url"]
+          optional_fields: ["auth_type", "api_key", "headers", "query_params"]
+          schema:
+            base_url:
+              type: "string"
+              pattern: "^https?://"
+              description: "Base URL for REST API"
+            auth_type:
+              type: "string"
+              enum: ["none", "bearer", "api_key", "basic"]
+              description: "Authentication method"
+            api_key:
+              type: "string"
+              description: "API key for api_key auth type"
+            headers:
+              type: "object"
+              description: "Additional HTTP headers"
+
+        database:
+          required_fields: ["connection_string"]
+          optional_fields: ["driver", "pool_size", "query_timeout"]
+          schema:
+            connection_string:
+              type: "string"
+              description: "Database connection string"
+            driver:
+              type: "string"
+              enum: ["postgres", "mysql", "sqlite", "sqlserver"]
+              description: "Database driver"
+            pool_size:
+              type: "integer"
+              minimum: 1
+              maximum: 100
+              description: "Connection pool size"
+            query_timeout:
+              type: "integer"
+              unit: "seconds"
+              description: "Query timeout duration"
+
+        binary:
+          required_fields: ["path"]
+          optional_fields: ["args", "stdin_data"]
+          schema:
+            path:
+              type: "string"
+              pattern: "^/.*"
+              description: "Path to standalone binary"
+            args:
+              type: "array"
+              description: "Arguments passed to binary"
+
+    tool_lifecycle:
+      title: "Tool Lifecycle Management"
+      description: "Discovery, registration, monitoring, and removal"
+      options:
+        discovery:
+          type: "object"
+          description: "How tools are discovered"
+          options:
+            auto_discover:
+              type: "boolean"
+              default: true
+              description: "Auto-scan for built-in tools on startup"
+            config_file:
+              type: "boolean"
+              default: true
+              description: "Load tools from config.yaml"
+            dashboard_ui:
+              type: "boolean"
+              default: true
+              description: "Allow adding via dashboard"
+            cli_command:
+              type: "boolean"
+              default: true
+              description: "Allow CLI tool management"
+
+        registration:
+          type: "object"
+          description: "Requirements for tool registration"
+          options:
+            validation_on_add:
+              type: "boolean"
+              default: true
+              description: "Validate path/socket before adding"
+            health_check_on_add:
+              type: "boolean"
+              default: true
+              description: "Test health check before accepting"
+            store_timestamp:
+              type: "boolean"
+              default: true
+              description: "Track when tool was registered"
+
+        monitoring:
+          type: "object"
+          description: "Monitoring during tool lifetime"
+          options:
+            enabled:
+              type: "boolean"
+              default: true
+              description: "Enable health monitoring"
+            interval_seconds:
+              type: "integer"
+              default: 300
+              description: "Health check frequency"
+            alerting_enabled:
+              type: "boolean"
+              default: true
+              description: "Alert on unhealthy tools"
+            log_health_events:
+              type: "boolean"
+              default: true
+              description: "Log all health status changes"
+
+        removal:
+          type: "object"
+          description: "Tool removal procedures"
+          options:
+            cascade_cleanup:
+              type: "boolean"
+              default: true
+              description: "Remove from all configs"
+            backup_on_remove:
+              type: "boolean"
+              default: true
+              description: "Backup config before removal"
+            audit_trail:
+              type: "boolean"
+              default: true
+              description: "Log removal events"
+
+    escalation_integration:
+      title: "Escalation Workflow Integration"
+      description: "Where and how tools are used during escalation"
+      options:
+        phase_1_classify:
+          tools_available: false
+          reason: "Intent detection must be fast"
+
+        phase_2_context_gathering:
+          tools_available: true
+          preferred_tools: ["rtk_git", "lsp_lookup", "scrapling_web"]
+          timeout_seconds: 30
+          description: "Gather context efficiently using tools"
+
+        phase_3_model_selection:
+          tools_available: false
+          reason: "Model selected based on intent only"
+
+        phase_4_invocation:
+          tools_available: true
+          tool_selection_rule: "intent_tool_mapping"
+          max_parallel_tools: 2
+          description: "Invoke matched tools for response enhancement"
+
+        phase_5_response_generation:
+          tools_available: false
+          reason: "Response generation should not block on tools"
+
+        output_integration:
+          type: "object"
+          description: "How tool output is incorporated into response"
+          options:
+            max_tool_results:
+              type: "integer"
+              default: 3
+              description: "Maximum tool results to include"
+            token_budget:
+              type: "integer"
+              default: 3000
+              unit: "tokens"
+              description: "Token budget for all tool outputs"
+            priority_order:
+              type: "array"
+              values: ["highest_relevance", "smallest_output", "fastest_execution"]
+              description: "Tool result ordering strategy"
+
+    error_handling:
+      title: "Error Handling & Failure Scenarios"
+      description: "How tool failures are handled during execution"
+      options:
+        timeout:
+          trigger: "Tool execution exceeds timeout_seconds"
+          action: "Kill subprocess, return error"
+          retry: false
+          fallback: true
+          description: "Handle tool timeout"
+
+        connection_refused:
+          trigger: "Cannot connect to tool socket/endpoint"
+          action: "Mark unhealthy, remove from rotation"
+          retry_count: 3
+          retry_delay_seconds: 5
+          description: "Handle connection failures"
+
+        invalid_output:
+          trigger: "Tool output malformed/unparseable"
+          action: "Discard output, try next tool"
+          retry: false
+          log_error: true
+          description: "Handle malformed output"
+
+        crash:
+          trigger: "Subprocess exits with non-zero code"
+          action: "Log error, remove temporarily"
+          recovery_delay_minutes: 5
+          description: "Handle tool crashes"
+
+        rate_limit:
+          trigger: "Tool returns 429 Too Many Requests"
+          action: "Backoff exponentially"
+          max_retries: 3
+          backoff_multiplier: 2.0
+          description: "Handle rate limiting"
+
+        authorization:
+          trigger: "Tool returns 401/403"
+          action: "Disable until credentials refreshed"
+          auto_retry: false
+          description: "Handle authorization failures"
+
+        error_policy:
+          type: "object"
+          description: "Global tool error policy"
+          options:
+            fail_open:
+              type: "boolean"
+              default: true
+              description: "Generate response without tool if all fail"
+            log_all_errors:
+              type: "boolean"
+              default: true
+              description: "Log every tool error"
+            alert_threshold:
+              type: "integer"
+              default: 5
+              description: "Alert after N consecutive errors"
+
+    output_processing:
+      title: "Tool Output Processing Pipeline"
+      description: "Capture, parse, truncate, cache, and inject tool output"
+      options:
+        processing_pipeline:
+          type: "object"
+          description: "Sequential processing steps"
+          options:
+            step_1_capture:
+              max_size_bytes: 1048576
+              timeout_seconds: 5
+              description: "Capture tool output (1MB max)"
+            step_2_parse:
+              detect_format: true
+              strip_ansi_codes: true
+              remove_control_chars: true
+              description: "Parse format and clean output"
+            step_3_truncate:
+              max_tokens: 2000
+              strategy: "preserve_structure"
+              description: "Truncate to token limit"
+            step_4_cache:
+              cacheable: true
+              cache_duration_minutes: 30
+              cache_key_includes: ["tool_name", "input", "version"]
+              description: "Cache tool output"
+            step_5_inject:
+              format: "markdown"
+              label_with_tool_name: true
+              include_metadata: true
+              description: "Inject into context as markdown"
+
+        context_window_allocation:
+          type: "object"
+          description: "Token allocation strategy"
+          options:
+            tool_output_budget:
+              type: "integer"
+              default: 3000
+              unit: "tokens"
+              description: "Total for all tool outputs"
+            per_tool_limit:
+              type: "integer"
+              default: 1000
+              unit: "tokens"
+              description: "Maximum per single tool"
+            system_message_overhead:
+              type: "integer"
+              default: 500
+              unit: "tokens"
+              description: "Reserved for system context"
+            escalation_history:
+              type: "integer"
+              default: 2000
+              unit: "tokens"
+              description: "Reserved for escalation history"
+
+    tool_capabilities:
+      title: "Tool Capabilities & Versioning"
+      description: "How tool capabilities are discovered and versioned"
+      options:
+        capability_detection:
+          type: "object"
+          description: "How capabilities are discovered per tool type"
+          options:
+            mcp:
+              method: "server_info request"
+              auto_refresh_minutes: 60
+              description: "MCP protocol capability discovery"
+            rest:
+              method: "OpenAPI /spec endpoint"
+              fallback: "OPTIONS request"
+              auto_refresh_minutes: 120
+              description: "REST API capability discovery"
+            cli:
+              method: "tool_name --help or --capabilities"
+              parsing: "regex extraction from help"
+              description: "CLI capability extraction"
+
+        version_management:
+          type: "object"
+          description: "Tool version tracking and management"
+          options:
+            track_version:
+              type: "boolean"
+              default: true
+              description: "Track tool version"
+            auto_upgrade:
+              type: "boolean"
+              default: false
+              description: "Auto-upgrade tools"
+            version_check_interval_days:
+              type: "integer"
+              default: 7
+              description: "How often to check for updates"
+            deprecation_warnings:
+              type: "boolean"
+              default: true
+              description: "Warn about deprecated tool versions"
+
 validation_rules:
   port:
     - "Must be integer between 1 and 65535"
@@ -597,6 +1161,16 @@ validation_rules:
     - "Must be writable directory"
     - "Created automatically if missing"
     - "Supports ~ for home directory"
+
+  tool_paths:
+    - "Must be absolute path (starts with /) or home-relative (~)"
+    - "File must exist and be executable for CLI tools"
+    - "Socket file must exist for MCP tools"
+
+  tool_names:
+    - "Must be alphanumeric with underscores only"
+    - "Cannot contain spaces or special characters"
+    - "Must be unique within tool configuration"
 
 examples:
   minimal:

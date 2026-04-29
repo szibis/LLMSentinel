@@ -16,6 +16,7 @@ import (
 
 	"github.com/szibis/claude-escalate/internal/config"
 	"github.com/szibis/claude-escalate/internal/discovery"
+	"github.com/szibis/claude-escalate/internal/gateway"
 	"github.com/szibis/claude-escalate/internal/metrics"
 )
 
@@ -26,6 +27,7 @@ type Server struct {
 	configLoader     *config.Loader
 	metricsCollector *metrics.MetricsCollector
 	metricsPublisher *metrics.MetricsPublisher
+	adapterFactory   *gateway.AdapterFactory
 	httpServer       *http.Server
 	mu               sync.RWMutex
 }
@@ -37,6 +39,7 @@ func NewServer(
 	configLoader *config.Loader,
 	metricsCollector *metrics.MetricsCollector,
 	metricsPublisher *metrics.MetricsPublisher,
+	adapterFactory *gateway.AdapterFactory,
 ) *Server {
 	s := &Server{
 		host:             host,
@@ -44,6 +47,7 @@ func NewServer(
 		configLoader:     configLoader,
 		metricsCollector: metricsCollector,
 		metricsPublisher: metricsPublisher,
+		adapterFactory:   adapterFactory,
 	}
 
 	// Create HTTP routes
@@ -479,9 +483,109 @@ func (s *Server) handleToolsDynamic(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (s *Server) handleToolTest(w http.ResponseWriter, _ *http.Request, _ string) {
-	// TODO: Implement tool health check
+func (s *Server) handleToolTest(w http.ResponseWriter, r *http.Request, toolName string) {
 	w.Header().Set("Content-Type", "application/json")
+
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	cfg, err := s.configLoader.Load()
+	if err != nil {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"status":  "unhealthy",
+			"error":   fmt.Sprintf("Failed to load config: %v", err),
+			"message": "Could not test tool health",
+		})
+		return
+	}
+
+	// Try to find tool in config's tools section
+	var toolType string
+	for _, tool := range cfg.Tools {
+		if tool.Name == toolName {
+			toolType = tool.Type
+			break
+		}
+	}
+
+	// If not found in tools, check built-in tools
+	if toolType == "" {
+		// Check MCP tools
+		for _, tool := range cfg.Optimizations.MCP.Tools {
+			if tool.Name == toolName {
+				toolType = "mcp"
+				break
+			}
+		}
+	}
+
+	if toolType == "" {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"status":  "unknown",
+			"error":   "Tool not found",
+			"message": fmt.Sprintf("No tool named '%s' in configuration", toolName),
+		})
+		return
+	}
+
+	// Create temporary adapter based on tool type to test health
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
+
+	var adapter gateway.ToolAdapter
+	switch toolType {
+	case "cli":
+		// Find tool config to get path
+		for _, tool := range cfg.Tools {
+			if tool.Name == toolName && tool.Type == "cli" {
+				adapter = gateway.NewCLIAdapter()
+				break
+			}
+		}
+	case "mcp":
+		var err error
+		adapter, err = gateway.NewMCPAdapter(toolName, nil)
+		if err != nil {
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"status":  "error",
+				"error":   err.Error(),
+				"message": "Failed to create MCP adapter",
+			})
+			return
+		}
+	case "rest":
+		adapter = gateway.NewRESTAdapter()
+	default:
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"status":  "unsupported",
+			"error":   fmt.Sprintf("Tool type '%s' not supported", toolType),
+			"message": "Cannot test health for this tool type",
+		})
+		return
+	}
+
+	// Test health
+	if adapter == nil {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"status":  "error",
+			"error":   "Failed to create adapter",
+			"message": "Could not initialize tool for health check",
+		})
+		return
+	}
+
+	err = adapter.Health(ctx)
+	defer adapter.Close()
+
+	if err != nil {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"status":  "unhealthy",
+			"error":   err.Error(),
+			"message": "Tool health check failed",
+		})
+		return
+	}
+
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"status":  "healthy",
 		"message": "Tool is responding",

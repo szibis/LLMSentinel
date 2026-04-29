@@ -18,6 +18,7 @@ type Config struct {
 	Timeouts        TimeoutsConfig      `yaml:"timeouts"`
 	Paths           PathsConfig         `yaml:"paths"`
 	Models          ModelsConfig        `yaml:"models"`
+	Tools           []MCPTool           `yaml:"tools"`
 }
 
 // GatewayConfig configures the gateway server

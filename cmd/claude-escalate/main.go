@@ -17,6 +17,7 @@ import (
 	"github.com/szibis/claude-escalate/internal/config"
 	"github.com/szibis/claude-escalate/internal/dashboard"
 	"github.com/szibis/claude-escalate/internal/detect"
+	"github.com/szibis/claude-escalate/internal/gateway"
 	"github.com/szibis/claude-escalate/internal/hook"
 	"github.com/szibis/claude-escalate/internal/service"
 	"github.com/szibis/claude-escalate/internal/store"
@@ -291,7 +292,15 @@ func runDashboard() {
 
 	// Create and start dashboard server
 	loader := config.NewLoader(configPath)
-	dashServer := dashboard.NewServer(bind, port, loader, nil, nil)
+
+	// Initialize adapter factory for tool health checks
+	factory := gateway.NewAdapterFactory()
+	if err := factory.CreateFromConfig(cfg); err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: Failed to initialize tool adapters: %v\n", err)
+		// Continue anyway, health checks just won't work for those tools
+	}
+
+	dashServer := dashboard.NewServer(bind, port, loader, nil, nil, factory)
 	if err := dashServer.Start(); err != nil {
 		fmt.Fprintf(os.Stderr, "Dashboard error: %v\n", err)
 		os.Exit(1)

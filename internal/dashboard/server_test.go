@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/szibis/claude-escalate/internal/config"
+	"github.com/szibis/claude-escalate/internal/gateway"
 	"github.com/szibis/claude-escalate/internal/metrics"
 )
 
@@ -18,8 +19,9 @@ func setupTestServer(_ *testing.T) *Server {
 	loader := config.NewLoader("")
 	collector := metrics.NewMetricsCollector()
 	publisher := metrics.NewMetricsPublisher(collector, 1*time.Minute)
+	factory := gateway.NewAdapterFactory()
 
-	s := NewServer("127.0.0.1", 8077, loader, collector, publisher)
+	s := NewServer("127.0.0.1", 8077, loader, collector, publisher, factory)
 	return s
 }
 
