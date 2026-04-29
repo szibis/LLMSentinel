@@ -3,6 +3,7 @@ package tools
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 )
 
@@ -28,6 +29,7 @@ type ErrorPolicy struct {
 
 // ErrorHandler manages tool execution errors
 type ErrorHandler struct {
+	mu     sync.Mutex
 	policy ErrorPolicy
 }
 
@@ -44,18 +46,23 @@ func NewErrorHandler(policy ErrorPolicy) *ErrorHandler {
 
 // Handle processes a tool error and determines recovery strategy
 func (eh *ErrorHandler) Handle(toolName string, scenario ErrorScenario, err error, retryCount *int) error {
+	eh.mu.Lock()
 	eh.policy.ConsecutiveErrors[toolName]++
+	consecutiveCount := eh.policy.ConsecutiveErrors[toolName]
+	logAllErrors := eh.policy.LogAllErrors
+	alertThreshold := eh.policy.AlertThreshold
+	eh.mu.Unlock()
 
 	// Log error if enabled
-	if eh.policy.LogAllErrors {
+	if logAllErrors {
 		fmt.Printf("Tool error [%s]: %s - %v (consecutive: %d)\n",
-			toolName, scenario, err, eh.policy.ConsecutiveErrors[toolName])
+			toolName, scenario, err, consecutiveCount)
 	}
 
 	// Check alert threshold
-	if eh.policy.ConsecutiveErrors[toolName] >= eh.policy.AlertThreshold {
+	if consecutiveCount >= alertThreshold {
 		fmt.Printf("⚠️ Alert: Tool %s has %d consecutive errors\n",
-			toolName, eh.policy.ConsecutiveErrors[toolName])
+			toolName, consecutiveCount)
 	}
 
 	// Return strategy per scenario
@@ -130,7 +137,9 @@ func (eh *ErrorHandler) Handle(toolName string, scenario ErrorScenario, err erro
 
 // ResetConsecutiveCount resets error counter for a tool
 func (eh *ErrorHandler) ResetConsecutiveCount(toolName string) {
+	eh.mu.Lock()
 	eh.policy.ConsecutiveErrors[toolName] = 0
+	eh.mu.Unlock()
 }
 
 // ToolError represents a tool execution error with recovery strategy
