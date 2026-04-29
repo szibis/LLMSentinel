@@ -12,6 +12,7 @@
 coverage.out
 coverage.html
 test_output.txt
+.execution-log.jsonl
 
 # IDE
 .idea/
