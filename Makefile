@@ -1,4 +1,4 @@
-BINARY=claude-escalate
+BINARY=llm-sentinel
 VERSION?=$(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
 LDFLAGS=-ldflags "-s -w -X github.com/szibis/claude-escalate/internal/config.Version=$(VERSION)"
 
@@ -7,10 +7,10 @@ LDFLAGS=-ldflags "-s -w -X github.com/szibis/claude-escalate/internal/config.Ver
 ## Build
 
 build:
-	CGO_ENABLED=0 go build $(LDFLAGS) -o bin/$(BINARY) ./cmd/claude-escalate
+	CGO_ENABLED=0 go build $(LDFLAGS) -o bin/$(BINARY) ./cmd/llm-sentinel
 
 build-static:
-	CGO_ENABLED=0 go build $(LDFLAGS) -a -tags netgo -o bin/$(BINARY) ./cmd/claude-escalate
+	CGO_ENABLED=0 go build $(LDFLAGS) -a -tags netgo -o bin/$(BINARY) ./cmd/llm-sentinel
 
 ## Test
 
@@ -86,7 +86,7 @@ install: build
 
 install-hook: install
 	@echo "Configuring Claude Code hook..."
-	@go run ./cmd/claude-escalate install-hook
+	@go run ./cmd/llm-sentinel install-hook
 	@echo "Hook installed. Restart Claude Code to activate."
 
 ## Clean
@@ -107,7 +107,7 @@ dev: build
 ## Help
 
 help:
-	@echo "claude-escalate - Intelligent model escalation for Claude Code"
+	@echo "llm-sentinel - Intelligent model escalation for Claude Code"
 	@echo ""
 	@echo "Build Targets:"
 	@echo "  build         Build binary"
