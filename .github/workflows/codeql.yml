@@ -23,7 +23,7 @@ jobs:
           languages: go
 
       - name: Build
-        run: CGO_ENABLED=0 go build ./cmd/claude-escalate
+        run: CGO_ENABLED=0 go build ./cmd/llm-sentinel
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v3
