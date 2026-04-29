@@ -26,7 +26,35 @@ LLMSentinel v1.0.0 is a gateway-layer token optimization engine for Claude API. 
 
 ---
 
-## ✨ Key Features (v0.8.0)
+## 🚀 Execution Feedback Loop (NEW)
+
+**Capture, analyze, and optimize your Claude operations:**
+
+- **Operation Logging**: Automatically logs all bash commands, Python scripts, web fetches, and binary runs
+- **Pattern Analysis**: Identifies slow operations, caching opportunities, and token waste patterns
+- **Auto-Generated Optimization Guide**: Creates `EXECUTION_PATTERNS.md` with recommendations
+- **Session-to-Session Learning**: Persists optimization patterns across sessions
+- **Multi-CLI Support**: Works with Claude Code, Copilot CLI, Gemini CLI, and OpenAI CLI
+
+Example: `wc -l before Read saves 90% tokens` — Automatically detected and recommended
+
+---
+
+## 🌍 Multi-CLI Architecture (NEW - Phase 2)
+
+**Deploy LLMSentinel across any LLM CLI platform:**
+
+- **Unified Gateway**: Single codebase works with Claude, Copilot, Gemini, OpenAI CLIs
+- **Adapter Pattern**: Pluggable adapters for each CLI's API/config format
+- **Feature Parity**: All optimizations (batch API, caching, knowledge graphs) available on all CLIs
+- **Auto-Detection**: Automatically detects installed CLI tools and configures accordingly
+- **Cross-CLI Metrics**: Aggregated cost tracking and optimization across multiple LLM providers
+
+See [docs/MULTI_CLI_ARCHITECTURE.md](docs/MULTI_CLI_ARCHITECTURE.md) for architecture
+
+---
+
+## ✨ Key Features (v1.0.0)
 
 ### Feature 0: Batch API Integration (50% Savings)
 
