@@ -1,0 +1,732 @@
+// LLMSentinel is an intelligent model escalation and multi-provider orchestration system.
+//
+// It supports multiple cloud AI CLIs (Claude, Copilot, Gemini, OpenAI) with:
+//   - Unified execution logging and analytics across all providers
+//   - Sentiment detection for intelligent escalation
+//   - Per-provider model escalation (Haiku → Sonnet → Opus, etc.)
+//   - Cross-provider fallback when budgets are hit
+//   - Real-time dashboard for monitoring and optimization
+//   - Pattern generation for continuous improvement
+package main
+
+import (
+	"encoding/json"
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+
+	"github.com/szibis/claude-escalate/internal/classify"
+	"github.com/szibis/claude-escalate/internal/config"
+	"github.com/szibis/claude-escalate/internal/dashboard"
+	"github.com/szibis/claude-escalate/internal/detect"
+	"github.com/szibis/claude-escalate/internal/execlog"
+	"github.com/szibis/claude-escalate/internal/gateway"
+	"github.com/szibis/claude-escalate/internal/hook"
+	"github.com/szibis/claude-escalate/internal/patterns"
+	"github.com/szibis/claude-escalate/internal/service"
+	"github.com/szibis/claude-escalate/internal/store"
+)
+
+func main() {
+	if len(os.Args) < 2 {
+		printUsage()
+		os.Exit(1)
+	}
+
+	switch os.Args[1] {
+	case "service":
+		runService()
+	case "hook":
+		runHook()
+	case "dashboard":
+		runDashboard()
+	case "stats":
+		runStats()
+	case "monitor":
+		runMonitor()
+	case "install-hook":
+		runInstallHook()
+	case "analytics":
+		runAnalytics()
+	case "generate-patterns":
+		runGeneratePatterns()
+	case "session-startup":
+		runSessionStartup()
+	case "version":
+		fmt.Printf("claude-escalate %s\n", config.Version)
+	default:
+		printUsage()
+		os.Exit(1)
+	}
+}
+
+func printUsage() {
+	fmt.Fprintf(os.Stderr, `claude-escalate %s — Intelligent model escalation for Claude Code
+
+Usage:
+  claude-escalate service              Start HTTP service on localhost:9000
+  claude-escalate hook                 Run as Claude Code UserPromptSubmit hook
+  claude-escalate monitor              Start token metrics monitoring daemon
+  claude-escalate dashboard            Start the local web dashboard
+  claude-escalate stats                Show escalation statistics
+  claude-escalate install-hook         Configure Claude Code to use this hook
+  claude-escalate analytics            Query execution analytics (--summary, --slowest N, etc)
+  claude-escalate generate-patterns    Generate EXECUTION_PATTERNS.md from logs
+  claude-escalate session-startup      Initialize execution patterns at session start
+  claude-escalate version              Show version
+
+Service flags:
+  --port PORT    Service port (default: 9000)
+
+Monitor flags:
+  --port PORT    Service port to connect to (default: 9000)
+
+Dashboard flags:
+  --port PORT    Dashboard port (default: 8077)
+
+Analytics flags:
+  --log-file FILE    Path to execution log (default: .execution-log.jsonl)
+  --summary          Show session summary
+  --slowest N        Show N slowest operations
+  --duplicates N     Show operations repeated N+ times
+  --recommendations  Show optimization recommendations
+  --all              Show all analysis
+  --json             Output in JSON format
+
+Generate Patterns flags:
+  --log-file FILE    Path to execution log (default: .execution-log.jsonl)
+  --output FILE      Output file (default: EXECUTION_PATTERNS.md)
+
+Session Startup flags:
+  --project-root DIR Project root directory (default: current directory)
+
+Stats subcommands:
+  stats summary      Overall statistics
+  stats types        Breakdown by task type
+  stats predictions  Predictive escalation status
+  stats history      Recent escalation events
+  stats reset        Clear all data
+`, config.Version)
+}
+
+// runHook is the main Claude Code hook entry point.
+// Reads JSON from stdin, processes the prompt, writes JSON to stdout.
+func runHook() {
+	input, err := hook.ReadInput()
+	if err != nil || input.Prompt == "" {
+		_ = hook.WriteOutput(hook.PassThrough())
+		return
+	}
+
+	cfg := config.DefaultConfig()
+
+	db, err := store.Open(cfg.Gateway.DataDir)
+	if err != nil {
+		_ = hook.WriteOutput(hook.PassThrough())
+		return
+	}
+	defer func() { _ = db.Close() }()
+
+	settings, err := config.ReadClaudeSettings()
+	if err != nil {
+		_ = hook.WriteOutput(hook.PassThrough())
+		return
+	}
+
+	prompt := input.Prompt
+	currentModel := settings.Model
+	modelShort := config.ModelShortName(currentModel)
+
+	// Skip meta-commands
+	if detect.IsMetaCommand(prompt) {
+		// Handle /escalate
+		if isEsc, target := detect.IsEscalateCommand(prompt); isEsc {
+			handleEscalate(db, currentModel, target)
+			return
+		}
+		_ = hook.WriteOutput(hook.PassThrough())
+		return
+	}
+
+	// Classify task type and store context
+	taskType := classify.Classify(prompt)
+
+	// Log turn for circular reasoning detection
+	concepts := detect.ExtractConcepts(prompt)
+	_ = db.LogTurn(modelShort, strings.Join(concepts, ","))
+
+	// Phase 5: Predictive escalation (only on Haiku)
+	predictThreshold := 5 // Min escalations to enable prediction
+	if config.ModelTierOf(currentModel) == config.TierHaiku && taskType != classify.TaskGeneral {
+		count, _ := db.EscalationCountForType(string(taskType))
+		if count >= predictThreshold {
+			_ = hook.WriteOutput(hook.WithHint(
+				fmt.Sprintf("📊 Predictive: %s tasks historically need escalation (%d prior). Consider: /escalate to sonnet", taskType, count),
+			))
+			return
+		}
+	}
+
+	// Phase 2: Frustration detection
+	frustrationRetries := 2 // Min retries before suggesting escalation
+	if detect.DetectFrustration(prompt) {
+		attempts, _ := db.CountRecentAttempts(modelShort, 5)
+		if attempts >= frustrationRetries {
+			suggestTarget := "sonnet"
+			if modelShort == "sonnet" {
+				suggestTarget = "opus"
+			}
+			if modelShort != "opus" {
+				_ = hook.WriteOutput(hook.WithHint(
+					fmt.Sprintf("💡 %s seems stuck (%d attempts). Try: /escalate to %s",
+						capitalize(modelShort), attempts, suggestTarget),
+				))
+				return
+			}
+		}
+	}
+
+	// Phase 4: Circular reasoning detection (only on Haiku)
+	circularTurns := 4 // Min turns to detect circular reasoning
+	if config.ModelTierOf(currentModel) == config.TierHaiku {
+		turns, _ := db.RecentTurns(6)
+		if len(turns) >= circularTurns {
+			var recentConcepts [][]string
+			haikuCount := 0
+			for _, t := range turns {
+				if t.Model == "haiku" {
+					haikuCount++
+				}
+				if t.Concepts != "" {
+					recentConcepts = append(recentConcepts, strings.Split(t.Concepts, ","))
+				}
+			}
+			if haikuCount >= 3 && detect.DetectCircularPattern(recentConcepts, circularTurns) {
+				_ = hook.WriteOutput(hook.WithHint(
+					"🔄 Circular pattern detected (same concepts repeating). Consider: /escalate to sonnet",
+				))
+				return
+			}
+		}
+	}
+
+	// Phase 3: De-escalation on success signal
+	if detect.DetectSuccess(prompt) && config.ModelTierOf(currentModel) > config.TierHaiku {
+		handleDeEscalate(db, currentModel, string(taskType))
+		return
+	}
+
+	_ = hook.WriteOutput(hook.PassThrough())
+}
+
+func handleEscalate(db *store.Store, currentModel, target string) {
+	var modelID, label, effort string
+	switch target {
+	case "opus":
+		modelID = config.ModelOpus
+		label = "Opus (deep reasoning)"
+		effort = "high"
+	case "sonnet":
+		modelID = config.ModelSonnet
+		label = "Sonnet (precision code)"
+		effort = "high"
+	case "haiku":
+		modelID = config.ModelHaiku
+		label = "Haiku (cost-optimized)"
+		effort = "low"
+	default:
+		modelID = config.ModelSonnet
+		label = "Sonnet (default)"
+		effort = "high"
+	}
+
+	if err := config.WriteClaudeSettings(modelID, effort); err != nil {
+		_ = hook.WriteOutput(hook.PassThrough())
+		return
+	}
+
+	_ = db.LogEscalation(config.ModelShortName(currentModel), target, "general", "user_command")
+	_ = db.SetSession("escalation_active", "true")
+
+	_ = hook.WriteOutput(hook.WithHint(fmt.Sprintf("🚀 Escalated: %s", label)))
+}
+
+func handleDeEscalate(db *store.Store, currentModel, taskType string) {
+	// Check if there's escalation context
+	active, _ := db.GetSession("escalation_active")
+	if active != "true" {
+		// Check if we've been on expensive model for 2+ turns
+		attempts, _ := db.CountRecentAttempts(config.ModelShortName(currentModel), 3)
+		if attempts < 2 {
+			_ = hook.WriteOutput(hook.PassThrough())
+			return
+		}
+	}
+
+	// Step down one tier
+	var targetModel, label, effort string
+	switch {
+	case strings.Contains(currentModel, "opus"):
+		targetModel = config.ModelSonnet
+		label = "Sonnet (balanced)"
+		effort = "medium"
+		// Keep session for cascade
+		_ = db.SetSession("escalation_active", "true")
+	case strings.Contains(currentModel, "sonnet"):
+		targetModel = config.ModelHaiku
+		label = "Haiku (cost-optimized)"
+		effort = "low"
+		_ = db.DeleteSession("escalation_active")
+	default:
+		_ = hook.WriteOutput(hook.PassThrough())
+		return
+	}
+
+	if err := config.WriteClaudeSettings(targetModel, effort); err != nil {
+		_ = hook.WriteOutput(hook.PassThrough())
+		return
+	}
+
+	_ = db.LogEscalation(config.ModelShortName(currentModel), config.ModelShortName(targetModel), taskType, "success")
+	_ = hook.WriteOutput(hook.WithHint(fmt.Sprintf("⬇️ Auto-downgrade: %s (problem solved, saving cost)", label)))
+}
+
+func runDashboard() {
+	port := 8077
+	bind := "0.0.0.0"
+	configPath := ""
+	for i, arg := range os.Args {
+		if arg == "--port" && i+1 < len(os.Args) {
+			_, _ = fmt.Sscanf(os.Args[i+1], "%d", &port)
+		}
+		if arg == "--bind" && i+1 < len(os.Args) {
+			bind = os.Args[i+1]
+		}
+		if arg == "--config" && i+1 < len(os.Args) {
+			configPath = os.Args[i+1]
+		}
+	}
+	// Environment variable override (for Docker)
+	if v := os.Getenv("ESCALATE_BIND"); v != "" {
+		bind = v
+	}
+	if v := os.Getenv("CONFIG_FILE"); v != "" {
+		configPath = v
+	}
+
+	cfg := config.DefaultConfig()
+	if v := os.Getenv("ESCALATE_DATA_DIR"); v != "" {
+		cfg.Gateway.DataDir = v
+	}
+
+	// Create and start dashboard server
+	loader := config.NewLoader(configPath)
+
+	// Initialize adapter factory for tool health checks
+	factory := gateway.NewAdapterFactory()
+	if err := factory.CreateFromConfig(cfg); err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: Failed to initialize tool adapters: %v\n", err)
+		// Continue anyway, health checks just won't work for those tools
+	}
+
+	dashServer := dashboard.NewServer(bind, port, loader, nil, nil, factory)
+	if err := dashServer.Start(); err != nil {
+		fmt.Fprintf(os.Stderr, "Dashboard error: %v\n", err)
+		os.Exit(1)
+	}
+}
+
+func runStats() {
+	subcmd := "summary"
+	if len(os.Args) >= 3 {
+		subcmd = os.Args[2]
+	}
+
+	cfg := config.DefaultConfig()
+	db, err := store.Open(cfg.Gateway.DataDir)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error opening database: %v\n", err)
+		os.Exit(1)
+	}
+	defer func() { _ = db.Close() }()
+
+	switch subcmd {
+	case "summary":
+		printStatsSummary(db)
+	case "types":
+		printStatsTypes(db)
+	case "predictions":
+		printStatsPredictions(db, cfg)
+	case "history":
+		printStatsHistory(db)
+	case "reset":
+		fmt.Println("This will delete all escalation history. Use --confirm to proceed.")
+	default:
+		fmt.Fprintf(os.Stderr, "Unknown stats subcommand: %s\n", subcmd)
+	}
+}
+
+func printStatsSummary(db *store.Store) {
+	esc, deesc, turns, _ := db.TotalStats()
+	fmt.Println("═══════════════════════════════════════════")
+	fmt.Println("  claude-escalate Statistics")
+	fmt.Println("═══════════════════════════════════════════")
+	fmt.Printf("\n  Escalations:     %d\n", esc)
+	fmt.Printf("  De-escalations:  %d\n", deesc)
+	fmt.Printf("  Turns tracked:   %d\n", turns)
+	if esc > 0 {
+		fmt.Printf("  Success rate:    %.0f%%\n", float64(deesc)/float64(esc)*100)
+	}
+	fmt.Println()
+}
+
+func printStatsTypes(db *store.Store) {
+	stats, _ := db.TaskTypeStatsAll()
+	fmt.Println("═══════════════════════════════════════════")
+	fmt.Println("  Escalation by Task Type")
+	fmt.Println("═══════════════════════════════════════════")
+	fmt.Println()
+	fmt.Println("  Task Type        Escalations  Successes  Rate")
+	fmt.Println("  ──────────────── ─────────── ───────── ─────")
+	for _, st := range stats {
+		fmt.Printf("  %-18s %5d       %5d      %3.0f%%\n",
+			st.TaskType, st.Escalations, st.Successes, st.SuccessRate)
+	}
+	fmt.Println()
+}
+
+func printStatsPredictions(db *store.Store, _ *config.Config) {
+	fmt.Println("═══════════════════════════════════════════")
+	fmt.Println("  Predictive Escalation Status")
+	fmt.Println("═══════════════════════════════════════════")
+	fmt.Println()
+	predictThreshold := 5 // Default threshold
+	found := false
+	for _, tt := range classify.AllTaskTypes() {
+		count, _ := db.EscalationCountForType(string(tt))
+		if count >= predictThreshold {
+			fmt.Printf("  ⚡ %s — %d escalations → will suggest proactively\n", tt, count)
+			found = true
+		} else if count >= 3 {
+			fmt.Printf("  📊 %s — %d escalations → approaching threshold (%d)\n", tt, count, predictThreshold)
+			found = true
+		}
+	}
+	if !found {
+		fmt.Printf("  No task types have enough data yet (threshold: %d)\n", predictThreshold)
+	}
+	fmt.Println()
+}
+
+func printStatsHistory(db *store.Store) {
+	events, _ := db.RecentEscalations(20)
+	fmt.Println("═══════════════════════════════════════════")
+	fmt.Println("  Recent Escalation History")
+	fmt.Println("═══════════════════════════════════════════")
+	fmt.Println()
+	fmt.Println("  Time               From     → To       Task Type      Reason")
+	fmt.Println("  ────────────────── ──────── ───────── ─────────────── ──────────")
+	for _, e := range events {
+		fmt.Printf("  %-18s %-8s → %-8s %-15s %s\n",
+			e.Timestamp.Format("01/02 15:04"),
+			e.FromModel, e.ToModel, e.TaskType, e.Reason)
+	}
+	fmt.Println()
+}
+
+func runInstallHook() {
+	fmt.Println("claude-escalate install-hook")
+	fmt.Println()
+	fmt.Println("Add this to your ~/.claude/settings.json under hooks.UserPromptSubmit:")
+	fmt.Println()
+	fmt.Println(`{
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "claude-escalate hook",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  }
+}`)
+	fmt.Println()
+	fmt.Println("This single hook replaces all 6 bash scripts (detect, escalate, de-escalate, analyze, track, auto-effort).")
+}
+
+func runService() {
+	cfg := config.DefaultConfig()
+
+	// Parse flags
+	port := "9000"
+	for i, arg := range os.Args[2:] {
+		if arg == "--port" && i+1 < len(os.Args)-2 {
+			port = os.Args[i+3]
+		}
+	}
+
+	svc, err := service.New(cfg)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to create service: %v\n", err)
+		os.Exit(1)
+	}
+
+	addr := "0.0.0.0:" + port
+	if err := svc.Start(addr); err != nil {
+		fmt.Fprintf(os.Stderr, "Service error: %v\n", err)
+		os.Exit(1)
+	}
+}
+
+// runMonitor starts a background daemon that monitors for token metrics.
+// The daemon can receive metrics via environment variables, files, or API calls,
+// then forward them to the service for validation.
+func runMonitor() {
+	cfg := config.DefaultConfig()
+
+	// Parse --port flag
+	port := "9000"
+	for i, arg := range os.Args[2:] {
+		if arg == "--port" && i+1 < len(os.Args)-2 {
+			port = os.Args[i+3]
+		}
+	}
+
+	fmt.Printf("Token metrics monitor started (connecting to service on port %s)\n", port)
+	fmt.Printf("Monitor will accept actual token metrics and forward to service.\n")
+	fmt.Printf("Send metrics via: curl -X POST http://localhost:%s/api/validate\n", port)
+	fmt.Printf("Or set environment variables: CLAUDE_TOKENS_ACTUAL, CLAUDE_TOKENS_COST\n")
+
+	// Open database for logging
+	db, err := store.Open(cfg.Gateway.DataDir)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to open database: %v\n", err)
+		os.Exit(1)
+	}
+	defer func() { _ = db.Close() }()
+
+	// Monitor is now ready
+	// In production, this would:
+	// 1. Watch for Claude Code output/logs
+	// 2. Extract token metrics when available
+	// 3. POST to service /api/validate
+	// 4. Log results
+	// 5. Continue monitoring
+
+	// For now, just log that monitor is running
+	fmt.Printf("Monitor is running. Service integration ready.\n")
+	fmt.Printf("Press Ctrl+C to stop.\n")
+
+	// Keep running indefinitely
+	select {}
+}
+
+func capitalize(s string) string {
+	if s == "" {
+		return s
+	}
+	return strings.ToUpper(s[:1]) + s[1:]
+}
+
+// runAnalytics queries execution logs and displays metrics
+func runAnalytics() {
+	logFile := ".execution-log.jsonl"
+	slowestN := 10
+	duplicatesN := 3
+	showSummary := false
+	showRecommendations := false
+	showAll := false
+	jsonOutput := false
+
+	// Parse flags
+	for i := 2; i < len(os.Args); i++ {
+		switch os.Args[i] {
+		case "--log-file":
+			if i+1 < len(os.Args) {
+				logFile = os.Args[i+1]
+				i++
+			}
+		case "--summary":
+			showSummary = true
+		case "--slowest":
+			if i+1 < len(os.Args) {
+				slowestN = parseIntFlag(os.Args[i+1])
+				i++
+			}
+		case "--duplicates":
+			if i+1 < len(os.Args) {
+				duplicatesN = parseIntFlag(os.Args[i+1])
+				i++
+			}
+		case "--recommendations":
+			showRecommendations = true
+		case "--all":
+			showAll = true
+		case "--json":
+			jsonOutput = true
+		}
+	}
+
+	// Open execution log
+	reader, err := execlog.NewReader(logFile)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error reading execution log: %v\n", err)
+		os.Exit(1)
+	}
+
+	// Default: show summary if no specific flags
+	if !showSummary && !showRecommendations && slowestN == 10 && duplicatesN == 3 && !showAll {
+		showSummary = true
+	}
+
+	if showSummary || showAll {
+		metrics := reader.SessionMetrics("")
+		if jsonOutput {
+			data, _ := json.MarshalIndent(metrics, "", "  ")
+			fmt.Println(string(data))
+		} else {
+			fmt.Printf("Session: %s\n", metrics.SessionID)
+			fmt.Printf("Total Operations: %d\n", metrics.TotalOperations)
+			fmt.Printf("Total Duration: %dms\n", metrics.TotalDurationMS)
+			fmt.Printf("Avg Duration: %dms\n", metrics.AvgDurationMS)
+			fmt.Printf("Success Rate: %.1f%%\n", metrics.SuccessRate*100)
+		}
+	}
+
+	if slowestN > 0 || showAll {
+		slowest := reader.SlowestOperations(slowestN)
+		if jsonOutput {
+			data, _ := json.MarshalIndent(slowest, "", "  ")
+			fmt.Println(string(data))
+		} else {
+			fmt.Printf("\nTop %d Slowest Operations:\n", slowestN)
+			for i, op := range slowest {
+				fmt.Printf("  %d. %s\n", i+1, op.Operation)
+				fmt.Printf("     Avg: %dms, Max: %dms, Count: %d\n", op.AvgDurationMS, op.MaxDurationMS, op.ExecutionCount)
+				fmt.Printf("     Caching Potential: %s\n", op.CachingPotential)
+			}
+		}
+	}
+
+	if duplicatesN > 0 || showAll {
+		duplicates := reader.CachingOpportunities()
+		if jsonOutput {
+			data, _ := json.MarshalIndent(duplicates, "", "  ")
+			fmt.Println(string(data))
+		} else {
+			fmt.Printf("\nCaching Opportunities (repeated %d+ times):\n", duplicatesN)
+			for _, opp := range duplicates {
+				fmt.Printf("  %s\n", opp.Operation)
+				fmt.Printf("    Repetitions: %d, Avg: %dms\n", opp.Repetitions, opp.AvgDurationMS)
+				fmt.Printf("    Potential Savings: %dms\n", opp.PotentialSavings)
+			}
+		}
+	}
+}
+
+// runGeneratePatterns generates EXECUTION_PATTERNS.md from execution logs
+func runGeneratePatterns() {
+	logFile := ".execution-log.jsonl"
+	outputFile := "EXECUTION_PATTERNS.md"
+
+	// Parse flags
+	for i := 2; i < len(os.Args); i++ {
+		switch os.Args[i] {
+		case "--log-file":
+			if i+1 < len(os.Args) {
+				logFile = os.Args[i+1]
+				i++
+			}
+		case "--output":
+			if i+1 < len(os.Args) {
+				outputFile = os.Args[i+1]
+				i++
+			}
+		}
+	}
+
+	// Open execution log
+	reader, err := execlog.NewReader(logFile)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error reading execution log: %v\n", err)
+		os.Exit(1)
+	}
+
+	// Generate and write patterns
+	gen := patterns.New(reader)
+	if err := gen.WriteFile(outputFile); err != nil {
+		fmt.Fprintf(os.Stderr, "Error writing patterns: %v\n", err)
+		os.Exit(1)
+	}
+
+	fmt.Printf("✅ Generated %s from %d operations\n", outputFile, reader.Count())
+}
+
+// runSessionStartup initializes execution patterns at session start
+func runSessionStartup() {
+	projectRoot := "."
+
+	// Parse flags
+	for i := 2; i < len(os.Args); i++ {
+		switch os.Args[i] {
+		case "--project-root":
+			if i+1 < len(os.Args) {
+				projectRoot = os.Args[i+1]
+				i++
+			}
+		}
+	}
+
+	logFile := filepath.Join(projectRoot, ".execution-log.jsonl")
+	patternsFile := filepath.Join(projectRoot, "EXECUTION_PATTERNS.md")
+
+	// Try to open execution log
+	reader, err := execlog.NewReader(logFile)
+	if err != nil {
+		// Log file doesn't exist yet; create empty patterns file
+		content := `# Execution Patterns & Optimization Guide
+
+*Auto-generated from execution logs. Patterns will be updated as operations are logged.*
+
+**Status**: Waiting for execution data (0 operations logged)
+
+Once you've run operations in this project, patterns will be automatically generated.
+See CLAUDE.md for details on the execution feedback loop system.
+`
+		if err := os.WriteFile(patternsFile, []byte(content), 0644); err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: Could not create patterns file: %v\n", err)
+		}
+		fmt.Println("✅ Session initialized (no operations logged yet)")
+		return
+	}
+
+	// Check if patterns file needs regeneration
+	logStat, _ := os.Stat(logFile)
+	patternsStat, _ := os.Stat(patternsFile)
+
+	needsRegenerate := patternsStat == nil || logStat.ModTime().After(patternsStat.ModTime())
+
+	if needsRegenerate && reader.Count() > 0 {
+		gen := patterns.New(reader)
+		if err := gen.WriteFile(patternsFile); err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: Could not regenerate patterns: %v\n", err)
+		} else {
+			fmt.Printf("✅ Patterns regenerated from %d operations\n", reader.Count())
+		}
+	} else if reader.Count() > 0 {
+		fmt.Printf("✅ Execution patterns loaded (%d operations)\n", reader.Count())
+	} else {
+		fmt.Println("✅ Session initialized (patterns available when operations logged)")
+	}
+}
+
+func parseIntFlag(s string) int {
+	var n int
+	fmt.Sscanf(s, "%d", &n)
+	return n
+}
