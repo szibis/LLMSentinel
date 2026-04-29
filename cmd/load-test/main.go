@@ -12,25 +12,25 @@ import (
 )
 
 type LoadTestConfig struct {
-	Duration        time.Duration
-	TargetRate      int // requests per second
-	Workers         int
-	RampUpDuration  time.Duration
+	Duration         time.Duration
+	TargetRate       int // requests per second
+	Workers          int
+	RampUpDuration   time.Duration
 	RampDownDuration time.Duration
-	ReportInterval  time.Duration
+	ReportInterval   time.Duration
 }
 
 type LoadTestMetrics struct {
-	TotalRequests   int64
-	SuccessCount    int64
-	FailureCount    int64
-	TotalLatencyMs  int64
-	MinLatencyMs    int64
-	MaxLatencyMs    int64
-	StartTime       time.Time
-	EndTime         time.Time
-	LatencyValues   []int64
-	mu              sync.RWMutex
+	TotalRequests  int64
+	SuccessCount   int64
+	FailureCount   int64
+	TotalLatencyMs int64
+	MinLatencyMs   int64
+	MaxLatencyMs   int64
+	StartTime      time.Time
+	EndTime        time.Time
+	LatencyValues  []int64
+	mu             sync.RWMutex
 }
 
 func main() {
@@ -67,7 +67,7 @@ func main() {
 
 func runLoadTest(config LoadTestConfig) *LoadTestMetrics {
 	metrics := &LoadTestMetrics{
-		StartTime:    time.Now(),
+		StartTime:     time.Now(),
 		LatencyValues: make([]int64, 0),
 	}
 
@@ -148,7 +148,7 @@ func runLoadTest(config LoadTestConfig) *LoadTestMetrics {
 				currentRate = config.TargetRate
 			} else if elapsed < config.Duration {
 				// Ramp-down phase
-				progress := float64(elapsed - config.RampUpDuration - sustainDuration) / float64(config.RampDownDuration)
+				progress := float64(elapsed-config.RampUpDuration-sustainDuration) / float64(config.RampDownDuration)
 				currentRate = int(float64(config.TargetRate) * (1 - progress))
 			} else {
 				// Test complete

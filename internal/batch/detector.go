@@ -11,16 +11,16 @@ import (
 // WorkloadDetectionResult represents the output of workload detection analysis
 type WorkloadDetectionResult struct {
 	ShouldBatch       bool
-	Confidence        float64       // 0.0-1.0
+	Confidence        float64 // 0.0-1.0
 	Reason            string
 	EstimatedWaitTime time.Duration
 }
 
 // WorkloadMetrics tracks request patterns for batch eligibility detection
 type WorkloadMetrics struct {
-	RecentRequestCount int64
-	AverageLatency    time.Duration
-	LastPeakTime      time.Time
+	RecentRequestCount     int64
+	AverageLatency         time.Duration
+	LastPeakTime           time.Time
 	BulkProcessingDetected bool
 }
 
@@ -196,19 +196,19 @@ func toLower(s string) string {
 
 // BatchEligibilityChecker determines if a request can be batched
 type BatchEligibilityChecker struct {
-	maxBatchSize     int
-	minBatchSize     int
-	maxWaitTime      time.Duration
-	allowedIntents   map[string]bool
-	blockedIntents   map[string]bool
+	maxBatchSize   int
+	minBatchSize   int
+	maxWaitTime    time.Duration
+	allowedIntents map[string]bool
+	blockedIntents map[string]bool
 }
 
 // NewBatchEligibilityChecker creates a new eligibility checker
 func NewBatchEligibilityChecker(minBatchSize, maxBatchSize int, maxWaitTime time.Duration) *BatchEligibilityChecker {
 	return &BatchEligibilityChecker{
-		maxBatchSize:   maxBatchSize,
-		minBatchSize:   minBatchSize,
-		maxWaitTime:    maxWaitTime,
+		maxBatchSize: maxBatchSize,
+		minBatchSize: minBatchSize,
+		maxWaitTime:  maxWaitTime,
 		allowedIntents: map[string]bool{
 			"batch_analysis": true,
 			"bulk_process":   true,
@@ -216,10 +216,10 @@ func NewBatchEligibilityChecker(minBatchSize, maxBatchSize int, maxWaitTime time
 			"scheduled":      true,
 		},
 		blockedIntents: map[string]bool{
-			"interactive":    true,
-			"real_time":      true,
-			"synchronous":    true,
-			"urgent":         true,
+			"interactive": true,
+			"real_time":   true,
+			"synchronous": true,
+			"urgent":      true,
 		},
 	}
 }

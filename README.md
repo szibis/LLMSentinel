@@ -1,18 +1,19 @@
-# Claude Escalate
+# Claude Escalate v0.8.0
 
-> **Token optimization gateway for Claude API — 40-60% cost savings with knowledge graphs, semantic caching, and intelligent input compression.**
+> **Token optimization gateway for Claude API — 60-75% cost savings with Batch API, knowledge graphs, semantic caching, intelligent input compression, and visual tool management.**
 
 [![Go](https://img.shields.io/badge/Go-1.26-blue)](https://golang.org)
 [![License](https://img.shields.io/badge/license-Apache%202.0-green)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-530%20passing-brightgreen)](https://github.com/szibis/claude-escalate)
+[![Tests](https://img.shields.io/badge/tests-614%20passing-brightgreen)](https://github.com/szibis/claude-escalate)
 [![Coverage](https://img.shields.io/badge/coverage-85%25-blue)]()
 
 ---
 
 ## 🎯 What Is Claude Escalate?
 
-Claude Escalate v0.5.0 is a gateway-layer token optimization engine for Claude API. It runs locally between your application and Claude, automatically reducing token usage by **40-60%** through:
+Claude Escalate v0.8.0 is a gateway-layer token optimization engine for Claude API. It runs locally between your application and Claude, automatically reducing token usage by **60-75%** through:
 
+- **⚡ Batch API** (50% savings) — Anthropic Batch API integration for non-interactive workloads
 - **🔍 Knowledge Graph Queries** (99% savings) — Answer relationship questions from indexed code
 - **💾 Semantic Caching** (98% savings) — Reuse responses for similar queries  
 - **📋 Exact Deduplication** (100% savings) — Cache identical requests
@@ -25,7 +26,37 @@ Claude Escalate v0.5.0 is a gateway-layer token optimization engine for Claude A
 
 ---
 
-## ✨ Key Features (v0.5.0)
+## ✨ Key Features (v0.8.0)
+
+### Feature 0: Batch API Integration (50% Savings)
+
+Anthropic Batch API for non-interactive workloads. 50% cost reduction on bulk analysis, overnight jobs, and scheduled tasks:
+
+```
+User: "Analyze all 50 files in repo for security"
+    ↓
+Non-interactive detector: Bulk workload detected
+    ↓
+Route to Batch API (instead of regular API)
+    ↓
+Anthropic processes in background (5min-24h)
+    ↓
+Cost: 50% discount on input/output tokens
+    ↓
+Savings: 50% per file × 50 files = 1250 tokens per file
+         Total: 125,000 tokens saved (est. $0.375 at Haiku pricing)
+```
+
+**When to Use**:
+- ✅ Bulk file analysis, overnight jobs, scheduled tasks
+- ✅ Non-urgent analysis that can wait 5-24 hours
+- ❌ Interactive queries (too slow for user-facing)
+- ❌ Real-time code review (use regular API)
+
+**Combined Savings** (Batch API + Semantic Cache):
+- Batch API: 50% discount
+- Semantic cache on repeated analyses: 98% savings
+- Combined: ~55% total when stacked
 
 ### Feature 1: Knowledge Graph Queries (99% Savings)
 
@@ -54,7 +85,11 @@ Savings: 99% vs Claude API call (2500+ tokens)
 - Relationships stored in SQLite graph with confidence scores
 - Recursive CTE queries find multi-hop paths efficiently (<10ms typical)
 
-### Feature 2: Semantic Caching (98% Savings)
+### Feature 2: Knowledge Graph Queries (99% Savings)
+
+*Moved below. See "Feature 3" in next section.*
+
+### Feature 3: Semantic Caching (98% Savings)
 
 Reuse responses for similar queries using vector embeddings:
 
@@ -202,6 +237,37 @@ Security Validations (ALWAYS applied):
 
 **Test Coverage**: 50+ attack patterns detected with 0 false positives
 
+### Feature 8: Visual Tool Configuration (v0.8.0)
+
+Dashboard-based tool management for CLI, MCP, REST, and database tools without YAML editing:
+
+```
+Dashboard → Tools Tab → Add Tool Form
+                      ↓
+                    Type: [CLI / MCP / REST / Database / Binary]
+                    Name: [my_tool]
+                    Path: [/usr/local/bin/tool]
+                    Settings: {json: "values"}
+                      ↓
+                    Test Connection → Health Check
+                      ↓
+                    Save → Config persisted to YAML
+                    
+Features:
+✅ Add, edit, delete tools via web UI
+✅ Tool health status indicators
+✅ Type-specific path validation (CLI vs MCP socket)
+✅ Real-time tool list with current status
+✅ Config auto-saves to disk (survives restart)
+✅ No YAML editing required (non-technical users supported)
+```
+
+**Use Cases**:
+- Add custom scripts without modifying config files
+- Manage MCP server sockets through UI
+- Test tool connectivity with one click
+- Audit all configured tools in one place
+
 ---
 
 ## 📊 Seven-Layer Optimization Pipeline
@@ -292,7 +358,19 @@ graph LR
 
 ## 🚀 Quick Start (5 minutes)
 
-### 1. Build Binary
+### Option A: Docker (Recommended)
+
+```bash
+docker build -t claude-escalate .
+docker run -d -p 9000:8077 -v escalate-data:/data \
+  claude-escalate:latest dashboard --port 8077
+# Access: http://localhost:9000/dashboard
+```
+
+See **[DOCKER_SETUP.md](docs/DOCKER_SETUP.md)** for full guide.
+
+### Option B: Build Locally
+
 ```bash
 git clone https://github.com/szibis/claude-escalate.git
 cd claude-escalate
@@ -301,14 +379,14 @@ make build
 ```
 
 ### 2. Start Service
+
 ```bash
-./bin/claude-escalate service --port 8080
-# Or with Docker:
-docker-compose up
+./bin/claude-escalate dashboard --port 8077
+# Service listens on all interfaces (0.0.0.0:8077)
 ```
 
 ### 3. Access Dashboard
-Open **http://localhost:8080** in your browser
+Open **http://localhost:8077/dashboard** in your browser
 - Real-time metrics
 - Task classification results
 - Budget status

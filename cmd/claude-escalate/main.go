@@ -263,7 +263,8 @@ func handleDeEscalate(db *store.Store, currentModel, taskType string) {
 
 func runDashboard() {
 	port := 8077
-	bind := "127.0.0.1"
+	bind := "0.0.0.0"
+	configPath := ""
 	for i, arg := range os.Args {
 		if arg == "--port" && i+1 < len(os.Args) {
 			_, _ = fmt.Sscanf(os.Args[i+1], "%d", &port)
@@ -271,10 +272,16 @@ func runDashboard() {
 		if arg == "--bind" && i+1 < len(os.Args) {
 			bind = os.Args[i+1]
 		}
+		if arg == "--config" && i+1 < len(os.Args) {
+			configPath = os.Args[i+1]
+		}
 	}
 	// Environment variable override (for Docker)
 	if v := os.Getenv("ESCALATE_BIND"); v != "" {
 		bind = v
+	}
+	if v := os.Getenv("CONFIG_FILE"); v != "" {
+		configPath = v
 	}
 
 	cfg := config.DefaultConfig()
@@ -283,7 +290,7 @@ func runDashboard() {
 	}
 
 	// Create and start dashboard server
-	loader := config.NewLoader("")
+	loader := config.NewLoader(configPath)
 	dashServer := dashboard.NewServer(bind, port, loader, nil, nil)
 	if err := dashServer.Start(); err != nil {
 		fmt.Fprintf(os.Stderr, "Dashboard error: %v\n", err)
@@ -430,7 +437,7 @@ func runService() {
 		os.Exit(1)
 	}
 
-	addr := "127.0.0.1:" + port
+	addr := "0.0.0.0:" + port
 	if err := svc.Start(addr); err != nil {
 		fmt.Fprintf(os.Stderr, "Service error: %v\n", err)
 		os.Exit(1)

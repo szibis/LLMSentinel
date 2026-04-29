@@ -322,7 +322,7 @@ func TestRampUpPhase(t *testing.T) {
 // Internal helper to run load test
 func runLoadTestInternal(config *LoadTestConfig, router *batch.Router, verbose bool) *LoadTestMetrics {
 	metrics := &LoadTestMetrics{
-		StartTime:    time.Now(),
+		StartTime:     time.Now(),
 		LatencyValues: make([]int64, 0),
 	}
 
@@ -463,16 +463,16 @@ type LoadTestConfig struct {
 
 // LoadTestMetrics tracks load test results
 type LoadTestMetrics struct {
-	TotalRequests   int64
-	SuccessCount    int64
-	FailureCount    int64
-	TotalLatencyMs  int64
-	MinLatencyMs    int64
-	MaxLatencyMs    int64
-	StartTime       time.Time
-	EndTime         time.Time
-	LatencyValues   []int64
-	mu              sync.RWMutex
+	TotalRequests  int64
+	SuccessCount   int64
+	FailureCount   int64
+	TotalLatencyMs int64
+	MinLatencyMs   int64
+	MaxLatencyMs   int64
+	StartTime      time.Time
+	EndTime        time.Time
+	LatencyValues  []int64
+	mu             sync.RWMutex
 }
 
 func calculatePercentile(values []int64, percentile float64) int64 {

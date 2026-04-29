@@ -39,9 +39,9 @@ type MessageResponse struct {
 		Type string `json:"type"`
 		Text string `json:"text"`
 	} `json:"content"`
-	Model     string `json:"model"`
+	Model      string `json:"model"`
 	StopReason string `json:"stop_reason"`
-	Usage     struct {
+	Usage      struct {
 		InputTokens  int `json:"input_tokens"`
 		OutputTokens int `json:"output_tokens"`
 	} `json:"usage"`
@@ -49,16 +49,16 @@ type MessageResponse struct {
 
 // BatchRequest represents a single request in a batch
 type BatchRequest struct {
-	CustomID string          `json:"custom_id"`
-	Params   MessageRequest  `json:"params"`
+	CustomID string         `json:"custom_id"`
+	Params   MessageRequest `json:"params"`
 }
 
 // BatchJob represents a submitted batch job
 type BatchJob struct {
-	ID             string    `json:"id"`
-	Type           string    `json:"type"`
-	ProcessingStatus string  `json:"processing_status"`
-	RequestCounts  struct {
+	ID               string `json:"id"`
+	Type             string `json:"type"`
+	ProcessingStatus string `json:"processing_status"`
+	RequestCounts    struct {
 		Processing int `json:"processing"`
 		Succeeded  int `json:"succeeded"`
 		Errored    int `json:"errored"`
@@ -75,8 +75,8 @@ type BatchJob struct {
 
 // BatchResult represents a result from a batch job
 type BatchResult struct {
-	CustomID string           `json:"custom_id"`
-	Result   MessageResponse  `json:"result"`
+	CustomID string                 `json:"custom_id"`
+	Result   MessageResponse        `json:"result"`
 	Error    map[string]interface{} `json:"error,omitempty"`
 }
 

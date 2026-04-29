@@ -1,4 +1,4 @@
-# Claude Escalate v4.0.0 - API Specification
+# Claude Escalate v0.8.0 - API Specification
 
 ## Overview
 
@@ -24,6 +24,130 @@ Returns service health status.
   "uptime_seconds": 3600,
   "version": "4.0.0",
   "timestamp": "2026-04-26T12:00:00Z"
+}
+```
+
+---
+
+## Batch API (v0.7.0+)
+
+### POST /batch/submit
+Submit a batch of requests for processing (50% cost reduction).
+
+**Request**:
+```json
+{
+  "requests": [
+    {"query": "Analyze file1.go for security"},
+    {"query": "Analyze file2.go for security"},
+    {"query": "Analyze file3.go for security"}
+  ]
+}
+```
+
+**Response** (202 Accepted):
+```json
+{
+  "job_id": "batch_abc123xyz789",
+  "status": "queued",
+  "request_count": 3,
+  "submitted_at": "2026-04-27T10:30:00Z",
+  "estimated_completion": "2026-04-27T11:30:00Z"
+}
+```
+
+### GET /batch/status/{job_id}
+Check status of batch job.
+
+**Response** (200 OK):
+```json
+{
+  "job_id": "batch_abc123xyz789",
+  "status": "processing",
+  "request_count": 3,
+  "completed_count": 1,
+  "failed_count": 0,
+  "progress_percent": 33,
+  "submitted_at": "2026-04-27T10:30:00Z",
+  "started_at": "2026-04-27T10:35:00Z",
+  "estimated_completion": "2026-04-27T11:30:00Z"
+}
+```
+
+**Status Values**:
+- `queued` — Batch submitted, waiting to start
+- `processing` — Requests being processed
+- `completed` — All requests processed (check results)
+- `failed` — Batch failed (check error)
+
+### GET /batch/results/{job_id}
+Retrieve results from completed batch.
+
+**Response** (200 OK):
+```json
+{
+  "job_id": "batch_abc123xyz789",
+  "status": "completed",
+  "request_count": 3,
+  "responses": [
+    {
+      "query": "Analyze file1.go for security",
+      "response": "Security analysis of file1.go...",
+      "tokens_used": 2450,
+      "cost": "$0.00735"
+    },
+    {
+      "query": "Analyze file2.go for security",
+      "response": "Security analysis of file2.go...",
+      "tokens_used": 2380,
+      "cost": "$0.00714"
+    },
+    {
+      "query": "Analyze file3.go for security",
+      "error": "Rate limit exceeded",
+      "status": "failed"
+    }
+  ],
+  "total_tokens": 7230,
+  "total_cost": "$0.02161",
+  "cost_without_batch": "$0.04322",
+  "savings": "50%"
+}
+```
+
+### POST /batch/cancel/{job_id}
+Cancel a queued batch (cannot cancel if already processing).
+
+**Response** (200 OK):
+```json
+{
+  "job_id": "batch_abc123xyz789",
+  "status": "cancelled",
+  "message": "Batch cancelled successfully"
+}
+```
+
+### GET /batch/list
+List all active batch jobs.
+
+**Response** (200 OK):
+```json
+{
+  "jobs": [
+    {
+      "job_id": "batch_abc123xyz789",
+      "status": "processing",
+      "progress": "45/100",
+      "submitted_at": "2026-04-27T10:00:00Z"
+    },
+    {
+      "job_id": "batch_xyz789abc123",
+      "status": "queued",
+      "progress": "0/50",
+      "submitted_at": "2026-04-27T10:15:00Z"
+    }
+  ],
+  "total_active": 2
 }
 ```
 
@@ -523,6 +647,134 @@ paths:
 
 ---
 
+## Tool Management API (v0.8.0+)
+
+### GET /tools
+List all configured tools with health status.
+
+**Response** (200 OK):
+```json
+{
+  "tools": [
+    {
+      "name": "my_script",
+      "type": "cli",
+      "path": "/usr/local/bin/my_script",
+      "health": "ok",
+      "settings": {}
+    },
+    {
+      "name": "custom_mcp",
+      "type": "mcp",
+      "path": "~/.sockets/custom.sock",
+      "health": "ok",
+      "settings": {"timeout": 30}
+    }
+  ]
+}
+```
+
+### POST /tools/add
+Add a new custom tool (CLI, MCP, REST, Database, or Binary).
+
+**Request**:
+```json
+{
+  "name": "new_tool",
+  "type": "cli",
+  "path": "/usr/local/bin/new_tool",
+  "settings": {}
+}
+```
+
+**Response** (200 OK):
+```json
+{
+  "status": "created",
+  "message": "Tool added successfully",
+  "tool": {
+    "name": "new_tool",
+    "type": "cli",
+    "path": "/usr/local/bin/new_tool",
+    "health": "ok",
+    "settings": {}
+  }
+}
+```
+
+**Validation**:
+- Tool name: alphanumeric + underscore only
+- Path must exist for CLI tools
+- Type must be one of: cli, mcp, rest, database, binary
+- Duplicate tool names are rejected
+
+### PUT /tools/{name}
+Update existing tool configuration.
+
+**Request**:
+```json
+{
+  "path": "/new/path/to/tool",
+  "settings": {"timeout": 60}
+}
+```
+
+**Response** (200 OK):
+```json
+{
+  "status": "updated",
+  "message": "Tool updated successfully"
+}
+```
+
+### DELETE /tools/{name}
+Remove a tool from configuration.
+
+**Response** (200 OK):
+```json
+{
+  "status": "deleted",
+  "message": "Tool removed successfully"
+}
+```
+
+### POST /tools/{name}/test
+Test tool connectivity and health status.
+
+**Response** (200 OK - Healthy):
+```json
+{
+  "status": "healthy",
+  "message": "Tool is responding"
+}
+```
+
+**Response** (200 OK - Unhealthy):
+```json
+{
+  "status": "unhealthy",
+  "error": "Connection refused on socket"
+}
+```
+
+### GET /tools/types
+List available tool types and descriptions.
+
+**Response** (200 OK):
+```json
+{
+  "types": [
+    {"type": "cli", "description": "Shell command or script"},
+    {"type": "mcp", "description": "MCP (Model Context Protocol) server"},
+    {"type": "rest", "description": "HTTP REST API"},
+    {"type": "database", "description": "SQL database"},
+    {"type": "binary", "description": "Standalone executable"}
+  ]
+}
+```
+
+---
+
 ## SDK & Client Libraries
 
 ### Go Client
@@ -546,6 +798,6 @@ See `web/src/api.js` for reference implementation.
 
 ---
 
-**Last Updated**: 2026-04-26  
-**Status**: Stable (v4.0.0)  
-**Next Review**: 2026-06-26
+**Last Updated**: 2026-04-27  
+**Status**: Stable (v0.8.0)  
+**Next Review**: 2026-06-27

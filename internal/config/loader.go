@@ -6,16 +6,50 @@ import (
 	"os/exec"
 	"os/user"
 	"path/filepath"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 
 	"github.com/szibis/claude-escalate/internal/discovery"
 )
 
+// expandHome expands ~ to user home directory
+func expandHome(path string) string {
+	if !strings.HasPrefix(path, "~") {
+		return path
+	}
+	usr, err := user.Current()
+	if err != nil {
+		return path
+	}
+	return filepath.Join(usr.HomeDir, path[1:])
+}
+
+// isToolAvailable checks if tool exists in PATH
+func isToolAvailable(toolName string) bool {
+	_, err := exec.LookPath(toolName)
+	return err == nil
+}
+
+// DefaultConfig returns config with auto-detected tools
+func DefaultConfig() *Config {
+	return &Config{
+		Gateway: GatewayConfig{
+			Port:            8077,
+			Host:            "0.0.0.0",
+			SecurityLayer:   true,
+			ShutdownTimeout: 30,
+			MaxRequestSize:  10485760,
+			DataDir:         expandHome("~/.claude-escalate/data"),
+		},
+	}
+}
+
 // Loader handles loading and managing configuration
 type Loader struct {
 	configPath string
 	config     *Config
+	loadedPath string
 }
 
 // NewLoader creates a new configuration loader
@@ -23,6 +57,11 @@ func NewLoader(configPath string) *Loader {
 	return &Loader{
 		configPath: configPath,
 	}
+}
+
+// GetLoadedPath returns the path of the config file that was loaded
+func (l *Loader) GetLoadedPath() string {
+	return l.loadedPath
 }
 
 // Load loads configuration from file, auto-detecting tools if no config exists
@@ -41,6 +80,21 @@ func (l *Loader) Load() (*Config, error) {
 		expandHome("~/.claude-escalate/config.yaml"),
 	}
 
+	// Add CONFIG_FILE environment variable if set
+	if envPath := os.Getenv("CONFIG_FILE"); envPath != "" {
+		// Check if it's not already in the default paths
+		found := false
+		for _, p := range defaultPaths {
+			if p == envPath {
+				found = true
+				break
+			}
+		}
+		if !found {
+			defaultPaths = append(defaultPaths, envPath)
+		}
+	}
+
 	for _, path := range defaultPaths {
 		if err := l.loadFromFile(path); err == nil {
 			return l.config, nil
@@ -48,7 +102,8 @@ func (l *Loader) Load() (*Config, error) {
 	}
 
 	// No config file found, use auto-detected defaults
-	cfg := l.generateDefaultConfigWithDiscovery()
+	cfg := DefaultConfig()
+	l.config = cfg
 	return cfg, nil
 }
 
@@ -73,6 +128,7 @@ func (l *Loader) loadFromFile(path string) error {
 	}
 
 	l.config = cfg
+	l.loadedPath = path
 	return nil
 }
 
@@ -400,57 +456,8 @@ func (l *Loader) GetConfig() *Config {
 	return l.config
 }
 
-// isToolAvailable checks if a tool is available in PATH or common locations
-func isToolAvailable(tool string) bool {
-	// Check common tool locations
-	commonPaths := []string{
-		filepath.Join(os.Getenv("HOME"), ".local", "bin", tool),
-		filepath.Join("/usr", "local", "bin", tool),
-		filepath.Join("/usr", "bin", tool),
-	}
-
-	for _, path := range commonPaths {
-		if _, err := os.Stat(path); err == nil {
-			return true
-		}
-	}
-
-	// Try to find in PATH
-	if path, err := exec.LookPath(tool); err == nil && path != "" {
-		return true
-	}
-
-	return false
-}
-
-// expandHome expands ~ in paths
-func expandHome(path string) string {
-	if path == "~" {
-		home, err := os.UserHomeDir()
-		if err != nil {
-			return path
-		}
-		return home
-	}
-
-	if len(path) > 2 && path[0] == '~' && path[1] == '/' {
-		home, err := os.UserHomeDir()
-		if err != nil {
-			return path
-		}
-		return filepath.Join(home, path[2:])
-	}
-
-	if len(path) > 1 && path[0] == '~' {
-		home, err := user.Current()
-		if err != nil {
-			return path
-		}
-		return filepath.Join(home.HomeDir, path[1:])
-	}
-
-	return path
-}
+// Note: isToolAvailable() and expandHome() are defined in defaults.go
+// and used throughout the package
 
 // applyNewConfigDefaults applies default values to new configuration sections
 func applyNewConfigDefaults(cfg *Config) {
@@ -605,6 +612,11 @@ func applyNewConfigDefaults(cfg *Config) {
 		cfg.Models.Opus.CostPer1KInput = 0.015
 		cfg.Models.Opus.CostPer1KOutput = 0.075
 		cfg.Models.Opus.ContextWindow = 200000
+	}
+
+	// Apply Security defaults
+	if cfg.Security.RateLimiting.RequestsPerMinute <= 0 {
+		cfg.Security.RateLimiting.RequestsPerMinute = 1000
 	}
 }
 

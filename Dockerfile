@@ -16,7 +16,7 @@ RUN CGO_ENABLED=0 go build \
 # Runtime stage
 FROM alpine:3.23
 
-RUN apk add --no-cache ca-certificates wget
+RUN apk add --no-cache ca-certificates wget git
 
 WORKDIR /app
 

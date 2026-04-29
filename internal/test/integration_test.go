@@ -102,9 +102,9 @@ gateway:
 metrics:
   enabled: true
   publish_to:
-    - debug_logs:
-        enabled: true
-        dir: `+tmpDir+`
+    debug_logs:
+      enabled: true
+      dir: `+tmpDir+`
 
 security:
   enabled: true

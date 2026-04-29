@@ -25,10 +25,10 @@ func TestGraphDB(t *testing.T) {
 	// Test creating a node
 	ctx := context.Background()
 	node := &Node{
-		ID:        "func_authenticate",
-		Name:      "authenticate",
-		Type:      NodeTypeFunction,
-		FilePath:  "auth.go",
+		ID:         "func_authenticate",
+		Name:       "authenticate",
+		Type:       NodeTypeFunction,
+		FilePath:   "auth.go",
 		LineNumber: 42,
 	}
 

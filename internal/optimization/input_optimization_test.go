@@ -268,10 +268,10 @@ func TestParameterCompression_RemoveDefaults(t *testing.T) {
 	compressor := NewParameterCompressor()
 
 	params := map[string]interface{}{
-		"max_results":  100,        // Default
-		"recursive":    true,       // Default
-		"timeout":      30,         // Default
-		"custom_field": "special",  // Non-default
+		"max_results":  100,       // Default
+		"recursive":    true,      // Default
+		"timeout":      30,        // Default
+		"custom_field": "special", // Non-default
 	}
 
 	optimized, err := compressor.RemoveDefaults(params)
@@ -315,7 +315,7 @@ func TestParameterCompression_CombinedSavings(t *testing.T) {
 
 	savingsPercent := 0.0
 	if originalLen > 0 {
-		savingsPercent = (float64(originalLen - compressedLen) / float64(originalLen)) * 100
+		savingsPercent = (float64(originalLen-compressedLen) / float64(originalLen)) * 100
 		if savingsPercent < 0 {
 			savingsPercent = 0
 		}

@@ -1,0 +1,646 @@
+---
+# Configuration Specification
+# Single source of truth for all configuration options, types, defaults, and documentation
+# Used by: dashboard config editor, CLI help, configuration validation, documentation generation
+
+sections:
+  gateway:
+    title: "Gateway Configuration"
+    description: "HTTP server for dashboard and API endpoints"
+    icon: "🚀"
+    options:
+      port:
+        type: "integer"
+        default: 8080
+        min: 1
+        max: 65535
+        description: "HTTP port for dashboard and API"
+        examples:
+          - value: 8077
+            desc: "Default dashboard port"
+          - value: 9000
+            desc: "Default API service port"
+        validation: "Must be between 1 and 65535"
+
+      host:
+        type: "string"
+        default: "0.0.0.0"
+        description: "Bind address for HTTP server"
+        options:
+          - value: "0.0.0.0"
+            desc: "All interfaces (Docker, network accessible)"
+          - value: "127.0.0.1"
+            desc: "Localhost only (no external access)"
+        validation: "Valid IP address or hostname"
+
+      security_layer:
+        type: "boolean"
+        default: true
+        description: "Enable input validation and security checks"
+        includes:
+          - "SQL injection detection"
+          - "XSS prevention"
+          - "Command injection detection"
+          - "Rate limiting"
+
+      shutdown_timeout:
+        type: "integer"
+        default: 30
+        unit: "seconds"
+        description: "Graceful shutdown timeout before forcing termination"
+
+      max_request_size:
+        type: "integer"
+        default: 10485760
+        unit: "bytes"
+        description: "Maximum request body size (10MB default)"
+
+      data_dir:
+        type: "string"
+        default: "~/.claude-escalate/data"
+        description: "Directory for database and persistent data"
+        validation: "Must be writable directory, created if missing"
+
+  optimizations:
+    title: "Model Optimizations"
+    description: "Token and latency optimization layers"
+    icon: "⚡"
+
+    rtk:
+      title: "RTK (Real Token Killer)"
+      description: "Reduces command output by ~99.4% using regex filters"
+      icon: "🎯"
+      options:
+        enabled:
+          type: "boolean"
+          default: "auto-detect"
+          description: "Auto-detects if rtk command is in PATH"
+
+        command_proxy_savings:
+          type: "float"
+          default: 99.4
+          unit: "%"
+          description: "Expected output reduction percentage"
+
+        cache_savings:
+          type: "boolean"
+          default: true
+          description: "Cache command results to avoid re-execution"
+
+    mcp:
+      title: "MCP Tools"
+      description: "Model Context Protocol - manages tool integrations"
+      icon: "🔧"
+      options:
+        enabled:
+          type: "boolean"
+          default: true
+          description: "Enable MCP tool system"
+
+        tools:
+          type: "array"
+          description: "List of configured MCP tools"
+          examples:
+            - name: "scrapling"
+              type: "mcp"
+              desc: "Web scraping and content extraction (85-94% savings)"
+            - name: "rtk"
+              type: "cli"
+              desc: "Real Token Killer - command output optimization"
+            - name: "git"
+              type: "cli"
+              desc: "Git operations and diff"
+            - name: "lsp"
+              type: "lsp"
+              desc: "Language Server Protocol for code navigation"
+
+    semantic_cache:
+      title: "Semantic Cache"
+      description: "Cache semantically similar requests (85%+ similarity matching)"
+      icon: "💾"
+      options:
+        enabled:
+          type: "boolean"
+          default: true
+          description: "Enable semantic similarity-based caching"
+
+        embedding_model:
+          type: "string"
+          default: "onnx-mini-l6"
+          description: "Embedding model for semantic similarity"
+          options:
+            - value: "onnx-mini-l6"
+              desc: "Lightweight (~50MB), local inference"
+            - value: "text-embedding-3-small"
+              desc: "OpenAI API-based embedding"
+
+        similarity_threshold:
+          type: "float"
+          default: 0.85
+          min: 0.0
+          max: 1.0
+          description: "Minimum similarity score (0.85 = 85% match required)"
+
+        hit_rate_target:
+          type: "integer"
+          default: 60
+          unit: "%"
+          description: "Goal cache hit rate percentage"
+
+        max_cache_size:
+          type: "integer"
+          default: 500
+          description: "Maximum cache entries to keep in memory"
+
+    knowledge_graph:
+      title: "Knowledge Graph"
+      description: "Index local code and web content for retrieval (Phase 2)"
+      icon: "📚"
+      options:
+        enabled:
+          type: "boolean"
+          default: false
+          description: "Enable knowledge graph indexing (Phase 2, beta)"
+
+        index_local_code:
+          type: "boolean"
+          default: false
+          description: "Index project files for retrieval"
+
+        index_web_content:
+          type: "boolean"
+          default: false
+          description: "Index fetched web pages"
+
+        cache_lookups:
+          type: "boolean"
+          default: true
+          description: "Cache graph query results"
+
+    input_optimization:
+      title: "Input Optimization"
+      description: "Reduce input tokens sent to Claude"
+      icon: "📥"
+      options:
+        enabled:
+          type: "boolean"
+          default: true
+
+        strip_unused_tools:
+          type: "boolean"
+          default: true
+          description: "Remove tool definitions not used in request"
+
+        compress_parameters:
+          type: "boolean"
+          default: true
+          description: "Compress JSON parameters to shorter format"
+
+        deduplicate_exact_requests:
+          type: "boolean"
+          default: true
+          description: "Cache exact duplicate requests"
+
+    output_optimization:
+      title: "Output Optimization"
+      description: "Reduce output tokens received from Claude"
+      icon: "📤"
+      options:
+        enabled:
+          type: "boolean"
+          default: true
+
+        response_compression:
+          type: "boolean"
+          default: true
+          description: "Compress response before sending to client"
+
+        field_filtering:
+          type: "boolean"
+          default: true
+          description: "Remove unused fields from responses"
+
+        delta_detection:
+          type: "boolean"
+          default: true
+          description: "Send only changed fields in updates"
+
+    batch_api:
+      title: "Batch API"
+      description: "50% cost reduction for non-interactive bulk operations"
+      icon: "📦"
+      options:
+        enabled:
+          type: "boolean"
+          default: false
+          description: "Enable batching for bulk requests"
+
+        min_batch_size:
+          type: "integer"
+          default: 10
+          description: "Minimum requests to batch together"
+
+        max_batch_size:
+          type: "integer"
+          default: 100
+          description: "Maximum requests per batch"
+
+        auto_batch_similar:
+          type: "boolean"
+          default: true
+          description: "Automatically batch similar requests"
+
+  security:
+    title: "Security Configuration"
+    description: "Input validation and threat detection"
+    icon: "🔒"
+    options:
+      enabled:
+        type: "boolean"
+        default: true
+        description: "Enable all security checks"
+
+      sql_injection_detection:
+        type: "boolean"
+        default: true
+        description: "Detect SQL injection patterns in input"
+        patterns:
+          - "DROP TABLE"
+          - "DELETE FROM"
+          - "INSERT INTO"
+          - "UPDATE"
+          - "UNION SELECT"
+
+      xss_prevention:
+        type: "boolean"
+        default: true
+        description: "Detect XSS payloads in input"
+
+      command_injection_detection:
+        type: "boolean"
+        default: true
+        description: "Detect shell command injection patterns"
+        patterns:
+          - "; rm"
+          - "| cat"
+          - "$(command)"
+          - "`command`"
+
+      rate_limiting:
+        title: "Rate Limiting"
+        type: "object"
+        options:
+          requests_per_minute:
+            type: "integer"
+            default: 1000
+            description: "Maximum requests per minute"
+
+          per_ip:
+            type: "boolean"
+            default: true
+            description: "Apply rate limits per IP address"
+
+      audit_logging:
+        type: "boolean"
+        default: true
+        description: "Log all security events and validations"
+
+  metrics:
+    title: "Metrics & Monitoring"
+    description: "Collect and publish performance metrics"
+    icon: "📊"
+    options:
+      enabled:
+        type: "boolean"
+        default: true
+        description: "Enable metrics collection"
+
+      publish_to:
+        title: "Publishing Targets"
+        type: "object"
+        description: "Where to send metrics"
+        options:
+          prometheus:
+            enabled:
+              type: "boolean"
+              default: true
+            port:
+              type: "integer"
+              default: 9090
+            path:
+              type: "string"
+              default: "/metrics"
+
+          grafana:
+            enabled:
+              type: "boolean"
+              default: false
+
+          cloudwatch:
+            enabled:
+              type: "boolean"
+              default: false
+
+          debug_logs:
+            enabled:
+              type: "boolean"
+              default: true
+            dir:
+              type: "string"
+              default: "~/.claude-escalate/metrics"
+
+  thresholds:
+    title: "Decision Thresholds"
+    description: "Confidence scores for escalation decisions"
+    icon: "📈"
+    options:
+      cache_similarity:
+        type: "float"
+        default: 0.85
+        min: 0.0
+        max: 1.0
+        description: "Required similarity for cache hit (0.85 = 85%)"
+
+      model_accuracy:
+        type: "float"
+        default: 0.85
+        min: 0.0
+        max: 1.0
+        description: "Minimum model accuracy required"
+
+      confidence_scores:
+        type: "object"
+        description: "Confidence thresholds for different levels"
+        options:
+          high:
+            type: "float"
+            default: 0.95
+            description: "High confidence threshold"
+          medium:
+            type: "float"
+            default: 0.85
+            description: "Medium confidence threshold"
+          low:
+            type: "float"
+            default: 0.70
+            description: "Low confidence threshold"
+
+  models:
+    title: "Model Configurations"
+    description: "Claude model specs, pricing, and context windows"
+    icon: "🤖"
+
+    haiku:
+      title: "Haiku"
+      description: "Fastest, cheapest model - 8x cheaper than Sonnet"
+      icon: "🐰"
+      options:
+        id:
+          type: "string"
+          default: "claude-haiku-4-5-20251001"
+          description: "Model identifier for API"
+
+        cost_per_1k_input:
+          type: "float"
+          default: 0.0008
+          unit: "$"
+          description: "Cost per 1000 input tokens"
+
+        cost_per_1k_output:
+          type: "float"
+          default: 0.0004
+          unit: "$"
+          description: "Cost per 1000 output tokens"
+
+        context_window:
+          type: "integer"
+          default: 200000
+          unit: "tokens"
+          description: "Maximum context window size"
+
+    sonnet:
+      title: "Sonnet"
+      description: "Balanced model - precision and speed"
+      icon: "🎨"
+      options:
+        id:
+          type: "string"
+          default: "claude-sonnet-4-6"
+
+        cost_per_1k_input:
+          type: "float"
+          default: 0.003
+          unit: "$"
+
+        cost_per_1k_output:
+          type: "float"
+          default: 0.015
+          unit: "$"
+
+        context_window:
+          type: "integer"
+          default: 200000
+          unit: "tokens"
+
+    opus:
+      title: "Opus"
+      description: "Most capable model - best for complex reasoning"
+      icon: "🧠"
+      options:
+        id:
+          type: "string"
+          default: "claude-opus-4-6"
+
+        cost_per_1k_input:
+          type: "float"
+          default: 0.015
+          unit: "$"
+
+        cost_per_1k_output:
+          type: "float"
+          default: 0.075
+          unit: "$"
+
+        context_window:
+          type: "integer"
+          default: 200000
+          unit: "tokens"
+
+  keywords:
+    title: "Intent Detection Keywords"
+    description: "Keywords that trigger specific behaviors"
+    icon: "🔑"
+    options:
+      detail:
+        type: "array"
+        description: "Triggers detailed/comprehensive response"
+        values:
+          - "detailed"
+          - "comprehensive"
+          - "explain"
+          - "why"
+          - "how"
+          - "deep"
+          - "thorough"
+          - "analysis"
+
+      quick:
+        type: "array"
+        description: "Triggers brief response"
+        values:
+          - "quick"
+          - "brief"
+          - "summary"
+          - "tl;dr"
+          - "just"
+          - "simply"
+          - "shortly"
+
+      followup:
+        type: "array"
+        description: "Indicates follow-up question"
+        values:
+          - "more"
+          - "additional"
+          - "also"
+          - "what about"
+          - "furthermore"
+          - "moreover"
+
+      learning:
+        type: "array"
+        description: "Indicates exploration/learning intent"
+        values:
+          - "what if"
+          - "try"
+          - "experiment"
+          - "compare"
+          - "explore"
+          - "alternative"
+
+      suspicious:
+        type: "array"
+        description: "Suspicious patterns to detect (security)"
+        values:
+          - "DROP TABLE"
+          - "DELETE FROM"
+          - "INSERT INTO"
+          - "UPDATE"
+          - "TRUNCATE"
+          - "UNION SELECT"
+
+  signals:
+    title: "Escalation Signals"
+    description: "Patterns that indicate success or failure"
+    icon: "📡"
+    options:
+      success_signals:
+        type: "object"
+        description: "User signals indicating problem solved"
+        examples:
+          perfect:
+            score: 0.95
+            desc: "User says 'perfect'"
+          thanks:
+            score: 0.85
+            desc: "User says 'thanks' or 'thank you'"
+          solved:
+            score: 0.90
+            desc: "User says 'solved' or 'works'"
+
+      failure_signals:
+        type: "object"
+        description: "User signals indicating problem persists"
+        examples:
+          error:
+            score: 0.90
+            desc: "User mentions error"
+          broken:
+            score: 0.90
+            desc: "User says code is broken"
+          failed:
+            score: 0.90
+            desc: "User says it failed"
+
+      frustration_keywords:
+        type: "object"
+        description: "Indicators of user frustration"
+        examples:
+          still_broken:
+            score: 0.90
+            desc: "Repeating same problem"
+          going_in_circles:
+            score: 0.85
+            desc: "Circular reasoning detected"
+          stuck:
+            score: 0.85
+            desc: "User feels stuck"
+
+validation_rules:
+  port:
+    - "Must be integer between 1 and 65535"
+    - "Cannot be in use by another service"
+
+  host:
+    - "Must be valid IP address or hostname"
+    - "0.0.0.0 recommended for Docker"
+
+  similarity_threshold:
+    - "Must be float between 0.0 and 1.0"
+    - "Higher = more strict matching"
+
+  float_thresholds:
+    - "Must be float between 0.0 and 1.0"
+    - "Represents confidence/probability scores"
+
+  directory_paths:
+    - "Must be writable directory"
+    - "Created automatically if missing"
+    - "Supports ~ for home directory"
+
+examples:
+  minimal:
+    description: "Minimal configuration for local testing"
+    yaml: |
+      gateway:
+        port: 8077
+        host: 127.0.0.1
+      optimizations:
+        rtk:
+          enabled: false
+      security:
+        enabled: true
+
+  docker:
+    description: "Configuration for Docker deployment"
+    yaml: |
+      gateway:
+        port: 8077
+        host: 0.0.0.0
+        data_dir: /data
+      optimizations:
+        rtk:
+          enabled: true
+        semantic_cache:
+          enabled: true
+
+  production:
+    description: "Production configuration with all optimizations"
+    yaml: |
+      gateway:
+        port: 8077
+        host: 0.0.0.0
+        security_layer: true
+      optimizations:
+        rtk:
+          enabled: true
+        mcp:
+          enabled: true
+        semantic_cache:
+          enabled: true
+        batch_api:
+          enabled: true
+      security:
+        enabled: true
+      metrics:
+        enabled: true

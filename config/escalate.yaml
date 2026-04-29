@@ -1,0 +1,248 @@
+gateway:
+    port: 8080
+    host: 127.0.0.1
+    security_layer: true
+    shutdown_timeout_seconds: 30
+    max_request_size_bytes: 10485760
+    data_dir: ~/.claude-escalate/data
+optimizations:
+    rtk:
+        enabled: true
+        command_proxy_savings: 99.4
+        models:
+            high_effort: opus
+            low_effort: haiku
+            medium_effort: sonnet
+        cache_savings: true
+    mcp:
+        enabled: true
+        tools:
+            - type: web_scraping
+              name: scrapling
+              settings:
+                cache_responses: true
+                css_selector: true
+                markdown_only: true
+            - type: code_analysis
+              name: builtin_lsp
+              settings:
+                cache_symbols: true
+                use_lsp: true
+            - type: database
+              name: builtin_sql
+              settings:
+                prepared_statements: true
+            - type: cli
+              name: persistent_test_v2
+              settings:
+                path: /bin/cat
+            - type: cli
+              name: final_persistence_test
+              settings:
+                path: /bin/echo
+    semantic_cache:
+        enabled: true
+        embedding_model: onnx-mini-l6
+        similarity_threshold: 0.85
+        hit_rate_target: 60
+        false_positive_limit: 0.5
+        max_cache_size_mb: 1024
+    knowledge_graph:
+        enabled: false
+        index_local_code: true
+        index_web_content: false
+        cache_lookups: true
+        db_path: ~/.claude-escalate/graph.db
+    input_optimization:
+        enabled: true
+        strip_unused_tools: true
+        compress_parameters: true
+        dedup_exact_requests: true
+    output_optimization:
+        enabled: true
+        response_compression: true
+        field_filtering: true
+        delta_detection: true
+    batch_api:
+        enabled: false
+        min_batch_size: 10
+        max_batch_size: 100
+        auto_batch_similar: true
+intent_detection:
+    enabled: true
+    cache_bypass_patterns:
+        - --no-cache
+        - --fresh
+        - '!'
+        - (no cache)
+        - (bypass)
+    personalization:
+        learn_from_feedback: true
+        adapt_per_user: true
+        feedback_history_depth: 90
+security:
+    enabled: true
+    sql_injection_detection: true
+    xss_prevention: true
+    command_injection_detection: true
+    rate_limiting:
+        requests_per_minute: 1000
+        per_ip: true
+    audit_logging: true
+metrics:
+    enabled: true
+    publish_to:
+        prometheus:
+            enabled: true
+            port: 9090
+            path: /metrics
+        grafana:
+            enabled: false
+            url: http://localhost:3000
+        cloudwatch:
+            enabled: false
+            namespace: claude-escalate
+        opentelemetry:
+            enabled: false
+            exporter_type: ""
+            otlp_endpoint: ""
+            jaeger_endpoint: ""
+            service_name: ""
+            service_version: ""
+            environment: ""
+            batch_size: 0
+            batch_timeout_ms: 0
+            headers: {}
+        debug_logs:
+            enabled: true
+            dir: ~/.claude-escalate/metrics
+    track:
+        cache_hit_rate:
+            enabled: true
+            interval: 1m0s
+        cache_false_positive_rate:
+            enabled: true
+            interval: 1m0s
+            alert_if_above: 0.5
+        token_savings_percent:
+            enabled: true
+            interval: 1m0s
+        latency_by_layer:
+            enabled: true
+            interval: 1m0s
+        per_optimization_savings:
+            enabled: true
+            interval: 1m0s
+        security_events:
+            enabled: true
+            interval: 1m0s
+        cost_tracking:
+            enabled: true
+            interval: 1m0s
+thresholds:
+    cache_similarity: 0.85
+    confidence_scores:
+        high: 0.95
+        medium: 0.85
+        low: 0.7
+    model_accuracy: 0.85
+keywords:
+    detail:
+        - detailed
+        - comprehensive
+        - explain
+        - why
+        - how
+        - deep
+        - thorough
+        - analysis
+    quick:
+        - quick
+        - brief
+        - summary
+        - tl;dr
+        - just
+        - simply
+        - shortly
+    follow_up:
+        - more
+        - additional
+        - also
+        - what about
+        - furthermore
+        - moreover
+    learning:
+        - what if
+        - try
+        - experiment
+        - compare
+        - explore
+        - alternative
+    suspicious:
+        - DROP TABLE
+        - DELETE FROM
+        - INSERT INTO
+        - UPDATE
+        - TRUNCATE
+        - UNION SELECT
+signals:
+    success_signals:
+        got_it: 0.85
+        perfect: 0.95
+        solved: 0.9
+        thank_you: 0.85
+        thanks: 0.85
+        works: 0.85
+    failure_signals:
+        broken: 0.9
+        doesnt_work: 0.85
+        error: 0.9
+        failed: 0.9
+        issue: 0.8
+    frustration_keywords:
+        frustrated: 0.8
+        going_in_circles: 0.85
+        still_broken: 0.9
+        stuck: 0.85
+token_limits:
+    quick_answer: 256
+    detailed_analysis: 2000
+    routine: 256
+    learning: 1024
+    follow_up: 512
+    cache_bypass: 2000
+    max_cache_size_per_model:
+        haiku: 5000
+        opus: 50000
+        sonnet: 10000
+timeouts:
+    individual_tool_check_ms: 500
+    total_discovery_ms: 5000
+    escalation_ms: 2000
+    intent_detection_ms: 50
+    security_validation_ms: 20
+    cache_lookup_ms: 10
+paths:
+    config_dir: ~/.claude-escalate
+    data_dir: ~/.claude-escalate/data
+    graph_db_path: ~/.claude-escalate/graph.db
+    metrics_dir: ~/.claude-escalate/metrics
+    log_dir: ~/.claude-escalate/logs
+    cache_dir: ~/.claude-escalate/cache
+    claude_home: ~/.claude
+models:
+    haiku:
+        id: claude-haiku-4-5-20251001
+        cost_per_1k_input: 0.0008
+        cost_per_1k_output: 0.0004
+        context_window: 200000
+    sonnet:
+        id: claude-sonnet-4-6
+        cost_per_1k_input: 0.003
+        cost_per_1k_output: 0.015
+        context_window: 200000
+    opus:
+        id: claude-opus-4-6
+        cost_per_1k_input: 0.015
+        cost_per_1k_output: 0.075
+        context_window: 200000

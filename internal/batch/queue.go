@@ -8,16 +8,16 @@ import (
 
 // BatchQueue manages requests pending batch submission to Anthropic API
 type BatchQueue struct {
-	mu                   sync.RWMutex
-	requests             []*BatchRequest
-	maxQueueSize         int
-	maxBatchWaitTime     time.Duration
-	minBatchSize         int
-	lastFlushTime        time.Time
-	idleTimeoutDuration  time.Duration // Auto-flush if idle this long
-	totalProcessed       int64
-	totalSaved           float64
-	createdAt            time.Time
+	mu                  sync.RWMutex
+	requests            []*BatchRequest
+	maxQueueSize        int
+	maxBatchWaitTime    time.Duration
+	minBatchSize        int
+	lastFlushTime       time.Time
+	idleTimeoutDuration time.Duration // Auto-flush if idle this long
+	totalProcessed      int64
+	totalSaved          float64
+	createdAt           time.Time
 }
 
 // NewBatchQueue creates a new batch queue with default settings
@@ -178,16 +178,16 @@ func (bq *BatchQueue) QueueStats() BatchQueueStats {
 	defer bq.mu.RUnlock()
 
 	stats := BatchQueueStats{
-		Size:            len(bq.requests),
-		MaxSize:         bq.maxQueueSize,
-		MinSize:         bq.minBatchSize,
-		TotalProcessed:  bq.totalProcessed,
-		EstimatedSaved:  bq.totalSaved,
-		CreatedAt:       bq.createdAt,
-		LastFlushTime:   bq.lastFlushTime,
-		IdleTime:        time.Since(bq.lastFlushTime),
+		Size:             len(bq.requests),
+		MaxSize:          bq.maxQueueSize,
+		MinSize:          bq.minBatchSize,
+		TotalProcessed:   bq.totalProcessed,
+		EstimatedSaved:   bq.totalSaved,
+		CreatedAt:        bq.createdAt,
+		LastFlushTime:    bq.lastFlushTime,
+		IdleTime:         time.Since(bq.lastFlushTime),
 		OldestRequestAge: 0,
-		AverageAge:      0,
+		AverageAge:       0,
 	}
 
 	if len(bq.requests) > 0 {
@@ -210,16 +210,16 @@ func (bq *BatchQueue) QueueStats() BatchQueueStats {
 
 // BatchQueueStats contains queue metrics
 type BatchQueueStats struct {
-	Size              int
-	MaxSize           int
-	MinSize           int
-	TotalProcessed    int64
-	EstimatedSaved    float64
-	CreatedAt         time.Time
-	LastFlushTime     time.Time
-	IdleTime          time.Duration
-	OldestRequestAge  time.Duration
-	AverageAge        time.Duration
+	Size             int
+	MaxSize          int
+	MinSize          int
+	TotalProcessed   int64
+	EstimatedSaved   float64
+	CreatedAt        time.Time
+	LastFlushTime    time.Time
+	IdleTime         time.Duration
+	OldestRequestAge time.Duration
+	AverageAge       time.Duration
 }
 
 // SetMinBatchSize sets minimum batch size before flushing

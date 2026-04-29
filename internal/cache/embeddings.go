@@ -52,7 +52,7 @@ func (e *EmbeddingModel) Embed(ctx context.Context, text string) ([]float32, err
 		// #nosec G115
 		seed := uint64(hash) ^ (uint64(i) << 8) ^ (uint64(i) * 7) // #nosec G115
 		seed = seed*6364136223846793005 + 1442695040888963407
-		embedding[i] = float32((seed >> 32) % 10000) / 10000.0
+		embedding[i] = float32((seed>>32)%10000) / 10000.0
 	}
 
 	return embedding, nil

@@ -16,12 +16,12 @@ type BatchRequestPayload struct {
 type BatchJobStatus string
 
 const (
-	BatchStatusQueued      BatchJobStatus = "queued"
-	BatchStatusInProgress  BatchJobStatus = "in_progress"
-	BatchStatusSucceeded   BatchJobStatus = "succeeded"
-	BatchStatusFailed      BatchJobStatus = "failed"
-	BatchStatusExpired     BatchJobStatus = "expired"
-	BatchStatusCanceled    BatchJobStatus = "canceled"
+	BatchStatusQueued     BatchJobStatus = "queued"
+	BatchStatusInProgress BatchJobStatus = "in_progress"
+	BatchStatusSucceeded  BatchJobStatus = "succeeded"
+	BatchStatusFailed     BatchJobStatus = "failed"
+	BatchStatusExpired    BatchJobStatus = "expired"
+	BatchStatusCanceled   BatchJobStatus = "canceled"
 )
 
 // BatchJobTracker keeps track of submitted batch jobs
@@ -53,11 +53,11 @@ type BatchQueue struct {
 // NewBatchQueue creates a new batch queue
 func NewBatchQueue(minSize, maxSize int, timeout time.Duration) *BatchQueue {
 	return &BatchQueue{
-		requests:   make([]BatchRequest, 0, maxSize),
-		minSize:    minSize,
-		maxSize:    maxSize,
-		timeout:    timeout,
-		createdAt:  time.Now(),
+		requests:    make([]BatchRequest, 0, maxSize),
+		minSize:     minSize,
+		maxSize:     maxSize,
+		timeout:     timeout,
+		createdAt:   time.Now(),
 		lastFlushAt: time.Now(),
 	}
 }
@@ -106,9 +106,9 @@ func (q *BatchQueue) Clear() {
 
 // BatchPoller handles polling for batch job completion
 type BatchPoller struct {
-	client      *AnthropicClient
+	client       *AnthropicClient
 	pollInterval time.Duration
-	maxWait     time.Duration
+	maxWait      time.Duration
 }
 
 // NewBatchPoller creates a new batch poller
@@ -215,11 +215,11 @@ func (bct *BatchCostTracker) CompareCosts(inputTokens, outputTokens int64, reque
 	}
 
 	return map[string]interface{}{
-		"regular_api_cost": regularCost,
-		"batch_api_cost":   batchCost,
-		"total_savings":    savings,
-		"savings_percent":  savingsPercent,
-		"requests":         requestCount,
+		"regular_api_cost":    regularCost,
+		"batch_api_cost":      batchCost,
+		"total_savings":       savings,
+		"savings_percent":     savingsPercent,
+		"requests":            requestCount,
 		"per_request_savings": perRequestSavings,
 	}
 }

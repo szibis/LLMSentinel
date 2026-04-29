@@ -1,22 +1,27 @@
 version: '3.8'
 
 services:
-  # Main Claude Escalate service
+  # Main Claude Escalate Dashboard
   claude-escalate:
     build:
       context: .
       dockerfile: Dockerfile
     container_name: claude-escalate
     ports:
-      - "9000:9000"     # Main HTTP service
-      - "9090:9090"     # Prometheus /metrics endpoint
+      - "8077:8077"      # Dashboard web UI
+      - "9000:9000"      # Main HTTP service
+      - "9090:9090"      # Prometheus /metrics endpoint
     environment:
       LOG_LEVEL: info
       CONFIG_FILE: /app/config/escalate.yaml
       OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector:4317"
       OTEL_ENABLED: "true"
+      ESCALATE_BIND: "0.0.0.0"
+      ESCALATE_DATA_DIR: "/data"
     volumes:
       - ./config:/app/config
+      - ./config:/root/.claude-escalate
+      - escalate-data:/data
       - escalate-data:/root/.claude/data/escalation
     depends_on:
       - victoriametrics
@@ -25,7 +30,7 @@ services:
       - monitoring
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8077/dashboard"]
       interval: 30s
       timeout: 10s
       retries: 3

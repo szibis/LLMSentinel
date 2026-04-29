@@ -7,25 +7,25 @@ import (
 
 // BatchCalculator handles batch API cost calculations and comparisons
 type BatchCalculator struct {
-	mu                    sync.RWMutex
-	calc                  *Calculator
-	batchDiscountPercent  float64 // Default 50% (0.5)
-	totalRegularCost      float64
-	totalBatchCost        float64
-	totalTokensSaved      int64
-	requestsProcessed     int64
+	mu                     sync.RWMutex
+	calc                   *Calculator
+	batchDiscountPercent   float64 // Default 50% (0.5)
+	totalRegularCost       float64
+	totalBatchCost         float64
+	totalTokensSaved       int64
+	requestsProcessed      int64
 	batchRequestsProcessed int64
 }
 
 // NewBatchCalculator creates a new batch cost calculator
 func NewBatchCalculator() *BatchCalculator {
 	return &BatchCalculator{
-		calc:                 NewCalculator(),
-		batchDiscountPercent: 0.5, // 50% discount
-		totalRegularCost:     0,
-		totalBatchCost:       0,
-		totalTokensSaved:     0,
-		requestsProcessed:    0,
+		calc:                   NewCalculator(),
+		batchDiscountPercent:   0.5, // 50% discount
+		totalRegularCost:       0,
+		totalBatchCost:         0,
+		totalTokensSaved:       0,
+		requestsProcessed:      0,
 		batchRequestsProcessed: 0,
 	}
 }
@@ -83,14 +83,14 @@ func (bc *BatchCalculator) CompareCosts(model string, inputTokens, outputTokens 
 	}
 
 	return BatchCostComparison{
-		Model:           model,
-		RegularCost:     regularCost,
-		BatchCost:       batchCost,
-		SavingsAmount:   savings,
-		SavingsPercent:  savingsPercent,
-		InputTokens:     inputTokens,
-		OutputTokens:    outputTokens,
-		TotalTokens:     inputTokens + outputTokens,
+		Model:          model,
+		RegularCost:    regularCost,
+		BatchCost:      batchCost,
+		SavingsAmount:  savings,
+		SavingsPercent: savingsPercent,
+		InputTokens:    inputTokens,
+		OutputTokens:   outputTokens,
+		TotalTokens:    inputTokens + outputTokens,
 	}, nil
 }
 
@@ -153,14 +153,14 @@ func (bc *BatchCalculator) GetCostSummary() CostSummary {
 	}
 
 	return CostSummary{
-		TotalRegularCost:       bc.totalRegularCost,
-		TotalBatchCost:         bc.totalBatchCost,
-		TotalCost:              totalCost,
-		TotalSavings:           bc.totalRegularCost - bc.totalBatchCost,
-		SavingsPercent:         savingsPercent,
-		TotalTokensSaved:       bc.totalTokensSaved,
-		TotalRequestsProcessed: bc.requestsProcessed,
-		BatchRequestsProcessed: bc.batchRequestsProcessed,
+		TotalRegularCost:         bc.totalRegularCost,
+		TotalBatchCost:           bc.totalBatchCost,
+		TotalCost:                totalCost,
+		TotalSavings:             bc.totalRegularCost - bc.totalBatchCost,
+		SavingsPercent:           savingsPercent,
+		TotalTokensSaved:         bc.totalTokensSaved,
+		TotalRequestsProcessed:   bc.requestsProcessed,
+		BatchRequestsProcessed:   bc.batchRequestsProcessed,
 		RegularRequestsProcessed: bc.requestsProcessed - bc.batchRequestsProcessed,
 	}
 }
