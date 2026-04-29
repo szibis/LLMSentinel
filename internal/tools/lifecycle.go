@@ -180,10 +180,7 @@ func (tr *ToolRegistry) RemoveTool(name string) error {
 		tr.backupConfig()
 	}
 
-	// Cascade cleanup if enabled
-	if tr.cascadeCleanup {
-		// TODO: Remove from all selectors and configurations
-	}
+	// TODO: Cascade cleanup - remove from all selectors and configurations if enabled
 
 	// Remove from registry
 	delete(tr.tools, name)
@@ -290,7 +287,7 @@ func (tr *ToolRegistry) performHealthChecks(ctx context.Context) {
 }
 
 // healthCheck tests if a tool is healthy
-func (tr *ToolRegistry) healthCheck(ctx context.Context, tool *ToolMetadata) error {
+func (tr *ToolRegistry) healthCheck(_ context.Context, tool *ToolMetadata) error {
 	// TODO: Implement per-type health checking using adapters
 	// For now, basic path validation
 	switch tool.Type {

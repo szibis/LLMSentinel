@@ -8,6 +8,7 @@ func TestNewOutputProcessor(t *testing.T) {
 	proc := NewOutputProcessor()
 	if proc == nil {
 		t.Error("NewOutputProcessor() returned nil")
+		return
 	}
 	if proc.maxContextTokens == 0 {
 		t.Error("maxContextTokens should be set")

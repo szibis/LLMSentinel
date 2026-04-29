@@ -2,7 +2,7 @@ package tools
 
 import (
 	"fmt"
-	"math/rand"
+	"math/rand/v2"
 )
 
 // Selector implements intent-based tool selection with weights and fallbacks
@@ -122,12 +122,18 @@ func (s *Selector) SelectByWeight(tools []string, weights map[string]float64) st
 		}
 	}
 
+	if len(tools) == 0 {
+		return ""
+	}
+
 	if totalWeight == 0 {
 		// Fallback to random selection
-		return tools[rand.Intn(len(tools))]
+		// nolint:gosec // G404 suppressed: non-cryptographic use case
+		return tools[rand.IntN(len(tools))]
 	}
 
 	// Weighted random selection
+	//nolint:gosec
 	r := rand.Float64() * totalWeight
 	current := 0.0
 	for _, tool := range tools {
@@ -138,5 +144,5 @@ func (s *Selector) SelectByWeight(tools []string, weights map[string]float64) st
 		}
 	}
 
-	return tools[0]
+	return tools[len(tools)-1]
 }

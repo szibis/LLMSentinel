@@ -16,6 +16,7 @@ func TestNewErrorHandler(t *testing.T) {
 
 	if handler == nil {
 		t.Error("NewErrorHandler() returned nil")
+		return
 	}
 	if handler.policy.FailOpen != policy.FailOpen {
 		t.Error("ErrorPolicy.FailOpen not set correctly")

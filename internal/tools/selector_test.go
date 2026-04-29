@@ -8,9 +8,11 @@ func TestNewSelector(t *testing.T) {
 	sel := NewSelector()
 	if sel == nil {
 		t.Error("NewSelector() returned nil")
+		return
 	}
 	if sel.intentToolMap == nil {
 		t.Error("Selector.intentToolMap is nil")
+		return
 	}
 	if len(sel.intentToolMap) == 0 {
 		t.Error("Selector.intentToolMap should have default mappings")

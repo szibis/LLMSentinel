@@ -16,21 +16,27 @@ func TestNewToolManager(t *testing.T) {
 
 	if manager == nil {
 		t.Error("NewToolManager() returned nil")
+		return
 	}
 	if manager.registry == nil {
 		t.Error("Manager.registry is nil")
+		return
 	}
 	if manager.invoker == nil {
 		t.Error("Manager.invoker is nil")
+		return
 	}
 	if manager.selector == nil {
 		t.Error("Manager.selector is nil")
+		return
 	}
 	if manager.errorHandler == nil {
 		t.Error("Manager.errorHandler is nil")
+		return
 	}
 	if manager.processor == nil {
 		t.Error("Manager.processor is nil")
+		return
 	}
 }
 

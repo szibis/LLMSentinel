@@ -10,6 +10,7 @@ func TestNewToolRegistry(t *testing.T) {
 	reg := NewToolRegistry("/tmp/config.yaml")
 	if reg == nil {
 		t.Error("NewToolRegistry() returned nil")
+		return
 	}
 	if reg.configPath != "/tmp/config.yaml" {
 		t.Errorf("configPath = %q, want /tmp/config.yaml", reg.configPath)
@@ -47,6 +48,7 @@ func TestToolRegistry_RegisterTool_Valid(t *testing.T) {
 	registered, _ := reg.GetTool("test_tool")
 	if registered == nil {
 		t.Error("Tool not registered")
+		return
 	}
 	if registered.Name != "test_tool" {
 		t.Errorf("Tool name = %q, want test_tool", registered.Name)

@@ -56,12 +56,15 @@ func TestInvoker_New(t *testing.T) {
 
 	if invoker == nil {
 		t.Error("NewInvoker() returned nil")
+		return
 	}
 	if invoker.selector == nil {
 		t.Error("Invoker.selector is nil")
+		return
 	}
 	if invoker.factory == nil {
 		t.Error("Invoker.factory is nil")
+		return
 	}
 }
 
@@ -105,9 +108,9 @@ func TestInvoker_Invoke_ContextCancellation(t *testing.T) {
 	}
 
 	results, err := invoker.Invoke(ctx, req)
-	// Should return empty or error due to cancellation
-	if results == nil {
-		results = []InvocationResult{}
+	// Should return empty or error due to cancellation (acceptable on context cancellation)
+	if results != nil {
+		t.Log("Results received despite context cancellation")
 	}
 	_ = err // Context cancellation is acceptable
 }
