@@ -15,7 +15,7 @@ Only the latest released version receives security fixes. Users are encouraged t
 
 Instead, use **GitHub's private vulnerability reporting** to report security issues:
 
-1. Go to the [Security Advisories](https://github.com/szibis/claude-escalate/security/advisories) page.
+1. Go to the [Security Advisories](https://github.com/szibis/llm-sentinel/security/advisories) page.
 2. Click **"Report a vulnerability"**.
 3. Fill in the details and submit.
 
@@ -37,7 +37,7 @@ Instead, use **GitHub's private vulnerability reporting** to report security iss
 
 The following are in scope for security reports:
 
-- The `claude-escalate` binary and its dependencies.
+- The `llm-sentinel` binary and its dependencies.
 - The Docker image and its base layers.
 - The local dashboard web server.
 - CI/CD workflow configurations that could lead to supply chain issues.

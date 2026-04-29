@@ -1,6 +1,6 @@
 # Code Quality Standards
 
-Claude Escalate maintains high quality standards across testing, documentation, and code style.
+LLMSentinel maintains high quality standards across testing, documentation, and code style.
 
 ---
 

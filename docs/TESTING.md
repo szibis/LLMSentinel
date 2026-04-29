@@ -245,7 +245,7 @@ TestModelSelectionLogic()
 
 // Cascade after success
 TestCascadeAfterSuccess()
-    1. Escalate to Opus for hard problem
+    1. LLMSentinel to Opus for hard problem
     2. Success detected
     3. Next task: De-escalate to Sonnet
     ✅ Verify cost optimization
@@ -267,7 +267,7 @@ TestRegressionFrustrationFalsePositive()
     // Issue: "thanks" detected as success even in angry message
     // Expected: Context-aware sentiment
 
-TestRegressionEscalateCommand()
+TestRegressionLLMSentinelCommand()
     // Issue: /escalate command triggered frustration signal
     // Expected: Commands don't affect sentiment
 

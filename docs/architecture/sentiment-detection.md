@@ -1,6 +1,6 @@
 # Sentiment Detection & Anti-Frustration System
 
-Claude Escalate detects user sentiment (frustrated, confused, impatient, cautious, satisfied) and uses it to make intelligent routing decisions. The goal: **minimize frustration while protecting your token budget**.
+LLMSentinel detects user sentiment (frustrated, confused, impatient, cautious, satisfied) and uses it to make intelligent routing decisions. The goal: **minimize frustration while protecting your token budget**.
 
 ---
 
@@ -10,8 +10,8 @@ The system recognizes six sentiment signals:
 
 | Sentiment | Signal | Response |
 |-----------|--------|----------|
-| **Frustrated** | "still broken", "not working", repeated escalations | Escalate to higher model (Haiku → Sonnet → Opus) |
-| **Confused** | "why", "don't understand", follow-up questions | Escalate to Sonnet for better explanations |
+| **Frustrated** | "still broken", "not working", repeated escalations | LLMSentinel to higher model (Haiku → Sonnet → Opus) |
+| **Confused** | "why", "don't understand", follow-up questions | LLMSentinel to Sonnet for better explanations |
 | **Impatient** | "hurry", "ASAP", rapid follow-ups | Switch to Haiku (faster) or show warning |
 | **Cautious** | "be careful", "slowly", "don't break" | Stay on current model or de-escalate carefully |
 | **Satisfied** | "perfect", "thanks", "works", "exactly" | Cascade to cheaper model (Opus → Sonnet → Haiku) |
@@ -152,7 +152,7 @@ Reason: Best model couldn't solve it, might need human help
 ```
 Sentiment: confused (why, explain, don't understand)
 Current: Haiku
-Action: Escalate to Sonnet
+Action: LLMSentinel to Sonnet
 Reason: Sonnet better at clear explanations
 ```
 
@@ -295,7 +295,7 @@ Output:
 === Sentiment Dashboard ===
 Satisfaction Rate: 87.3% (62/71)
 Recent Frustration Events: 2
-  [2h ago] Concurrency on Haiku → Escalated to Sonnet → Resolved ✅
+  [2h ago] Concurrency on Haiku → LLMSentineld to Sonnet → Resolved ✅
   [30m ago] Parsing on Haiku → Success, no escalation needed ✅
 
 Model Satisfaction (by task type):
@@ -341,7 +341,7 @@ You: "I'm still confused, can you explain with an example?"
 System detects:
 - Keyword: "confused"
 - Sentiment: confused
-- Action: Escalate to Sonnet (better at explaining)
+- Action: LLMSentinel to Sonnet (better at explaining)
 
 [Sonnet explains with detailed example]
 You: "Ah, got it! That makes sense now."

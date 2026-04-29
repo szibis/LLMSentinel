@@ -28,7 +28,7 @@
    - Frustration events list with:
      - Timestamp
      - Task type
-     - Initial model → Escalated to model
+     - Initial model → LLMSentineld to model
      - Resolution status
    - Model satisfaction by task type (ranked by success rate)
 

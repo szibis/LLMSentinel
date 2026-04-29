@@ -9,7 +9,7 @@
 
 ---
 
-## 🎯 What Is Claude Escalate?
+## 🎯 What Is LLMSentinel?
 
 LLMSentinel v1.0.0 is a gateway-layer token optimization engine for Claude API. It runs locally between your application and Claude, automatically reducing token usage by **60-75%** through:
 

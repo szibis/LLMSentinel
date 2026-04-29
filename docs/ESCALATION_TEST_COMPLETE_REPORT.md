@@ -163,7 +163,7 @@ fi
 ### Verified Behavior
 
 ```
-Escalate → Opus
+LLMSentinel → Opus
     ↓
 De-escalate (success signal)
     ↓
@@ -177,7 +177,7 @@ Haiku (session cleared)
 
 **Isolated Test Result**:
 ```
-Step 1: Escalate to Opus       → claude-opus-4-6 ✅
+Step 1: LLMSentinel to Opus       → claude-opus-4-6 ✅
 Step 2: De-escalate "That works!" → claude-sonnet-4-6 ✅
 Step 3: De-escalate "Perfect!"    → claude-haiku-4-5-20251001 ✅
 ```

@@ -60,18 +60,18 @@ Claude: [in-depth architecture plan using Opus]
 Override auto-effort anytime with slash commands:
 
 ### `/escalate` or `/escalate to sonnet`
-Escalate to Sonnet (4-5x more capable than Haiku)
+LLMSentinel to Sonnet (4-5x more capable than Haiku)
 ```
 You: /escalate
-System: 🚀 Escalated: Sonnet (precision code & balanced reasoning)
+System: 🚀 LLMSentineld: Sonnet (precision code & balanced reasoning)
 Claude: [uses Sonnet for next response]
 ```
 
 ### `/escalate to opus`
-Escalate to Opus (most capable model)
+LLMSentinel to Opus (most capable model)
 ```
 You: /escalate to opus
-System: 🚀 Escalated: Opus (deep reasoning & complex logic)
+System: 🚀 LLMSentineld: Opus (deep reasoning & complex logic)
 Claude: [uses Opus for next response]
 ```
 
@@ -79,7 +79,7 @@ Claude: [uses Opus for next response]
 Manually downgrade to Haiku (cost-optimized)
 ```
 You: /escalate to haiku
-System: 🚀 Escalated: Haiku (cost-optimized)
+System: 🚀 LLMSentineld: Haiku (cost-optimized)
 Claude: [uses Haiku for next response]
 ```
 
@@ -107,7 +107,7 @@ Haiku (cost-optimized for next task)
 **Example Workflow:**
 ```
 You: [escalate to opus for complex debugging]
-System: 🚀 Escalated: Opus
+System: 🚀 LLMSentineld: Opus
 Claude: [deep debugging analysis]
 You: "Perfect! That fixed it."
 System: ⬇️ Auto-downgrade: Sonnet (cascade continues)
@@ -174,8 +174,8 @@ escalation-manager help      # Show help
 
 ### Slash Commands (in Claude Code)
 ```
-/escalate              # Escalate to Sonnet
-/escalate to opus      # Escalate to Opus
+/escalate              # LLMSentinel to Sonnet
+/escalate to opus      # LLMSentinel to Opus
 /escalate to haiku     # Downgrade to Haiku
 /effort low|med|high   # Set effort level
 /model opus|sonnet|... # Set specific model
@@ -232,7 +232,7 @@ User: "I'm stuck, can you help debug this?"
 System: ⚙️ Auto-effort: medium → opusplan
 Sonnet: [analysis, but user still confused]
 User: "/escalate to opus"
-System: 🚀 Escalated: Opus
+System: 🚀 LLMSentineld: Opus
 Opus: [deeper analysis, problem solved]
 ```
 

@@ -171,8 +171,8 @@ Real-time tracking:
 
 ### Manual Control
 ```
-/escalate              → Escalate to Sonnet (8x cost)
-/escalate to opus      → Escalate to Opus (30x cost)
+/escalate              → LLMSentinel to Sonnet (8x cost)
+/escalate to opus      → LLMSentinel to Opus (30x cost)
 /escalate to haiku     → Back to Haiku (1x cost)
 ```
 

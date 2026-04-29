@@ -4,8 +4,8 @@
 
 ### 1. Clone the Repository
 ```bash
-git clone https://github.com/szibis/claude-escalate.git
-cd claude-escalate
+git clone https://github.com/szibis/llm-sentinel.git
+cd llm-sentinel
 ```
 
 ### 2. Install the Binary
@@ -17,7 +17,7 @@ cd claude-escalate
 
 This will:
 - Download the latest compiled binary for your OS/architecture
-- Place it in `~/.local/bin/claude-escalate`
+- Place it in `~/.local/bin/llm-sentinel`
 - Verify installation
 
 #### Option B: Use Bash Version (Lightweight)

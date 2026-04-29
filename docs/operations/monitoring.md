@@ -1,6 +1,6 @@
 # Monitoring & Observability
 
-Monitor Claude Escalate in production.
+Monitor LLMSentinel in production.
 
 ---
 

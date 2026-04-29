@@ -1,7 +1,7 @@
 # Multi-CLI Integration Feasibility Analysis
 
 **Date**: 2026-04-29  
-**Scope**: Feasibility of adopting claude-escalate across Claude CLI, Copilot CLI, Gemini CLI, and Codex CLI  
+**Scope**: Feasibility of adopting llm-sentinel across Claude CLI, Copilot CLI, Gemini CLI, and Codex CLI  
 **Verdict**: ⚠️ **Conditionally Feasible** - Core execution feedback loop works everywhere; feature coverage varies by 40-95% per CLI
 
 ---
@@ -41,7 +41,7 @@
   - Settings: `~/.claude/settings.json` (statusline, plugins, etc.)
 - **Authentication**: Anthropic API key in `~/.anthropic-api-key`
 
-#### Escalate Integration Path
+#### LLMSentinel Integration Path
 ```
 Claude Code CLI
     ↓
@@ -79,7 +79,7 @@ Pattern generation → EXECUTION_PATTERNS.md auto-loaded at session start
 - **Configuration**: `~/.config/gh/config.yml` (YAML)
 - **API Endpoint**: Proprietary GitHub API (not public, reverse-engineered)
 
-#### Escalate Integration Path
+#### LLMSentinel Integration Path
 ```
 User runs: gh copilot suggest "write a function"
     ↓
@@ -127,7 +127,7 @@ Patterns auto-generated from logs
 - **API Endpoint**: `https://generativelanguage.googleapis.com/v1beta/` (public Google API)
 - **Models**: `gemini-1.5-flash`, `gemini-1.5-pro`, `gemini-2.0-flash-exp`, `gemini-2.0-pro`
 
-#### Escalate Integration Path
+#### LLMSentinel Integration Path
 ```
 User runs: glm --model=gemini-2.0-flash "explain this code"
     ↓
@@ -173,7 +173,7 @@ Patterns auto-generated with token cost analysis
 - **API Endpoint**: `https://api.openai.com/v1/` (public OpenAI API)
 - **Models**: `gpt-3.5-turbo`, `gpt-4`, `gpt-4o`, `gpt-4-turbo` (Codex itself deprecated in 2023)
 
-#### Escalate Integration Path
+#### LLMSentinel Integration Path
 ```
 User runs: openai api chat.completions --model=gpt-4o "write function"
     ↓
@@ -863,7 +863,7 @@ escalate config --add-provider=gemini --api-key=$GCLOUD_API_KEY
 escalate analytics --by-provider
 
 # Step 3: Optional: Add fallback
-escalate config --set-fallback=gemini  # Escalate to Gemini if Claude over budget
+escalate config --set-fallback=gemini  # LLMSentinel to Gemini if Claude over budget
 
 # Step 4: Monitor cross-provider behavior
 escalate analytics --compare-providers

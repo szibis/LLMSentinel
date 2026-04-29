@@ -124,7 +124,7 @@ sentiment:
 
 ## How It Works in Practice
 
-### Scenario 1: Frustrated User Gets Auto-Escalated
+### Scenario 1: Frustrated User Gets Auto-LLMSentineld
 
 ```
 You: "Debug this race condition"
@@ -179,7 +179,7 @@ System: Record success, learn "explanation" questions → Sonnet
 
 ```
 Multiple interactions:
-1. Concurrency question on Haiku → User frustrated (0.75) → Escalated
+1. Concurrency question on Haiku → User frustrated (0.75) → LLMSentineld
 2. Concurrency question on Sonnet → User satisfied (0.90)
 3. Concurrency question on Sonnet → User satisfied (0.95)
 4. Concurrency question on Opus → User satisfied (0.98)
@@ -207,7 +207,7 @@ escalation-manager dashboard --sentiment
 # Output:
 # Satisfaction Rate: 87.3% (62/71)
 # Recent Frustration Events: 2
-#   [2h ago] Concurrency on Haiku → Escalated
+#   [2h ago] Concurrency on Haiku → LLMSentineld
 #   [30m ago] Parsing on Haiku → Resolved
 #
 # Model Satisfaction (by task type):

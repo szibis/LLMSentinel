@@ -1,6 +1,6 @@
 # Deployment Guide
 
-Deploy Claude Escalate in your environment.
+Deploy LLMSentinel in your environment.
 
 ---
 

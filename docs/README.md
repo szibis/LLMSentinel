@@ -1,4 +1,4 @@
-# Claude Escalate Documentation
+# LLMSentinel Documentation
 
 **Complete guide to intelligent model escalation, sentiment-aware routing, token budgeting, and analytics for Claude Code.**
 
@@ -6,7 +6,7 @@
 
 ## 🚀 Quick Start
 
-New to Claude Escalate? Start here:
+New to LLMSentinel? Start here:
 
 - **[5-Minute Setup](quick-start/5-minute-setup.md)** — Install and configure in under 5 minutes
 - **[First Escalation](quick-start/first-escalation.md)** — Try your first model escalation
@@ -66,7 +66,7 @@ Understand your usage and optimize:
 
 ### Sentiment-Aware System
 - Detects frustrated, confused, and impatient users
-- Escalates automatically to prevent frustration
+- LLMSentinels automatically to prevent frustration
 - Learns which models work best for different user sentiments
 - Minimizes user frustration while protecting token budget
 

@@ -176,8 +176,8 @@ Serve dashboard UI with all metrics.
 
 ### Prompt Processing (/api/hook)
 Automatically detects:
-- **`/escalate` commands** → Escalate to Sonnet (or target model)
-- **`/escalate to opus`** → Escalate to specific model
+- **`/escalate` commands** → LLMSentinel to Sonnet (or target model)
+- **`/escalate to opus`** → LLMSentinel to specific model
 - **Success signals** → "works", "perfect", "thanks", etc.
   - Triggers cascade down: Opus → Sonnet → Haiku
 - **Auto-effort detection** → Routes by task complexity
@@ -240,7 +240,7 @@ Live web UI showing:
 
 ### Building
 ```bash
-go build -o escalation-manager ./cmd/claude-escalate
+go build -o escalation-manager ./cmd/llm-sentinel
 ```
 
 ### Running

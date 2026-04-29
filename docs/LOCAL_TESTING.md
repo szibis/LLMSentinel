@@ -7,7 +7,7 @@
 ### 1. Start Docker Service
 
 ```bash
-cd /tmp/claude-escalate/docker-compose
+cd /tmp/llm-sentinel/docker-compose
 docker-compose up -d
 
 # Verify it's running
@@ -20,12 +20,12 @@ curl http://localhost:8077
 ```bash
 # Option A: Use the Go binary (pre-built, faster)
 mkdir -p ~/.local/bin
-cp /tmp/claude-escalate/claude-escalate ~/.local/bin/escalation-manager
+cp /tmp/llm-sentinel/llm-sentinel ~/.local/bin/escalation-manager
 chmod +x ~/.local/bin/escalation-manager
 
 # Verify
 ~/.local/bin/escalation-manager version
-# Should show: claude-escalate 2.0.0
+# Should show: llm-sentinel 2.0.0
 ```
 
 ### 3. Configure Claude Code Hook
@@ -122,7 +122,7 @@ Observe dashboard effort level changing automatically.
 
 ### Scenario 4: Cascade Timeout Prevention
 
-1. Escalate to Opus: `/escalate to opus`
+1. LLMSentinel to Opus: `/escalate to opus`
 2. Send success signal: `This is perfect!`
 3. System cascades: Opus → Sonnet
 4. Send another success signal immediately: `Thanks!`
@@ -257,7 +257,7 @@ cat ~/.claude/data/escalation/sessions.jsonl | head
 
 ```bash
 # Stop Docker service
-cd /tmp/claude-escalate/docker-compose
+cd /tmp/llm-sentinel/docker-compose
 docker-compose down
 
 # Remove hook from settings (optional)
@@ -267,7 +267,7 @@ mv /tmp/settings.json ~/.claude/settings.json
 
 ### Preserve Data
 
-Data persists in `/tmp/claude-escalate/docker-compose/escalation-data` volume.
+Data persists in `/tmp/llm-sentinel/docker-compose/escalation-data` volume.
 
 To keep data while stopping:
 ```bash

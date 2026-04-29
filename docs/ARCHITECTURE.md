@@ -1,12 +1,12 @@
-# Claude Escalate v4.0.0 - Architecture & Technical Design
+# LLMSentinel v4.0.0 - Architecture & Technical Design
 
 ## System Overview
 
-Claude Escalate v4.0.0 is a cost optimization platform for Claude deployments featuring ML-based task classification, advanced analytics, observability, and a comprehensive web dashboard.
+LLMSentinel v4.0.0 is a cost optimization platform for Claude deployments featuring ML-based task classification, advanced analytics, observability, and a comprehensive web dashboard.
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    Claude Escalate v4.0.0                   │
+│                    LLMSentinel v4.0.0                   │
 │                 (http://localhost:9000)                      │
 └─────────────────────────────────────────────────────────────┘
         │
@@ -220,7 +220,7 @@ Scrape interval: configurable (default: 15s)
 
 #### 3b. OTEL Metrics Push
 ```
-Claude Escalate Service
+LLMSentinel Service
     ↓ (Every 60 seconds)
 Build OTLP metrics payload
 (same metrics as Prometheus)
@@ -347,7 +347,7 @@ web/
 
 ```
 ┌─────────────────────────────────────────────┐
-│ Claude Escalate (Port 9000)                 │
+│ LLMSentinel (Port 9000)                 │
 │ ├─ :9000/api/* (REST endpoints)             │
 │ ├─ :9000/metrics (Prometheus export)        │
 │ └─ :9000/health (Service health)            │
@@ -678,7 +678,7 @@ Impact: Requests fail temporarily (client should retry)
 Issue: Metrics scrape fails (port 8428 unreachable)
     ↓
 Behavior:
-  ├─ Claude Escalate continues normally
+  ├─ LLMSentinel continues normally
   ├─ /metrics endpoint still works (pull)
   ├─ OTEL push fails silently (with backoff retry)
   └─ Grafana has stale data (last scraped value)
@@ -716,7 +716,7 @@ Behavior:
   └─ CLI tools still functional
     ↓
 Recovery: Check backend logs
-  docker-compose logs -f claude-escalate
+  docker-compose logs -f llm-sentinel
 ```
 
 ---
@@ -827,7 +827,7 @@ Classification:
 
 ```
 Host Machine
-├─ Claude Escalate (go run)
+├─ LLMSentinel (go run)
 ├─ VictoriaMetrics (docker)
 ├─ Grafana (docker)
 ├─ OTel Collector (docker)
@@ -841,7 +841,7 @@ All communicate via localhost networking
 ```
 Host Machine
 ├─ docker-compose up -d
-│  ├─ claude-escalate:4.0.0 (image)
+│  ├─ llm-sentinel:4.0.0 (image)
 │  ├─ victoriametrics:latest
 │  ├─ grafana:latest
 │  └─ otel-collector:latest
@@ -858,9 +858,9 @@ Host Machine
 
 ```
 Load Balancer (nginx/haproxy)
-├─ Claude Escalate Pod 1 (replica)
-├─ Claude Escalate Pod 2 (replica)
-└─ Claude Escalate Pod N (replica)
+├─ LLMSentinel Pod 1 (replica)
+├─ LLMSentinel Pod 2 (replica)
+└─ LLMSentinel Pod N (replica)
     ↓ (all write to)
 Shared PostgreSQL
     ↓

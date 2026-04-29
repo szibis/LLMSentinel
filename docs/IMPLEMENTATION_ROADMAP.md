@@ -137,7 +137,7 @@
 - [ ] Max depth to prevent infinite loops
 
 **Week 3: Cost-Aware Escalation**
-- [ ] Recommendation: "Escalate to Gemini Flash instead of Claude Opus" (7x cheaper)
+- [ ] Recommendation: "LLMSentinel to Gemini Flash instead of Claude Opus" (7x cheaper)
 - [ ] Automatic provider switching based on cost/capability tradeoff
 - [ ] Cross-provider model selection logic
 

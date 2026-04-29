@@ -2,7 +2,7 @@
 
 ## Overview
 
-Claude Escalate exports metrics for monitoring cache performance, token savings, security events, and system health. Two formats:
+LLMSentinel exports metrics for monitoring cache performance, token savings, security events, and system health. Two formats:
 - **Prometheus**: `http://localhost:8080/metrics` (pull-based scraping)
 - **OpenTelemetry**: Push metrics to collector (configurable push interval)
 
@@ -10,7 +10,7 @@ Claude Escalate exports metrics for monitoring cache performance, token savings,
 
 ```mermaid
 graph TD
-    A["📊 Claude Escalate<br/>Collecting Metrics"] --> B["📈 Prometheus<br/>Pull /metrics"]
+    A["📊 LLMSentinel<br/>Collecting Metrics"] --> B["📈 Prometheus<br/>Pull /metrics"]
     A --> C["📤 OTEL<br/>Push to Collector"]
     
     B --> B1["Prometheus<br/>Server"]
@@ -278,7 +278,7 @@ Provides metrics every 1 second to connected clients (for dashboard).
 ```yaml
 # Grafana UI: Configuration → Data Sources → Add Prometheus
 
-name: Claude Escalate
+name: LLMSentinel
 url: http://localhost:9090
 ```
 

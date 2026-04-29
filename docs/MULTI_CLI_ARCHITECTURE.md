@@ -11,7 +11,7 @@
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                      Escalate Multi-CLI System                   │
+│                      LLMSentinel Multi-CLI System                   │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                   │
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐            │
@@ -264,7 +264,7 @@ type MultiProviderEngine struct {
 type FallbackPolicy struct {
     Enabled              bool
     FallbackOrder        []string  // ["gemini", "openai"] if primary fails
-    FallbackOnBudgetHit  bool      // Escalate to another provider?
+    FallbackOnBudgetHit  bool      // LLMSentinel to another provider?
     MaxFallbackDepth     int       // Prevent infinite loops
 }
 

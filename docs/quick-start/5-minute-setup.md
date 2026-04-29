@@ -1,6 +1,6 @@
 # 5-Minute Setup Guide
 
-Get Claude Escalate running in under 5 minutes.
+Get LLMSentinel running in under 5 minutes.
 
 ## Prerequisites
 - Claude Code installed and configured
