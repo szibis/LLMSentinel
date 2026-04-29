@@ -1,17 +1,17 @@
-# Claude Escalate v0.8.0
+# LLMSentinel v1.0.0
 
 > **Token optimization gateway for Claude API — 60-75% cost savings with Batch API, knowledge graphs, semantic caching, intelligent input compression, and visual tool management.**
 
 [![Go](https://img.shields.io/badge/Go-1.26-blue)](https://golang.org)
 [![License](https://img.shields.io/badge/license-Apache%202.0-green)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-614%20passing-brightgreen)](https://github.com/szibis/claude-escalate)
+[![Tests](https://img.shields.io/badge/tests-614%20passing-brightgreen)](https://github.com/szibis/LLMSentinel)
 [![Coverage](https://img.shields.io/badge/coverage-85%25-blue)]()
 
 ---
 
 ## 🎯 What Is Claude Escalate?
 
-Claude Escalate v0.8.0 is a gateway-layer token optimization engine for Claude API. It runs locally between your application and Claude, automatically reducing token usage by **60-75%** through:
+LLMSentinel v1.0.0 is a gateway-layer token optimization engine for Claude API. It runs locally between your application and Claude, automatically reducing token usage by **60-75%** through:
 
 - **⚡ Batch API** (50% savings) — Anthropic Batch API integration for non-interactive workloads
 - **🔍 Knowledge Graph Queries** (99% savings) — Answer relationship questions from indexed code
@@ -372,7 +372,7 @@ See **[DOCKER_SETUP.md](docs/DOCKER_SETUP.md)** for full guide.
 ### Option B: Build Locally
 
 ```bash
-git clone https://github.com/szibis/claude-escalate.git
+git clone https://github.com/szibis/LLMSentinel.git
 cd claude-escalate
 make build
 ./bin/claude-escalate version
@@ -536,14 +536,14 @@ docker run -p 8080:8080 szibis/claude-escalate:4.0.0
 
 ### Option B: Pre-built Binary
 ```bash
-wget https://github.com/szibis/claude-escalate/releases/download/v4.0.0/claude-escalate-linux-x64
+wget https://github.com/szibis/LLMSentinel/releases/download/v4.0.0/claude-escalate-linux-x64
 chmod +x claude-escalate-linux-x64
 ./claude-escalate-linux-x64 service --port 8080
 ```
 
 ### Option C: Build from Source
 ```bash
-git clone https://github.com/szibis/claude-escalate.git
+git clone https://github.com/szibis/LLMSentinel.git
 cd claude-escalate
 make build          # Builds Go binary
 make dev            # Starts dashboard on :8080
@@ -614,8 +614,8 @@ MIT License — See [LICENSE](LICENSE) file for details.
 
 ## 🆘 Support
 
-- **Issues**: [GitHub Issues](https://github.com/szibis/claude-escalate/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/szibis/claude-escalate/discussions)
+- **Issues**: [GitHub Issues](https://github.com/szibis/LLMSentinel/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/szibis/LLMSentinel/discussions)
 - **Documentation**: [Full Docs](docs/)
 
 ---
