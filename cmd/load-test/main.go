@@ -35,22 +35,48 @@ type LoadTestMetrics struct {
 
 func main() {
 	// Parse flags
+	scenarioName := flag.String("scenario", "", "Load test scenario (constant, burst, churn, mixed, recovery, or custom)")
 	duration := flag.Duration("duration", 5*time.Minute, "Total test duration")
 	rate := flag.Int("rate", 5000, "Target requests per second")
 	workers := flag.Int("workers", 100, "Number of concurrent workers")
 	rampUp := flag.Duration("ramp-up", 30*time.Second, "Ramp-up duration")
 	rampDown := flag.Duration("ramp-down", 30*time.Second, "Ramp-down duration")
 	reportInterval := flag.Duration("report", 10*time.Second, "Metrics report interval")
+	listScenarios := flag.Bool("list-scenarios", false, "List all available scenarios and exit")
 
 	flag.Parse()
 
-	config := LoadTestConfig{
-		Duration:         *duration,
-		TargetRate:       *rate,
-		Workers:          *workers,
-		RampUpDuration:   *rampUp,
-		RampDownDuration: *rampDown,
-		ReportInterval:   *reportInterval,
+	// List scenarios if requested
+	if *listScenarios {
+		PrintScenarioList()
+		return
+	}
+
+	// Load scenario or use custom config
+	var config LoadTestConfig
+	if *scenarioName != "" {
+		scenarios := AllScenarios()
+		scenario, ok := scenarios[*scenarioName]
+		if !ok {
+			fmt.Printf("ERROR: Unknown scenario '%s'\n", *scenarioName)
+			fmt.Println("\nAvailable scenarios:")
+			for name := range scenarios {
+				fmt.Printf("  - %s\n", name)
+			}
+			return
+		}
+		config = scenario.Config
+		fmt.Printf("Running Scenario: %s\n\n", scenario.Description)
+	} else {
+		// Use custom configuration from flags
+		config = LoadTestConfig{
+			Duration:         *duration,
+			TargetRate:       *rate,
+			Workers:          *workers,
+			RampUpDuration:   *rampUp,
+			RampDownDuration: *rampDown,
+			ReportInterval:   *reportInterval,
+		}
 	}
 
 	fmt.Printf("Load Test Configuration:\n")

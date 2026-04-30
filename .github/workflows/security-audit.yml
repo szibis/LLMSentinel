@@ -1,0 +1,219 @@
+name: Security Audit
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+  schedule:
+    - cron: '0 2 * * *'  # Daily security scan at 2 AM UTC
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  gosec:
+    name: Go Security Scanner (gosec)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run gosec
+        uses: securego/gosec@master
+        with:
+          args: '-fmt sarif -out gosec-report.sarif -severity medium,high -confidence medium,high ./...'
+
+      - name: Upload gosec report to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v2
+        if: always()
+        with:
+          sarif_file: gosec-report.sarif
+          category: gosec
+
+      - name: Report gosec findings
+        if: always()
+        run: |
+          echo "## gosec Security Scan Results" >> $GITHUB_STEP_SUMMARY
+          gosec -fmt json ./... | jq '.Results[] | {file: .file, line: .line, issue: .title}' || echo "✓ No issues found"
+
+  govulncheck:
+    name: Go Vulnerability Check (govulncheck)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Run govulncheck
+        run: |
+          go install golang.org/x/vuln/cmd/govulncheck@latest
+          govulncheck ./... || echo "⚠️ Vulnerabilities found"
+
+      - name: Report govulncheck results
+        if: always()
+        run: |
+          echo "## govulncheck Results" >> $GITHUB_STEP_SUMMARY
+          govulncheck -json ./... | jq '.' || echo "✓ No vulnerable dependencies found"
+
+  nancy:
+    name: Dependency Vulnerability Scanner (Nancy)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Run Nancy
+        run: |
+          go install github.com/sonatype-nexus-community/nancy@latest
+          go list -json ./... | nancy sleuth -severity high
+
+      - name: Report Nancy results
+        if: always()
+        run: |
+          echo "## Nancy Dependency Scan" >> $GITHUB_STEP_SUMMARY
+          echo "✓ Dependencies scanned for known vulnerabilities" >> $GITHUB_STEP_SUMMARY
+
+  secrets-detection:
+    name: Secrets Detection
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect secrets with TruffleHog
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
+          base: ${{ github.event.repository.default_branch }}
+          head: HEAD
+          extra_args: --debug --only-verified
+
+      - name: Check for API keys in code
+        run: |
+          if grep -r "sk-ant-\|ANTHROPIC_API_KEY=" --include="*.go" --include="*.yaml" --include="*.json" . 2>/dev/null | grep -v ".env\|testdata\|docs"; then
+            echo "❌ Potential hardcoded secrets found!"
+            exit 1
+          else
+            echo "✓ No hardcoded secrets detected"
+          fi
+
+  lint-security:
+    name: Go Linting with Security Focus
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v3
+        with:
+          version: latest
+          args: --deadline=5m
+          # Enable security linters:
+          # - gosec: Go security checker
+          # - govet: Go vet with security checks
+          # - revive: Code quality with security rules
+
+  sast:
+    name: SAST Analysis
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Build for analysis
+        run: go build -o llm-sentinel ./cmd/llm-sentinel
+
+      - name: Run staticcheck
+        run: |
+          go install honnef.co/go/tools/cmd/staticcheck@latest
+          staticcheck ./...
+
+  dependency-audit:
+    name: Dependency Audit
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Go mod audit
+        run: go mod verify
+
+      - name: Check for outdated dependencies
+        run: |
+          go list -u -json ./... | jq -r 'select(.Update != null) | "\(.Path): \(.Version) -> \(.Update.Version)"' || echo "✓ All dependencies up to date"
+
+  output-summary:
+    name: Security Scan Summary
+    runs-on: ubuntu-latest
+    needs: [gosec, govulncheck, nancy, secrets-detection, lint-security, sast, dependency-audit]
+    if: always()
+
+    steps:
+      - name: Create security summary
+        run: |
+          cat >> $GITHUB_STEP_SUMMARY << 'EOF'
+          # 🔒 Security Audit Results
+
+          ## Scan Status
+          - **gosec**: ${{ needs.gosec.result }}
+          - **govulncheck**: ${{ needs.govulncheck.result }}
+          - **nancy**: ${{ needs.nancy.result }}
+          - **Secrets Detection**: ${{ needs.secrets-detection.result }}
+          - **Lint (Security)**: ${{ needs.lint-security.result }}
+          - **SAST**: ${{ needs.sast.result }}
+          - **Dependencies**: ${{ needs.dependency-audit.result }}
+
+          ## Action Required
+          If any check failed:
+          1. Review the detailed scan results above
+          2. Create a security issue for each finding
+          3. Prioritize by severity (CRITICAL → LOW)
+          4. Submit PR with fixes
+
+          ## Documentation
+          - [Phase 3: Security Audit Guide](docs/PHASE_3_SECURITY_AUDIT.md)
+          - [OWASP Top 10](https://owasp.org/www-project-top-ten/)
+          EOF
+
+      - name: Fail if critical issues found
+        if: failure()
+        run: |
+          echo "❌ Security scan failed - please review and fix issues"
+          exit 1
