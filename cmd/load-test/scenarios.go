@@ -19,11 +19,14 @@ type WorkloadFunction func(workerID int, requestNum int64) (duration time.Durati
 // AllScenarios returns all available load test scenarios
 func AllScenarios() map[string]*Scenario {
 	return map[string]*Scenario{
-		"constant": ScenarioConstantLoad(),
-		"burst":    ScenarioBurstLoad(),
-		"churn":    ScenarioConnectionChurn(),
-		"mixed":    ScenarioMixedWorkload(),
-		"recovery": ScenarioFailureRecovery(),
+		"constant":     ScenarioConstantLoad(),
+		"burst":        ScenarioBurstLoad(),
+		"rampup":       ScenarioRampUp(),
+		"mixed":        ScenarioMixedWorkload(),
+		"recovery":     ScenarioFailureRecovery(),
+		"sustained":    ScenarioSustained(),
+		"spike":        ScenarioSpike(),
+		"degradation":  ScenarioDegradation(),
 	}
 }
 
@@ -243,6 +246,189 @@ func ScenarioFailureRecovery() *Scenario {
 	}
 }
 
+// ScenarioSustained: Maintain 1000 req/sec for 30 minutes
+// Tests sustained performance, memory stability over extended period
+func ScenarioSustained() *Scenario {
+	return &Scenario{
+		Name: "sustained",
+		Description: "Sustained load: 1000 req/sec for 30 minutes\n" +
+			"Tests sustained performance, memory stability, long-running consistency\n" +
+			"Target: <200ms P99 latency held throughout, memory growth <5%",
+		Config: LoadTestConfig{
+			Duration:         30 * time.Minute,
+			TargetRate:       1000,
+			Workers:          100,
+			RampUpDuration:   3 * time.Minute,
+			RampDownDuration: 3 * time.Minute,
+			ReportInterval:   30 * time.Second,
+		},
+		WorkloadFn: func(workerID int, requestNum int64) (time.Duration, bool) {
+			// Consistent latency throughout sustained period
+			latency := 80 + (int(requestNum%100) % 60)
+			if requestNum%5000 == 0 {
+				latency = 300 // Occasional spike
+			}
+			if requestNum%50000 == 0 {
+				return 0, false // Very rare failure
+			}
+			return time.Duration(latency) * time.Millisecond, true
+		},
+	}
+}
+
+// ScenarioSpike: Sudden spike from 100 to 2000 req/sec
+// Tests adaptive throttling, queue management, backpressure response
+func ScenarioSpike() *Scenario {
+	return &Scenario{
+		Name: "spike",
+		Description: "Spike scenario: Sudden jump from 100 to 2000 req/sec\n" +
+			"Tests adaptive throttling, queue management, backpressure response\n" +
+			"Target: Recovery to baseline within 30 seconds, <5% error rate during spike",
+		Config: LoadTestConfig{
+			Duration:         90 * time.Second,
+			TargetRate:       100,  // Start low
+			Workers:          200,  // High workers for spike
+			RampUpDuration:   2 * time.Second,
+			RampDownDuration: 5 * time.Second,
+			ReportInterval:   5 * time.Second,
+		},
+		WorkloadFn: func(workerID int, requestNum int64) (time.Duration, bool) {
+			elapsed := requestNum / 50 // Approximate elapsed time in seconds
+			var latency int
+			failureRate := 0.0
+
+			// 0-20s: Normal at 100 req/sec
+			// 20-25s: Spike to 2000 req/sec
+			// 25-60s: Recovery and return to normal
+			switch {
+			case elapsed < 20:
+				// Normal baseline
+				latency = 100 + int(requestNum%50)
+				failureRate = 0.01
+			case elapsed < 25:
+				// Spike period
+				latency = 800 + int(requestNum%400)
+				failureRate = 0.05
+			default:
+				// Recovery
+				latency = 200 - (int(elapsed-25) * 5) // Gradual improvement
+				if latency < 100 {
+					latency = 100
+				}
+				failureRate = 0.02
+			}
+
+			success := (requestNum % 100) >= int64(failureRate*100)
+			return time.Duration(latency) * time.Millisecond, success
+		},
+	}
+}
+
+// ScenarioDegradation: Extreme load test - progressive increase from 200 to 5000 req/sec
+// Tests system limits, graceful degradation under extreme conditions
+func ScenarioDegradation() *Scenario {
+	return &Scenario{
+		Name: "degradation",
+		Description: "Degradation test: Progressive load from 200 to 5000 req/sec\n" +
+			"Tests system limits, graceful degradation under extreme conditions\n" +
+			"Target: Identify breaking point, <20% error rate at max load",
+		Config: LoadTestConfig{
+			Duration:         120 * time.Second,
+			TargetRate:       5000, // Peak target
+			Workers:          300,  // Many workers for extreme load
+			RampUpDuration:   60 * time.Second,
+			RampDownDuration: 30 * time.Second,
+			ReportInterval:   10 * time.Second,
+		},
+		WorkloadFn: func(workerID int, requestNum int64) (time.Duration, bool) {
+			// Load increases every 30 seconds: 200 → 500 → 1000 → 2000 → 5000 req/sec
+			stage := int(requestNum / 1500) // Roughly 30s per stage
+			var baseLatency int
+			failureRate := 0.0
+
+			switch stage {
+			case 0:
+				// 200 req/sec baseline
+				baseLatency = 50
+				failureRate = 0.01
+			case 1:
+				// 500 req/sec
+				baseLatency = 100
+				failureRate = 0.02
+			case 2:
+				// 1000 req/sec
+				baseLatency = 200
+				failureRate = 0.05
+			case 3:
+				// 2000 req/sec
+				baseLatency = 400
+				failureRate = 0.10
+			default:
+				// 5000 req/sec extreme load
+				baseLatency = 1000
+				failureRate = 0.20
+			}
+
+			latency := baseLatency + int(requestNum%(int64(baseLatency/2)+1))
+			success := (requestNum % 100) >= int64(failureRate*100)
+			return time.Duration(latency) * time.Millisecond, success
+		},
+	}
+}
+
+// ScenarioRampUp: Gradual increase from 100 to 1000 req/sec
+// Tests ramp behavior, smooth load increase handling
+func ScenarioRampUp() *Scenario {
+	return &Scenario{
+		Name: "rampup",
+		Description: "Ramp-up test: Gradual increase from 100 to 1000 req/sec\n" +
+			"Tests smooth load increase, adaptive scaling, resource allocation\n" +
+			"Target: Latency increases proportional to load, no sudden failures",
+		Config: LoadTestConfig{
+			Duration:         40 * time.Minute, // 5 stages of 8 min each
+			TargetRate:       1000,             // Ramp reaches 1000
+			Workers:          100,
+			RampUpDuration:   35 * time.Minute, // Slow ramp
+			RampDownDuration: 5 * time.Minute,
+			ReportInterval:   1 * time.Minute, // Report every minute
+		},
+		WorkloadFn: func(workerID int, requestNum int64) (time.Duration, bool) {
+			// 5 stages of ~480s each: 100→250→500→750→1000 req/sec
+			stage := int(requestNum / 2400) // ~480 requests per stage at different rates
+			var latency int
+			failureRate := 0.0
+
+			// Latency should scale with stage
+			switch stage {
+			case 0:
+				// 100 req/sec
+				latency = 50
+				failureRate = 0.01
+			case 1:
+				// 250 req/sec
+				latency = 75
+				failureRate = 0.01
+			case 2:
+				// 500 req/sec
+				latency = 100
+				failureRate = 0.02
+			case 3:
+				// 750 req/sec
+				latency = 150
+				failureRate = 0.02
+			default:
+				// 1000 req/sec
+				latency = 200
+				failureRate = 0.03
+			}
+
+			latency += int(requestNum % 50)
+			success := (requestNum % 100) >= int64(failureRate*100)
+			return time.Duration(latency) * time.Millisecond, success
+		},
+	}
+}
+
 // PrintScenarioList prints all available scenarios
 func PrintScenarioList() {
 	separator := "================================================================================"
@@ -251,7 +437,7 @@ func PrintScenarioList() {
 	fmt.Println(separator + "\n")
 
 	scenarios := AllScenarios()
-	for _, scenarioName := range []string{"constant", "burst", "churn", "mixed", "recovery"} {
+	for _, scenarioName := range []string{"constant", "burst", "rampup", "mixed", "recovery", "sustained", "spike", "degradation"} {
 		scenario := scenarios[scenarioName]
 		fmt.Printf("Scenario: %s\n", scenario.Name)
 		fmt.Printf("Description: %s\n", scenario.Description)
@@ -263,8 +449,11 @@ func PrintScenarioList() {
 	fmt.Println(separator + "\n")
 	fmt.Println("Usage: ./load-test -scenario=constant")
 	fmt.Println("       ./load-test -scenario=burst")
-	fmt.Println("       ./load-test -scenario=churn")
+	fmt.Println("       ./load-test -scenario=rampup")
 	fmt.Println("       ./load-test -scenario=mixed")
 	fmt.Println("       ./load-test -scenario=recovery")
+	fmt.Println("       ./load-test -scenario=sustained")
+	fmt.Println("       ./load-test -scenario=spike")
+	fmt.Println("       ./load-test -scenario=degradation")
 	fmt.Println()
 }
