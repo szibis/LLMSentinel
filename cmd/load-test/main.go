@@ -1,14 +1,16 @@
 package main
 
 import (
+	"bytes"
+	"encoding/json"
 	"flag"
 	"fmt"
+	"io"
+	"net/http"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
-
-	"github.com/szibis/claude-escalate/internal/batch"
 )
 
 type LoadTestConfig struct {
@@ -18,6 +20,7 @@ type LoadTestConfig struct {
 	RampUpDuration   time.Duration
 	RampDownDuration time.Duration
 	ReportInterval   time.Duration
+	GatewayURL       string // HTTP gateway endpoint
 }
 
 type LoadTestMetrics struct {
@@ -42,6 +45,7 @@ func main() {
 	rampUp := flag.Duration("ramp-up", 30*time.Second, "Ramp-up duration")
 	rampDown := flag.Duration("ramp-down", 30*time.Second, "Ramp-down duration")
 	reportInterval := flag.Duration("report", 10*time.Second, "Metrics report interval")
+	gatewayURL := flag.String("gateway", "http://localhost:8080", "Gateway URL (e.g., http://localhost:8080)")
 	listScenarios := flag.Bool("list-scenarios", false, "List all available scenarios and exit")
 
 	flag.Parse()
@@ -66,6 +70,7 @@ func main() {
 			return
 		}
 		config = scenario.Config
+		config.GatewayURL = *gatewayURL
 		fmt.Printf("Running Scenario: %s\n\n", scenario.Description)
 	} else {
 		// Use custom configuration from flags
@@ -76,8 +81,18 @@ func main() {
 			RampUpDuration:   *rampUp,
 			RampDownDuration: *rampDown,
 			ReportInterval:   *reportInterval,
+			GatewayURL:       *gatewayURL,
 		}
 	}
+
+	// Verify gateway is reachable
+	fmt.Printf("Gateway: %s\n", config.GatewayURL)
+	if err := verifyGateway(config.GatewayURL); err != nil {
+		fmt.Printf("ERROR: Gateway not reachable: %v\n", err)
+		fmt.Println("Start the gateway first: go run cmd/gateway/main.go -provider mock")
+		return
+	}
+	fmt.Println("✓ Gateway reachable")
 
 	fmt.Printf("Load Test Configuration:\n")
 	fmt.Printf("  Duration: %v\n", config.Duration)
@@ -97,9 +112,16 @@ func runLoadTest(config LoadTestConfig) *LoadTestMetrics {
 		LatencyValues: make([]int64, 0),
 	}
 
-	// Create router
-	router := batch.NewRouter(batch.StrategyAuto)
-	router.EnableDetector(true)
+	// HTTP client with connection pooling
+	client := &http.Client{
+		Timeout: 30 * time.Second,
+		Transport: &http.Transport{
+			MaxIdleConns:        config.Workers * 2,
+			MaxIdleConnsPerHost: config.Workers,
+			IdleConnTimeout:     90 * time.Second,
+		},
+	}
+	defer client.CloseIdleConnections()
 
 	// Channels for coordination
 	stopChan := make(chan struct{})
@@ -114,25 +136,31 @@ func runLoadTest(config LoadTestConfig) *LoadTestMetrics {
 	for i := 0; i < config.Workers; i++ {
 		go func(workerID int) {
 			defer wg.Done()
+			reqNum := int64(0)
 			for range requestChan {
 				start := time.Now()
 
-				// Simulate request processing
-				req := batch.BatchRequest{
-					ID:              fmt.Sprintf("req_%d_%d", workerID, metrics.TotalRequests),
-					PromptLength:    5000 + workerID*100,
-					EstimatedOutput: 2000 + workerID*50,
-					Model:           "sonnet",
-					MaxWaitTime:     10 * time.Minute,
-					CreatedAt:       time.Now(),
-					UserContext: map[string]interface{}{
-						"intent": "batch_analysis",
-						"query":  "analyze all files",
+				// Make HTTP request to gateway
+				payload := map[string]interface{}{
+					"model": "mock-model",
+					"messages": []map[string]string{
+						{"role": "user", "content": fmt.Sprintf("Test message %d from worker %d", reqNum, workerID)},
 					},
 				}
 
-				_, err := router.MakeRoutingDecision(req)
+				body, _ := json.Marshal(payload)
+				resp, err := client.Post(
+					config.GatewayURL+"/v1/chat/completions",
+					"application/json",
+					bytes.NewReader(body),
+				)
+
 				latencyMs := time.Since(start).Milliseconds()
+
+				if resp != nil && resp.Body != nil {
+					io.ReadAll(resp.Body)
+					resp.Body.Close()
+				}
 
 				metrics.mu.Lock()
 				metrics.TotalLatencyMs += latencyMs
@@ -144,13 +172,15 @@ func runLoadTest(config LoadTestConfig) *LoadTestMetrics {
 				}
 				metrics.LatencyValues = append(metrics.LatencyValues, latencyMs)
 
-				if err != nil {
+				if err != nil || (resp != nil && resp.StatusCode >= 400) {
 					atomic.AddInt64(&metrics.FailureCount, 1)
 				} else {
 					atomic.AddInt64(&metrics.SuccessCount, 1)
 				}
 				atomic.AddInt64(&metrics.TotalRequests, 1)
 				metrics.mu.Unlock()
+
+				reqNum++
 			}
 		}(i)
 	}
@@ -316,4 +346,17 @@ func calculatePercentile(values []int64, percentile float64) int64 {
 	}
 
 	return values[index]
+}
+
+func verifyGateway(gatewayURL string) error {
+	client := &http.Client{Timeout: 5 * time.Second}
+	resp, err := client.Get(gatewayURL + "/health")
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("gateway returned status %d", resp.StatusCode)
+	}
+	return nil
 }
