@@ -57,9 +57,7 @@ jobs:
       # ==========================================
       - name: Run Go tests with coverage
         run: |
-          go test -v -race -coverprofile=coverage.out -timeout=20m ./...
-          go tool cover -func=coverage.out
-          echo "✅ Go unit tests passed"
+          go test -v -race -coverprofile=coverage.out -timeout=20m ./... && echo "✅ Go unit tests passed"
 
       - name: Upload coverage
         uses: codecov/codecov-action@v3
