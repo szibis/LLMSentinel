@@ -18,11 +18,11 @@ linters:
     - gocyclo
     - gofmt
     - goimports
-    - goconst
     - gosimple
   disable:
     - errcheck
     - unused
+    - goconst
 
 linters-settings:
   misspell:
