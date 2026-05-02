@@ -1,5 +1,6 @@
 run:
   timeout: 5m
+  tests: true
 
 linters:
   enable:
@@ -14,6 +15,11 @@ linters:
     - unparam
     - whitespace
     - gosec
+    - gocyclo
+    - gofmt
+    - goimports
+    - goconst
+    - gosimple
   disable:
     - errcheck
     - unused
@@ -21,7 +27,18 @@ linters:
 linters-settings:
   misspell:
     locale: US
+  gocyclo:
+    min-complexity: 15
+  lll:
+    line-length: 120
 
 issues:
   max-issues-per-linter: 50
   max-same-issues: 10
+  exclude-rules:
+    - path: _test\.go$
+      linters:
+        - gocyclo
+    - path: _test\.go$
+      linters:
+        - lll

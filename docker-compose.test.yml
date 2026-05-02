@@ -1,0 +1,94 @@
+version: '3.9'
+
+services:
+  gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: claude-escalate-gateway
+    ports:
+      - "8080:8077"
+    environment:
+      - ESCALATE_BIND=0.0.0.0
+      - ESCALATE_DATA_DIR=/app/data
+      - LOG_LEVEL=debug
+    volumes:
+      - test-data:/app/data
+    networks:
+      - test
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8077/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    depends_on:
+      - mock-api
+
+  mock-api:
+    build:
+      context: ./tests/mock-api
+      dockerfile: Dockerfile
+    container_name: claude-escalate-mock-api
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+      - RESPONSE_DELAY_MS=50
+      - SUCCESS_RATE=0.98
+    networks:
+      - test
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: claude-escalate-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./tests/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+    networks:
+      - test
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9090/-/healthy"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    depends_on:
+      - gateway
+
+  redis:
+    image: redis:7-alpine
+    container_name: claude-escalate-redis
+    ports:
+      - "6379:6379"
+    networks:
+      - test
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    volumes:
+      - redis-data:/data
+
+volumes:
+  test-data:
+    driver: local
+  prometheus-data:
+    driver: local
+  redis-data:
+    driver: local
+
+networks:
+  test:
+    driver: bridge
