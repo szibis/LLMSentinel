@@ -267,10 +267,10 @@ Usage:
 
 Examples:
   # Create backup
-  ./backup-restore backup ./data ./backups/db-$(date +%Y%m%d-%H%M%S).tar.gz
+  ./backup-restore backup ./data ./backups/db-YYYYMMDD-HHMMSS.tar.gz
 
   # Restore backup
-  ./backup-restore restore ./backups/db-20260430-140000.tar.gz ./data-restored
+  ./backup-restore restore ./backups/db-backup.tar.gz ./data-restored
 
   # Verify backup
   ./backup-restore verify ./backups/db-20260430-140000.tar.gz
