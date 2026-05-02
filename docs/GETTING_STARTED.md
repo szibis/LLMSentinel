@@ -1,4 +1,4 @@
-# Claude Escalate: Getting Started Guide
+# LLMSentinel: Getting Started Guide
 
 **Time to Production**: 10 minutes | **Complexity**: Beginner-friendly
 
@@ -320,7 +320,7 @@ curl http://localhost:9000/api/analytics/cost-optimization | jq .
 ## 🔌 Integration with Claude Code
 
 ### Hook Integration
-Claude Escalate automatically integrates with Claude Code hook system:
+LLMSentinel automatically integrates with Claude Code hook system:
 
 1. **Phase 1** (Pre-response):
    - Sentiment detection runs

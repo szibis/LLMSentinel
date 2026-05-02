@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"time"
@@ -127,7 +128,10 @@ func (s *Store) LogEscalation(fromModel, toModel, taskType, reason string) error
 	return s.db.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket(bucketEscalations)
 		id, _ := b.NextSequence()
-		event.ID = int64(id) //nolint:gosec // sequence IDs won't overflow int64
+		if id > math.MaxInt64 {
+			return fmt.Errorf("escalation ID exceeds max int64: %d", id)
+		}
+		event.ID = int64(id)
 		data, err := json.Marshal(event)
 		if err != nil {
 			return err
@@ -336,7 +340,10 @@ func (s *Store) LogValidationMetric(metric ValidationMetric) error {
 	return s.db.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket(bucketValidation)
 		id, _ := b.NextSequence()
-		metric.ID = int64(id) //nolint:gosec
+		if id > math.MaxInt64 {
+			return fmt.Errorf("validation ID exceeds max int64: %d", id)
+		}
+		metric.ID = int64(id)
 		data, err := json.Marshal(metric)
 		if err != nil {
 			return err

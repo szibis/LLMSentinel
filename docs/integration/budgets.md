@@ -26,7 +26,7 @@ escalation-manager service --port 9000
 
 ## Budget Levels
 
-Claude Escalate supports **5 levels of budgets** for fine-grained spending control:
+LLMSentinel supports **5 levels of budgets** for fine-grained spending control:
 
 ### 1. Daily Budget (Primary)
 

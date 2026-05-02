@@ -1,8 +1,8 @@
-# Claude Escalate v0.8.0 - API Specification
+# LLMSentinel v0.8.0 - API Specification
 
 ## Overview
 
-Complete REST API specification for Claude Escalate v4.0.0. All endpoints require no authentication for local deployment, support JSON request/response format, and follow HTTP conventions.
+Complete REST API specification for LLMSentinel v4.0.0. All endpoints require no authentication for local deployment, support JSON request/response format, and follow HTTP conventions.
 
 ---
 
@@ -593,7 +593,7 @@ Future versions will use `/api/v2`, `/api/v3`, etc.
 ```yaml
 openapi: 3.0.0
 info:
-  title: Claude Escalate API
+  title: LLMSentinel API
   version: 4.0.0
   description: Cost optimization API for Claude deployments
 
@@ -779,7 +779,7 @@ List available tool types and descriptions.
 
 ### Go Client
 ```go
-import "github.com/szibis/claude-escalate/sdk"
+import "github.com/szibis/llm-sentinel/sdk"
 
 client := sdk.NewClient("http://localhost:9000")
 metrics, err := client.Analytics.GetTimeseries("daily", 7)

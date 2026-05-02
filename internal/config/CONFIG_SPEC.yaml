@@ -57,7 +57,7 @@ sections:
 
       data_dir:
         type: "string"
-        default: "~/.claude-escalate/data"
+        default: "~/.llm-sentinel/data"
         description: "Directory for database and persistent data"
         validation: "Must be writable directory, created if missing"
 
@@ -347,7 +347,7 @@ sections:
               default: true
             dir:
               type: "string"
-              default: "~/.claude-escalate/metrics"
+              default: "~/.llm-sentinel/metrics"
 
   thresholds:
     title: "Decision Thresholds"

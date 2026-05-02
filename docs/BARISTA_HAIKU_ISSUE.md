@@ -68,7 +68,7 @@ grep "auto-effort" ~/.claude/hooks/auto-effort.sh | head -5
 /effort
 # Should show current model
 
-# Escalate
+# LLMSentinel
 /escalate to opus
 # Check again
 /effort
@@ -247,7 +247,7 @@ jq '.hooks.UserPromptSubmit' ~/.claude/settings.json | grep -i "deescalate\|de-e
 # Add logging to auto-effort.sh
 ```
 
-### Fix 3: /Escalate Not Persisting
+### Fix 3: /LLMSentinel Not Persisting
 **If**: Model changes then reverts
 
 **Solution**: Check hook order and de-escalation session

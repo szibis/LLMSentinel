@@ -90,7 +90,7 @@ func (dm *DownloadManager) downloadFromHuggingFace(ctx context.Context, modelID,
 	}
 
 	// Create cache directory
-	if err := os.MkdirAll(dm.cachePath, 0755); err != nil {
+	if err := os.MkdirAll(dm.cachePath, 0700); err != nil {
 		return "", fmt.Errorf("failed to create cache dir: %w", err)
 	}
 

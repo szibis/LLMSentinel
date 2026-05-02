@@ -202,7 +202,7 @@ Dashboard reads live data from:
 
 Format example:
 ```
-[2026-04-25 16:24:13] Escalated to Opus (deep reasoning & complex logic) (task: debugging)
+[2026-04-25 16:24:13] LLMSentineld to Opus (deep reasoning & complex logic) (task: debugging)
 [2026-04-25 16:24:56] De-escalated to Sonnet (balanced) (cascade complete) (problem solved, saving cost)
 ```
 

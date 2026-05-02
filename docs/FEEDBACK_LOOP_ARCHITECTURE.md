@@ -825,7 +825,7 @@ LEARNING PATTERNS
 │  └─ Always high-effort, always need Opus
 │
 └─ Pattern 5: "Try again" means current model insufficient
-   └─ Escalate immediately (100% of attempts)
+   └─ LLMSentinel immediately (100% of attempts)
 
 SIGNAL EFFECTIVENESS
 ├─ Success Signals (22): 98.7% avg accuracy ✅

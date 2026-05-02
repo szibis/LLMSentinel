@@ -1,4 +1,4 @@
-# Claude Escalate Developer Guide
+# LLMSentinel Developer Guide
 
 ## System Requirements
 
@@ -11,7 +11,7 @@
 ```bash
 # 1. Clone and enter the project
 git clone <repo-url>
-cd claude-escalate
+cd llm-sentinel
 
 # 2. Verify Go version
 go version  # Should be go1.26.2
@@ -20,13 +20,13 @@ go version  # Should be go1.26.2
 go mod download
 
 # 4. Build the binary
-go build -o escalate ./cmd/claude-escalate
+go build -o llm-sentinel ./cmd/llm-sentinel
 
 # 5. Run tests
 go test ./...
 
 # 6. Start the service
-./escalate service --port 9000
+./llm-sentinel service --port 9000
 ```
 
 ## Local Development
@@ -35,7 +35,7 @@ go test ./...
 
 ```bash
 # Build binary
-go build -o escalate ./cmd/claude-escalate
+go build -o llm-sentinel ./cmd/llm-sentinel
 
 # Run tests with coverage
 go test -v -coverprofile=coverage.out ./...
@@ -78,7 +78,7 @@ staticcheck ./...
 
 ```bash
 # Enable debug logging
-ESCALATION_LOG_LEVEL=debug ./escalate service --port 9000
+ESCALATION_LOG_LEVEL=debug ./llm-sentinel service --port 9000
 
 # Get analytics for validation ID
 curl http://localhost:9000/api/analytics/phase-1/{validation_id}
@@ -102,7 +102,7 @@ curl http://localhost:9000/api/analytics/budget-status
 - **`internal/statusline/`** - Multi-source statusline integration (webhook, file, native, etc.)
 - **`internal/analytics/`** - Analytics persistence (SQLite)
 - **`internal/decisions/`** - Model routing and escalation decisions
-- **`cmd/claude-escalate/`** - Main CLI entry point
+- **`cmd/llm-sentinel/`** - Main CLI entry point
 
 ### Multi-Source Statusline Integration
 

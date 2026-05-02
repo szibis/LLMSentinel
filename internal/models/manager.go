@@ -59,7 +59,7 @@ func NewManager(cfg *ModelConfig) (*Manager, error) {
 	}
 
 	// Create cache directory
-	if err := os.MkdirAll(cachePath, 0755); err != nil {
+	if err := os.MkdirAll(cachePath, 0700); err != nil {
 		return nil, fmt.Errorf("failed to create cache dir: %w", err)
 	}
 

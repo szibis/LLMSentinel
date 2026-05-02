@@ -1,11 +1,11 @@
-# Claude Escalate v4.0.0 - Compliance & Testing Specification
+# LLMSentinel v4.0.0 - Compliance & Testing Specification
 
 **Status**: Production Standard  
 **Effective Date**: 2026-04-26  
 **Version**: 4.0.0  
 **Maintainer**: Core Team
 
-This specification defines the quality, testing, compliance, and release standards that Claude Escalate v4.0.0 and all future versions must meet.
+This specification defines the quality, testing, compliance, and release standards that LLMSentinel v4.0.0 and all future versions must meet.
 
 ---
 
@@ -967,4 +967,4 @@ Cache Hit Rate
 **Status**: ACTIVE  
 **Approval**: [Approved by core team]
 
-This specification is the single source of truth for Claude Escalate quality standards. All releases must comply with all sections.
+This specification is the single source of truth for LLMSentinel quality standards. All releases must comply with all sections.

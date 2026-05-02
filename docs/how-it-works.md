@@ -2,7 +2,7 @@
 
 ## Architecture
 
-claude-escalate runs as a single Claude Code `UserPromptSubmit` hook. On every user prompt, it:
+llm-sentinel runs as a single Claude Code `UserPromptSubmit` hook. On every user prompt, it:
 
 1. Reads the prompt from stdin (JSON)
 2. Runs through a decision pipeline (<5ms total)

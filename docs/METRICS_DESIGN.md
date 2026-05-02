@@ -1,4 +1,4 @@
-# Claude Escalate Metrics Design (OTEL/Prometheus)
+# LLMSentinel Metrics Design (OTEL/Prometheus)
 
 ## Philosophy: Labels Not Metric Explosion
 
@@ -221,7 +221,7 @@ claude_escalate_tokens_total{type="saved"}
 
 ```yaml
 scrape_configs:
-  - job_name: 'claude-escalate'
+  - job_name: 'llm-sentinel'
     static_configs:
       - targets: ['localhost:8080']
     metrics_path: '/metrics'

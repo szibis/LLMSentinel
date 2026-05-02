@@ -2,7 +2,7 @@
 
 ## Overview
 
-Claude Escalate is configured via `config.yaml`. Default: `~/.claude-escalate/config.yaml`
+LLMSentinel is configured via `config.yaml`. Default: `~/.claude-escalate/config.yaml`
 
 Settings support **live reload** — changes apply immediately without restart.
 

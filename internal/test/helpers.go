@@ -22,7 +22,7 @@ func TempDir(t *testing.T) string {
 		t.Fatalf("failed to create temp directory: %v", err)
 	}
 	t.Cleanup(func() {
-		os.RemoveAll(dir)
+		_ = os.RemoveAll(dir)
 	})
 	return dir
 }
@@ -30,7 +30,7 @@ func TempDir(t *testing.T) string {
 // WriteTestFile writes content to a test file
 func WriteTestFile(t *testing.T, dir, name, content string) string {
 	path := filepath.Join(dir, name)
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		t.Fatalf("failed to create directory: %v", err)
 	}
 	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
@@ -56,9 +56,9 @@ func EnvVar(t *testing.T, key, value string) string {
 	}
 	t.Cleanup(func() {
 		if old == "" {
-			os.Unsetenv(key)
+			_ = os.Unsetenv(key)
 		} else {
-			os.Setenv(key, old)
+			_ = os.Setenv(key, old)
 		}
 	})
 	return old

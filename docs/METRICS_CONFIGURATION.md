@@ -97,7 +97,7 @@ docker run -d \
 
 ---
 
-## Claude Escalate Configuration
+## LLMSentinel Configuration
 
 Add to `config.yaml`:
 
@@ -159,7 +159,7 @@ metrics:
 ```json
 {
   "dashboard": {
-    "title": "Claude Escalate Metrics",
+    "title": "LLMSentinel Metrics",
     "panels": [
       {
         "title": "Cache Hit Rate by Layer",

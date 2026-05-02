@@ -1,10 +1,10 @@
 # System Overview
 
-High-level architecture of Claude Escalate.
+High-level architecture of LLMSentinel.
 
 ## Core Concept
 
-Claude Escalate is a **sentiment-aware, budget-conscious model routing system** that:
+LLMSentinel is a **sentiment-aware, budget-conscious model routing system** that:
 
 1. **Detects user frustration** (repeated failures, explicit signals)
 2. **Automatically escalates** to better models (Haiku → Sonnet → Opus)

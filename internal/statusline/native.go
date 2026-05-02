@@ -20,7 +20,6 @@ func NewNativeSource(path string) *NativeSource {
 	if path == "" {
 		path = filepath.Join(os.Getenv("HOME"), ".claude", "statusline.json")
 	}
-
 	_, err := os.Stat(path)
 	enabled := err == nil
 

@@ -213,8 +213,8 @@ http://localhost:8077/               # Web dashboard
 ### In Claude Code
 
 ```
-/escalate              # Escalate to Sonnet (default)
-/escalate to opus      # Escalate to Opus
+/escalate              # LLMSentinel to Sonnet (default)
+/escalate to opus      # LLMSentinel to Opus
 /escalate to haiku     # Downgrade to Haiku
 
 [any success phrase]   # Trigger auto de-escalation

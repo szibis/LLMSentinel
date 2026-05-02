@@ -90,7 +90,7 @@ Intelligent user sentiment analysis with automatic escalation:
   - 3+ failures: Already on Opus, manual help needed
 - Special handling:
   - Impatient users: Switch to Haiku (instant)
-  - Confused users: Escalate to Sonnet (better explanations)
+  - Confused users: LLMSentinel to Sonnet (better explanations)
 - Auto de-escalation on success (save tokens)
 
 - **Files Created**: 2 (sentiment.go, frustration_handler.go)

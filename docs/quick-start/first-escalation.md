@@ -99,7 +99,7 @@ Simple question (Haiku) ✅
   ↓
 Complex question (Haiku) ❌ Didn't work
   ↓ After 2 failures + frustration
-Escalate to Sonnet ✅ Works!
+LLMSentinel to Sonnet ✅ Works!
   ↓
 Simple follow-up
   ↓ After success

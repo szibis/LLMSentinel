@@ -1,4 +1,4 @@
-# Claude Escalate CLI Tools Guide
+# LLMSentinel CLI Tools Guide
 
 Complete reference for CLI commands and utilities.
 

@@ -2,7 +2,7 @@
 
 ## Overview
 
-Claude Escalate includes a SQLite-backed knowledge graph that indexes your source code and answers relationship queries instantly, without calling Claude. Typical query: <10ms response time, 0 tokens used.
+LLMSentinel includes a SQLite-backed knowledge graph that indexes your source code and answers relationship queries instantly, without calling Claude. Typical query: <10ms response time, 0 tokens used.
 
 **Savings**: 99% token reduction when a query can be answered by the graph.
 
@@ -114,7 +114,7 @@ graph LR
 
 ## Query Detection
 
-Claude Escalate automatically detects if a query can be answered by the graph:
+LLMSentinel automatically detects if a query can be answered by the graph:
 
 ```go
 // Automatic detection:
@@ -143,7 +143,7 @@ Graph queries are perfect for **relationship questions** but cannot answer:
 - ❌ "Find performance issues" (needs testing/benchmarking)
 - ❌ "What would break if we change X?" (needs simulation)
 
-For these, Claude Escalate automatically falls back to fresh Claude API calls.
+For these, LLMSentinel automatically falls back to fresh Claude API calls.
 
 ## Fallback Behavior
 

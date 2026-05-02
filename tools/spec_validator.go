@@ -246,6 +246,7 @@ func (sv *SpecValidator) PrintReport(results *ValidationResults) {
 // ValidatePatterns checks if all security patterns are present
 func ValidateSecurityPatterns(srcDir string) {
 	patternFile := filepath.Join(srcDir, "internal/security/patterns.go")
+	//nolint:gosec // G703/G304: path is constructed from known base + constant filename
 	content, err := os.ReadFile(patternFile)
 	if err != nil {
 		fmt.Printf("❌ Failed to read patterns.go: %v\n", err)

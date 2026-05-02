@@ -120,7 +120,7 @@ type Service struct {
 1. **Sentiment Detection**:
    - If enabled, detect user sentiment from prompt
    - If frustration_risk > threshold and auto-escalate enabled:
-     - Escalate to next model tier
+     - LLMSentinel to next model tier
      - Log escalation event
      - Update Claude settings
 
@@ -232,7 +232,7 @@ budgets:
 sentiment:
   enabled: true
   frustration_trigger_escalate: true
-  frustration_risk_threshold: 0.70    # Escalate if > 0.70
+  frustration_risk_threshold: 0.70    # LLMSentinel if > 0.70
   learning_enabled: true              # Track patterns for learning
   track_satisfaction: true
 

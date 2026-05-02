@@ -1,6 +1,6 @@
 # Docker Setup Guide
 
-Quick start guide for running Claude Escalate with Docker.
+Quick start guide for running LLMSentinel with Docker.
 
 ---
 
@@ -70,7 +70,7 @@ docker-compose up -d
 ```
 
 Services:
-- **Claude Escalate**: http://localhost:9000/dashboard
+- **LLMSentinel**: http://localhost:9000/dashboard
 - **Grafana**: http://localhost:3000 (admin/admin)
 - **Prometheus**: http://localhost:9090
 - **VictoriaMetrics**: http://localhost:8428

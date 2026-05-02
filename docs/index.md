@@ -1,6 +1,6 @@
-# Claude Escalate Documentation
+# LLMSentinel Documentation
 
-Complete guides and API reference for Claude Escalate v4.0.0.
+Complete guides and API reference for LLMSentinel v4.0.0.
 
 **Version**: 4.0.0 | **Release**: 2026-04-26 | **Status**: Production Ready
 

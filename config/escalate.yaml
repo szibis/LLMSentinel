@@ -4,7 +4,7 @@ gateway:
     security_layer: true
     shutdown_timeout_seconds: 30
     max_request_size_bytes: 10485760
-    data_dir: ~/.claude-escalate/data
+    data_dir: ~/.llm-sentinel/data
 optimizations:
     rtk:
         enabled: true
@@ -52,7 +52,7 @@ optimizations:
         index_local_code: true
         index_web_content: false
         cache_lookups: true
-        db_path: ~/.claude-escalate/graph.db
+        db_path: ~/.llm-sentinel/graph.db
     input_optimization:
         enabled: true
         strip_unused_tools: true
@@ -101,7 +101,7 @@ metrics:
             url: http://localhost:3000
         cloudwatch:
             enabled: false
-            namespace: claude-escalate
+            namespace: llm-sentinel
         opentelemetry:
             enabled: false
             exporter_type: ""
@@ -115,7 +115,7 @@ metrics:
             headers: {}
         debug_logs:
             enabled: true
-            dir: ~/.claude-escalate/metrics
+            dir: ~/.llm-sentinel/metrics
     track:
         cache_hit_rate:
             enabled: true
@@ -223,12 +223,12 @@ timeouts:
     security_validation_ms: 20
     cache_lookup_ms: 10
 paths:
-    config_dir: ~/.claude-escalate
-    data_dir: ~/.claude-escalate/data
-    graph_db_path: ~/.claude-escalate/graph.db
-    metrics_dir: ~/.claude-escalate/metrics
-    log_dir: ~/.claude-escalate/logs
-    cache_dir: ~/.claude-escalate/cache
+    config_dir: ~/.llm-sentinel
+    data_dir: ~/.llm-sentinel/data
+    graph_db_path: ~/.llm-sentinel/graph.db
+    metrics_dir: ~/.llm-sentinel/metrics
+    log_dir: ~/.llm-sentinel/logs
+    cache_dir: ~/.llm-sentinel/cache
     claude_home: ~/.claude
 models:
     haiku:

@@ -2,7 +2,7 @@
 
 ## Overview
 
-Claude Escalate v0.7.0 integrates Anthropic's Batch API for **50% cost reduction** on non-interactive workloads. Batch requests are processed in the background (5 minutes to 24 hours) and cost 50% less than regular API calls.
+LLMSentinel v0.7.0 integrates Anthropic's Batch API for **50% cost reduction** on non-interactive workloads. Batch requests are processed in the background (5 minutes to 24 hours) and cost 50% less than regular API calls.
 
 **Cost Comparison**:
 - Regular API: 100 × 2500 tokens = 250,000 tokens = $0.75 (Haiku)

@@ -6,7 +6,7 @@ Understand and optimize your Claude token spending.
 
 ## Token Pricing
 
-Claude Escalate tracks spending across three models with different cost tiers:
+LLMSentinel tracks spending across three models with different cost tiers:
 
 | Model | Input Cost | Output Cost | Relative Cost | Speed |
 |-------|-----------|-------------|---|---|

@@ -1,6 +1,6 @@
 # Three-Phase Validation Flow
 
-Claude Escalate uses a three-phase approach to model routing and token management: **Phase 1 (Estimation)**, **Phase 2 (Monitoring)**, and **Phase 3 (Validation & Learning)**.
+LLMSentinel uses a three-phase approach to model routing and token management: **Phase 1 (Estimation)**, **Phase 2 (Monitoring)**, and **Phase 3 (Validation & Learning)**.
 
 ---
 

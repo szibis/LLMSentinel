@@ -80,7 +80,7 @@ curl -X POST http://localhost:9000/api/validate \
 "Missing something"
 "Going in circles"
 ```
-**Action**: Escalate to better model (Haiku→Sonnet, Sonnet→Opus)
+**Action**: LLMSentinel to better model (Haiku→Sonnet, Sonnet→Opus)
 
 **CLARIFICATION SIGNALS** (User needs model to understand context):
 ```

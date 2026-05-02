@@ -302,7 +302,7 @@ Based on tests, typical users fall into categories:
 
 **Type C: Efficiency-Conscious (switch-friendly)**
 - Uses low-effort for simple tasks
-- Escalates only when needed
+- LLMSentinels only when needed
 - Expected cache hit rate: 10-15%
 - Expected switch rate: 20-30%
 - Savings achieved: 30-40%

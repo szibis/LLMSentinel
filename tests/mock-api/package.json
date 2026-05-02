@@ -1,0 +1,15 @@
+{
+  "name": "claude-escalate-mock-api",
+  "version": "1.0.0",
+  "description": "Mock Anthropic API for testing",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": ["mock", "api", "anthropic"],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {}
+}

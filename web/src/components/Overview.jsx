@@ -10,11 +10,21 @@ export default function Overview({ darkMode }) {
     const fetchMetrics = async () => {
       try {
         setLoading(true);
-        const response = await metricsAPI.getMetricsSnapshot();
+        const response = await metricsAPI.getMetrics();
         setMetrics(response.data);
         setError(null);
       } catch (err) {
         setError('Failed to load metrics: ' + err.message);
+        // Set mock data for demo purposes
+        setMetrics({
+          requests_per_second: 125.5,
+          cache_hit_rate: 0.85,
+          avg_latency: 45.2,
+          tokens_saved: 275000,
+          cost_savings: 0.825,
+          active_connections: 12,
+          total_requests: 50000,
+        });
       } finally {
         setLoading(false);
       }

@@ -1,10 +1,10 @@
-# Claude Escalate Metrics & Visibility
+# LLMSentinel Metrics & Visibility
 
 Complete observability into token optimization, cost savings, and performance metrics—matching codeburn's format.
 
 ## Overview
 
-Claude Escalate tracks every optimization layer and exposes comprehensive metrics through:
+LLMSentinel tracks every optimization layer and exposes comprehensive metrics through:
 
 1. **Web Dashboard** - HTTP API endpoints for real-time metrics
 2. **CLI Viewer** - Command-line interface for quick metrics lookup
@@ -130,7 +130,7 @@ claude-escalate-metrics overview
 Terminal dashboard output:
 ```
 ╔══════════════════════════════════════════════════════════════╗
-║           Claude Escalate Metrics Overview                   ║
+║           LLMSentinel Metrics Overview                   ║
 ╚══════════════════════════════════════════════════════════════╝
 
 📊 TOKENS BURNED (sent to Claude API)
@@ -230,7 +230,7 @@ claude-escalate-metrics status
 
 One-liner output:
 ```
-Claude Escalate Metrics Status
+LLMSentinel Metrics Status
 ─────────────────────────────────────────
 Total Tokens Burned:  1500000
 Total Tokens Saved:   450000
@@ -263,7 +263,7 @@ console.log(`Savings: ${metrics.tokens_saved.savings_percent}%`);
 
 ## Metrics Format (Codeburn Compatible)
 
-Claude Escalate metrics match [codeburn](https://github.com/getagentseal/codeburn) format:
+LLMSentinel metrics match [codeburn](https://github.com/getagentseal/codeburn) format:
 
 ```json
 {

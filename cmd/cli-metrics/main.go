@@ -302,7 +302,7 @@ func cmdExport(format string) {
 func cmdStatus() {
 	sm := metrics.NewSessionMetrics()
 
-	fmt.Printf("Claude Escalate Metrics Status\n")
+	fmt.Printf("LLMSentinel Metrics Status\n")
 	fmt.Printf("─────────────────────────────────────────\n")
 	fmt.Printf("Total Tokens Burned:  %d\n", sm.TotalBurned.TotalTokens)
 	fmt.Printf("Total Tokens Saved:   %d\n", sm.TotalSaved.TotalTokensSaved)
