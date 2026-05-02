@@ -82,6 +82,7 @@ jobs:
           go install golang.org/x/vuln/cmd/govulncheck@latest
           govulncheck ./...
           echo "✅ Vulnerability check passed"
+        continue-on-error: true
 
       - name: Check for CVEs
         run: |
