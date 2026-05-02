@@ -67,15 +67,15 @@ func backup(dataDir, outputFile string) error {
 	if err != nil {
 		return fmt.Errorf("failed to create backup file: %w", err)
 	}
-	defer out.Close() // nolint:gosec // G104: backup file close
+	defer out.Close() //nolint:gosec // G104: backup file close
 
 	// Create gzip writer
 	gw := gzip.NewWriter(out)
-	defer gw.Close() // nolint:gosec // G104: gzip writer close
+	defer gw.Close() //nolint:gosec // G104: gzip writer close
 
 	// Create tar writer
 	tw := tar.NewWriter(gw)
-	defer tw.Close() // nolint:gosec // G104: tar writer close
+	defer tw.Close() //nolint:gosec // G104: tar writer close
 
 	// Add files from data directory
 	err = filepath.Walk(dataDir, func(path string, info os.FileInfo, err error) error {
@@ -93,7 +93,7 @@ func backup(dataDir, outputFile string) error {
 		if err != nil {
 			return err
 		}
-		defer file.Close() // nolint:gosec // G104: backup walk file close
+		defer file.Close() //nolint:gosec // G104: backup walk file close
 
 		// Create tar header
 		header, err := tar.FileInfoHeader(info, "")
@@ -140,14 +140,14 @@ func restore(backupFile, dataDir string) error {
 	if err != nil {
 		return fmt.Errorf("failed to open backup file: %w", err)
 	}
-	defer in.Close() // nolint:gosec // G104: backup file close
+	defer in.Close() //nolint:gosec // G104: backup file close
 
 	// Create gzip reader
 	gr, err := gzip.NewReader(in)
 	if err != nil {
 		return fmt.Errorf("failed to create gzip reader: %w", err)
 	}
-	defer gr.Close() // nolint:gosec // G104: gzip reader close
+	defer gr.Close() //nolint:gosec // G104: gzip reader close
 
 	// Create tar reader
 	tr := tar.NewReader(gr)
@@ -178,10 +178,10 @@ func restore(backupFile, dataDir string) error {
 
 		// Write content
 		if _, err := io.Copy(file, tr); err != nil {
-			file.Close() // nolint:gosec // G104: restore file close
+			file.Close() //nolint:gosec // G104: restore file close
 			return fmt.Errorf("failed to write file %s: %w", filePath, err)
 		}
-		file.Close() // nolint:gosec // G104: restore file close
+		file.Close() //nolint:gosec // G104: restore file close
 
 		// Set file mode
 		if err := os.Chmod(filePath, os.FileMode(header.Mode)); err != nil {
@@ -202,14 +202,14 @@ func verify(backupFile string) error {
 	if err != nil {
 		return fmt.Errorf("failed to open backup file: %w", err)
 	}
-	defer in.Close() // nolint:gosec // G104: verify file close
+	defer in.Close() //nolint:gosec // G104: verify file close
 
 	// Create gzip reader
 	gr, err := gzip.NewReader(in)
 	if err != nil {
 		return fmt.Errorf("invalid gzip file: %w", err)
 	}
-	defer gr.Close() // nolint:gosec // G104: verify gzip close
+	defer gr.Close() //nolint:gosec // G104: verify gzip close
 
 	// Create tar reader
 	tr := tar.NewReader(gr)

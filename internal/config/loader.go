@@ -109,7 +109,7 @@ func (l *Loader) Load() (*Config, error) {
 
 // loadFromFile loads configuration from a YAML file
 func (l *Loader) loadFromFile(path string) error {
-	// nolint:gosec // G304/G703: path is from validated configuration
+	//nolint:gosec // G304/G703: path is from validated configuration
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return err

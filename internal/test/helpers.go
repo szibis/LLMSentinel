@@ -22,7 +22,7 @@ func TempDir(t *testing.T) string {
 		t.Fatalf("failed to create temp directory: %v", err)
 	}
 	t.Cleanup(func() {
-		_ = os.RemoveAll(dir) // nolint:gosec // G104: cleanup operation in test
+		_ = os.RemoveAll(dir) //nolint:gosec // G104: cleanup operation in test
 	})
 	return dir
 }
@@ -41,7 +41,7 @@ func WriteTestFile(t *testing.T, dir, name, content string) string {
 
 // ReadTestFile reads content from a test file
 func ReadTestFile(t *testing.T, path string) string {
-	// nolint:gosec // G304: path is test file from test setup
+	//nolint:gosec // G304: path is test file from test setup
 	content, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatalf("failed to read test file: %v", err)
@@ -57,9 +57,9 @@ func EnvVar(t *testing.T, key, value string) string {
 	}
 	t.Cleanup(func() {
 		if old == "" {
-			_ = os.Unsetenv(key) // nolint:gosec // G104: cleanup operation in test
+			_ = os.Unsetenv(key) //nolint:gosec // G104: cleanup operation in test
 		} else {
-			_ = os.Setenv(key, old) // nolint:gosec // G104: cleanup operation in test
+			_ = os.Setenv(key, old) //nolint:gosec // G104: cleanup operation in test
 		}
 	})
 	return old

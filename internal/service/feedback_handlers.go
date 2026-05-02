@@ -88,7 +88,7 @@ func (s *Service) handleFeedback(w http.ResponseWriter, r *http.Request) {
 
 	// Return confirmation
 	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]interface{}{ // nolint:gosec // G104: JSON encoding in HTTP response
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{ //nolint:gosec // G104: JSON encoding in HTTP response
 		"status":       "recorded",
 		"request_id":   feedbackReq.RequestID,
 		"rating":       feedbackReq.Rating,
@@ -129,7 +129,7 @@ func (s *Service) handleUserAnalytics(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(analytics) // nolint:gosec // G104: JSON encoding in HTTP response
+	_ = json.NewEncoder(w).Encode(analytics) //nolint:gosec // G104: JSON encoding in HTTP response
 }
 
 // learnUserPreference updates model and cache decisions based on feedback

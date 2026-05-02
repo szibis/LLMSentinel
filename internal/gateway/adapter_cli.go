@@ -63,7 +63,7 @@ func (a *CLIAdapter) Execute(ctx context.Context, req *ToolRequest) (*ToolRespon
 
 	// Execute command with shell interpretation (intentional feature for CLI adapter)
 	// Input validation should be performed by the caller before reaching this point
-	// nolint:gosec // G204: Subprocess launched with variable - intentional shell execution
+	//nolint:gosec // G204: Subprocess launched with variable - intentional shell execution
 	cmd := exec.CommandContext(execCtx, "sh", "-c", command)
 
 	// Capture output

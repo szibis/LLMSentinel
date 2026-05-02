@@ -698,7 +698,7 @@ func runSessionStartup() {
 Once you've run operations in this project, patterns will be automatically generated.
 See CLAUDE.md for details on the execution feedback loop system.
 `
-		// nolint:gosec // G703: patternsFile path is from configuration
+		//nolint:gosec // G703: patternsFile path is from configuration
 		if err := os.WriteFile(patternsFile, []byte(content), 0600); err != nil {
 			fmt.Fprintf(os.Stderr, "Warning: Could not create patterns file: %v\n", err)
 		}
@@ -707,9 +707,9 @@ See CLAUDE.md for details on the execution feedback loop system.
 	}
 
 	// Check if patterns file needs regeneration
-	// nolint:gosec // G703: logFile path is from configuration
+	//nolint:gosec // G703: logFile path is from configuration
 	logStat, _ := os.Stat(logFile)
-	// nolint:gosec // G703: patternsFile path is from configuration
+	//nolint:gosec // G703: patternsFile path is from configuration
 	patternsStat, _ := os.Stat(patternsFile)
 
 	needsRegenerate := patternsStat == nil || logStat.ModTime().After(patternsStat.ModTime())

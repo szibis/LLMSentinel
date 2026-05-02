@@ -239,7 +239,7 @@ func normalizeVector(v []float64) {
 }
 
 // hashWord computes a simple hash for a word.
-// nolint:gosec // G115: rune is int32, safe to cast to uint32
+//nolint:gosec // G115: rune is int32, safe to cast to uint32
 func hashWord(word string) uint32 {
 	hash := uint32(5381)
 	for _, c := range word {

@@ -100,7 +100,7 @@ func (r *Runner) executeMigration(m *Migration) error {
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback() // nolint:gosec // G104: transaction rollback
+	defer tx.Rollback() //nolint:gosec // G104: transaction rollback
 
 	// Execute migration SQL
 	if _, err := tx.Exec(m.UpSQL); err != nil {
@@ -128,7 +128,7 @@ func (r *Runner) rollbackMigration(m *Migration) error {
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback() // nolint:gosec // G104: transaction rollback
+	defer tx.Rollback() //nolint:gosec // G104: transaction rollback
 
 	if _, err := tx.Exec(m.DownSQL); err != nil {
 		return fmt.Errorf("rollback SQL failed: %w", err)
@@ -199,6 +199,6 @@ func compareVersions(a, b string) int {
 // parseVersion parses semantic version into [major, minor, patch]
 func parseVersion(v string) [3]int {
 	var major, minor, patch int
-	fmt.Sscanf(v, "%d.%d.%d", &major, &minor, &patch) // nolint:gosec // G104: parsing version
+	fmt.Sscanf(v, "%d.%d.%d", &major, &minor, &patch) //nolint:gosec // G104: parsing version
 	return [3]int{major, minor, patch}
 }

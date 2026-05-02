@@ -171,7 +171,7 @@ func (sv *SpecValidator) ValidateSpecCompliance(srcDir string) *ValidationResult
 		implementationFound := false
 		for _, file := range req.Files {
 			fullPath := filepath.Join(srcDir, file)
-			// nolint:gosec // G703: path constructed safely with filepath.Join
+			//nolint:gosec // G703: path constructed safely with filepath.Join
 			if _, err := os.Stat(fullPath); err == nil {
 				implementationFound = true
 				results.ImplementedCount++
@@ -183,7 +183,7 @@ func (sv *SpecValidator) ValidateSpecCompliance(srcDir string) *ValidationResult
 		testsFound := false
 		for _, testFile := range req.Tests {
 			fullPath := filepath.Join(srcDir, testFile)
-			// nolint:gosec // G703: path constructed safely with filepath.Join
+			//nolint:gosec // G703: path constructed safely with filepath.Join
 			if _, err := os.Stat(fullPath); err == nil {
 				testsFound = true
 				results.TestedCount++
@@ -248,7 +248,7 @@ func (sv *SpecValidator) PrintReport(results *ValidationResults) {
 // ValidatePatterns checks if all security patterns are present
 func ValidateSecurityPatterns(srcDir string) {
 	patternFile := filepath.Join(srcDir, "internal/security/patterns.go")
-	// nolint:gosec // G703/G304: path is constructed from known base + constant filename
+	//nolint:gosec // G703/G304: path is constructed from known base + constant filename
 	content, err := os.ReadFile(patternFile)
 	if err != nil {
 		fmt.Printf("❌ Failed to read patterns.go: %v\n", err)
