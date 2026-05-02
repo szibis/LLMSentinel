@@ -253,8 +253,7 @@ func verify(backupFile string) error {
 
 // printUsage prints usage information
 func printUsage() {
-	fmt.Println(`
-Database Backup and Restore Tool for LLMSentinel
+	fmt.Println(`Database Backup and Restore Tool for LLMSentinel
 
 Usage:
   backup-restore backup <data-dir> <output-file>

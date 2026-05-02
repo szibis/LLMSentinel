@@ -130,8 +130,7 @@ func main() {
 }
 
 func printUsage() {
-	fmt.Println(`
-LLMSentinel Gateway - Unified LLM API Gateway
+	fmt.Println(`LLMSentinel Gateway - Unified LLM API Gateway
 
 Usage:
   gateway [options]
