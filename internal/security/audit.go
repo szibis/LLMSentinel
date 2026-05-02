@@ -116,8 +116,6 @@ func (al *AuditLogger) rotateLogFile() error {
 
 	timestamp := time.Now().Format("2006-01-02_15-04-05")
 	logPath := filepath.Join(al.logDir, fmt.Sprintf("security_%s.log", timestamp))
-
-	//nolint:gosec // G304: logPath is constructed from safe sources (logDir + timestamp)
 	file, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0600)
 	if err != nil {
 		return err

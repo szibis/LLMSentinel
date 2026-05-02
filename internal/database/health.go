@@ -71,7 +71,7 @@ func CheckSQLiteHealth(db *sql.DB) HealthCheck {
 			check.Status = "degraded"
 			check.SQLiteMessages = append(check.SQLiteMessages, fmt.Sprintf("write test failed: %v", err))
 		}
-		_ = tx.Rollback() //nolint:gosec // G104: test transaction rollback
+		_ = tx.Rollback()
 	}
 
 	if check.SQLiteOK {

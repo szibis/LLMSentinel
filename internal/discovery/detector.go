@@ -167,7 +167,6 @@ func findTool(searchPaths []string) string {
 		}
 
 		// Check if file exists and is executable
-		//nolint:gosec // G703: path is from environment variable expansion
 		info, err := os.Stat(expanded)
 		if err != nil {
 			continue
@@ -218,7 +217,6 @@ func findGlob(pattern string) []string {
 
 	// Filter to only executable files
 	for _, match := range matches {
-		//nolint:gosec // G703: match is from glob expansion, path-safe
 		info, err := os.Stat(match)
 		if err != nil {
 			continue

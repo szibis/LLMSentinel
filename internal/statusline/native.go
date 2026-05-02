@@ -20,8 +20,6 @@ func NewNativeSource(path string) *NativeSource {
 	if path == "" {
 		path = filepath.Join(os.Getenv("HOME"), ".claude", "statusline.json")
 	}
-
-	//nolint:gosec // G703: path is from configuration
 	_, err := os.Stat(path)
 	enabled := err == nil
 

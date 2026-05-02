@@ -112,7 +112,7 @@ func (bh *BatchHandlers) HandleSubmitBatch(w http.ResponseWriter, r *http.Reques
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	_ = json.NewEncoder(w).Encode(response) //nolint:gosec // G104: JSON encoding in HTTP response
+	_ = json.NewEncoder(w).Encode(response)
 }
 
 // BatchStatusResponse represents status of a batch job
@@ -164,7 +164,7 @@ func (bh *BatchHandlers) HandleBatchStatus(w http.ResponseWriter, r *http.Reques
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(response) //nolint:gosec // G104: JSON encoding in HTTP response
+	_ = json.NewEncoder(w).Encode(response)
 }
 
 // BatchResultsResponse represents results from a completed batch
@@ -223,7 +223,7 @@ func (bh *BatchHandlers) HandleBatchResults(w http.ResponseWriter, r *http.Reque
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(response) //nolint:gosec // G104: JSON encoding in HTTP response
+	_ = json.NewEncoder(w).Encode(response)
 }
 
 // HandleCancelBatch cancels a batch job
@@ -255,7 +255,7 @@ func (bh *BatchHandlers) HandleCancelBatch(w http.ResponseWriter, r *http.Reques
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(response) //nolint:gosec // G104: JSON encoding in HTTP response
+	_ = json.NewEncoder(w).Encode(response)
 }
 
 // HandleQueueStatus returns current queue statistics
@@ -279,7 +279,7 @@ func (bh *BatchHandlers) HandleQueueStatus(w http.ResponseWriter, r *http.Reques
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(response) //nolint:gosec // G104: JSON encoding in HTTP response
+	_ = json.NewEncoder(w).Encode(response)
 }
 
 // HandlePollerStats returns polling statistics
@@ -305,7 +305,7 @@ func (bh *BatchHandlers) HandlePollerStats(w http.ResponseWriter, r *http.Reques
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(response) //nolint:gosec // G104: JSON encoding in HTTP response
+	_ = json.NewEncoder(w).Encode(response)
 }
 
 // RegisterBatchRoutes registers all batch API routes

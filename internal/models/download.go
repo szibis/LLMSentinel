@@ -96,7 +96,6 @@ func (dm *DownloadManager) downloadFromHuggingFace(ctx context.Context, modelID,
 
 	// Write to temporary file first
 	tmpFile := cacheFile + ".tmp"
-	//nolint:gosec // G304: tmpFile is constructed from cache path
 	f, err := os.Create(tmpFile)
 	if err != nil {
 		return "", fmt.Errorf("failed to create temp file: %w", err)
@@ -143,7 +142,6 @@ func (dm *DownloadManager) findLocalModel(modelID string) (string, error) {
 
 // VerifyModelIntegrity checks if a downloaded model is valid
 func (dm *DownloadManager) VerifyModelIntegrity(modelPath, expectedHash string) error {
-	//nolint:gosec // G304: modelPath is from download manager cache
 	f, err := os.Open(modelPath)
 	if err != nil {
 		return fmt.Errorf("failed to open model: %w", err)
