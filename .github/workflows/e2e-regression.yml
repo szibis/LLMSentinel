@@ -237,19 +237,7 @@ jobs:
         uses: actions/github-script@v6
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            const comment = `## Testing Complete
-
-Test Results: E2E (49+), Config (50+), Security (50+), Quality checks passed
-Performance: P50 <100ms, P99 <500ms, Success >95%
-Security: Zero CRITICAL issues found`;
-
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: comment
-            });
+          script: github.rest.issues.createComment({issue_number:context.issue.number,owner:context.repo.owner,repo:context.repo.repo,body:"Testing Complete - All checks passing"})
 
       - name: Cleanup Docker Compose
         if: always()
