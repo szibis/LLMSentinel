@@ -3,8 +3,8 @@ module github.com/szibis/claude-escalate
 go 1.26.2
 
 require (
-	github.com/fsnotify/fsnotify v1.9.0
-	github.com/mattn/go-sqlite3 v1.14.42
+	github.com/fsnotify/fsnotify v1.10.0
+	github.com/mattn/go-sqlite3 v1.14.44
 	go.etcd.io/bbolt v1.4.3
 	gopkg.in/yaml.v3 v3.0.1
 	modernc.org/sqlite v1.50.0
