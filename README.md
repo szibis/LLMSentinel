@@ -1,10 +1,12 @@
 # LLMSentinel v1.0.0
 
+> Start with [the local gateway and isolated Claude Code lab](docs/local-gateway.md), [Qwen roles](docs/claude-qwen-roles.md), and [build/release checks](docs/ci-release.md). See [source provenance](UPSTREAM.md) and the lab's recorded validation before relying on native inference.
+
 > **Token optimization gateway for Claude API — 60-75% cost savings with Batch API, knowledge graphs, semantic caching, intelligent input compression, and visual tool management.**
 
-[![Go](https://img.shields.io/badge/Go-1.26-blue)](https://golang.org)
+[![Go](https://img.shields.io/badge/Go-1.27.1-blue)](https://golang.org)
 [![License](https://img.shields.io/badge/license-Apache%202.0-green)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-614%20passing-brightgreen)](https://github.com/szibis/LLMSentinel)
+[![Build](https://github.com/szibis/LLMSentinel/actions/workflows/build.yml/badge.svg)](https://github.com/szibis/LLMSentinel/actions/workflows/build.yml)
 [![Coverage](https://img.shields.io/badge/coverage-85%25-blue)]()
 
 ---
@@ -530,21 +532,22 @@ graph TB
 
 ### Option A: Docker (Recommended)
 ```bash
-docker pull szibis/claude-escalate:4.0.0
-docker run -p 8080:8080 szibis/claude-escalate:4.0.0
+docker build -t llm-sentinel .
+docker run --rm -p 8077:8077 llm-sentinel
 ```
 
 ### Option B: Pre-built Binary
 ```bash
-wget https://github.com/szibis/LLMSentinel/releases/download/v4.0.0/claude-escalate-linux-x64
-chmod +x claude-escalate-linux-x64
-./claude-escalate-linux-x64 service --port 8080
+# After a release from the current workflow:
+gh release download --repo szibis/LLMSentinel --pattern llm-sentinel-linux-amd64
+chmod +x llm-sentinel-linux-amd64
+./llm-sentinel-linux-amd64 dashboard --port 8077
 ```
 
 ### Option C: Build from Source
 ```bash
 git clone https://github.com/szibis/LLMSentinel.git
-cd claude-escalate
+cd LLMSentinel
 make build          # Builds Go binary
 make dev            # Starts dashboard on :8080
 ```
@@ -559,7 +562,7 @@ docker-compose up   # Service + dashboard
 
 ## 📋 Requirements
 
-- **Go 1.26** (for building from source)
+- **Go 1.27.1** (for building from source)
 - **Node.js 18+** (for building web dashboard)
 - **Linux or macOS** (Intel/ARM)
 - **8 MB disk space** (binary + cache)

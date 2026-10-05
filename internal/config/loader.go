@@ -109,7 +109,7 @@ func (l *Loader) Load() (*Config, error) {
 
 // loadFromFile loads configuration from a YAML file
 func (l *Loader) loadFromFile(path string) error {
-	data, err := os.ReadFile(path)
+	data, err := os.ReadFile(path) // #nosec G703 -- Local configuration path is explicitly selected by the operator.
 	if err != nil {
 		return err
 	}

@@ -167,7 +167,7 @@ func findTool(searchPaths []string) string {
 		}
 
 		// Check if file exists and is executable
-		info, err := os.Stat(expanded)
+		info, err := os.Stat(expanded) // #nosec G703 -- Operator-configured executable search path; arbitrary locations are intentional.
 		if err != nil {
 			continue
 		}
@@ -217,7 +217,7 @@ func findGlob(pattern string) []string {
 
 	// Filter to only executable files
 	for _, match := range matches {
-		info, err := os.Stat(match)
+		info, err := os.Stat(match) // #nosec G703 -- Glob matches operator-configured executable search paths.
 		if err != nil {
 			continue
 		}

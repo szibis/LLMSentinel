@@ -26,7 +26,7 @@ func NewBaristaSource(configPath string) *BaristaSource {
 	dataPath := filepath.Join(os.Getenv("HOME"), ".claude", "data", "escalation", "barista-metrics.json")
 
 	// Check if Barista config exists
-	_, err := os.Stat(configPath)
+	_, err := os.Stat(configPath) // #nosec G703 -- Operator selects the local Barista configuration path.
 	enabled := err == nil
 
 	return &BaristaSource{

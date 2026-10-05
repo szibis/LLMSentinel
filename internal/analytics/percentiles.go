@@ -178,17 +178,17 @@ func percentile(data []float64, p float64) float64 {
 
 	// Linear interpolation method (Type 7)
 	h := (float64(len(data)-1) * p) + 1
-	h_floor := int(h) - 1
-	h_frac := h - float64(h_floor+1)
+	hFloor := int(h) - 1
+	hFrac := h - float64(hFloor+1)
 
-	if h_floor < 0 {
+	if hFloor < 0 {
 		return data[0]
 	}
-	if h_floor >= len(data)-1 {
+	if hFloor >= len(data)-1 {
 		return data[len(data)-1]
 	}
 
-	return data[h_floor] + h_frac*(data[h_floor+1]-data[h_floor])
+	return data[hFloor] + hFrac*(data[hFloor+1]-data[hFloor])
 }
 
 // calculateMean computes the arithmetic mean.

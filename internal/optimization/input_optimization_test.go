@@ -2,6 +2,7 @@ package optimization
 
 import (
 	"context"
+	"fmt"
 	"testing"
 )
 
@@ -408,7 +409,7 @@ func TestInputOptimization_Concurrent(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		go func(idx int) {
 			input := &PipelineRequest{
-				Query:  "Query " + string(rune(idx)),
+				Query:  fmt.Sprintf("Query %d", idx),
 				Intent: "quick_answer",
 				Tool:   "cli",
 				Params: map[string]interface{}{"index": idx},
@@ -444,7 +445,7 @@ func containsStructuredKeys(s string) bool {
 
 func nameOfParam(i int) string {
 	names := []string{"param_a", "param_b", "param_c", "param_d", "param_e"}
-	return names[i%len(names)] + "_" + string(rune(48+i/5))
+	return fmt.Sprintf("%s_%d", names[i%len(names)], i/5)
 }
 
 func valueOfParam(i int) interface{} {

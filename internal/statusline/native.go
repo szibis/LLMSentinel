@@ -21,7 +21,7 @@ func NewNativeSource(path string) *NativeSource {
 		path = filepath.Join(os.Getenv("HOME"), ".claude", "statusline.json")
 	}
 
-	_, err := os.Stat(path)
+	_, err := os.Stat(path) // #nosec G703 -- Operator selects the local Claude status file.
 	enabled := err == nil
 
 	return &NativeSource{
