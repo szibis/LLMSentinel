@@ -21,6 +21,10 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  qwen-metal:
+    uses: ./.github/workflows/qwen-metal.yml
+    with:
+      source_ref: ${{ inputs.ref || github.sha }}
   metadata:
     runs-on: ubuntu-latest
     outputs:
@@ -39,7 +43,7 @@ jobs:
             echo "image=ghcr.io/${REPOSITORY,,}"
           } >> "$GITHUB_OUTPUT"
   build:
-    needs: metadata
+    needs: [metadata, qwen-metal]
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -98,7 +102,7 @@ jobs:
             gh release edit "$VERSION" --repo "$REPOSITORY" --latest
           fi
   docker:
-    needs: metadata
+    needs: [metadata, qwen-metal]
     runs-on: ubuntu-latest
     concurrency:
       group: sentinel-release-docker

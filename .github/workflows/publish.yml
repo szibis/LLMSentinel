@@ -1,0 +1,51 @@
+name: Publish Tested Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Stable release version, for example v3.1.0
+        required: true
+        type: string
+      ref:
+        description: Main commit or existing tag that passed Build on main
+        default: main
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  packages: write
+  actions: read
+
+concurrency:
+  group: sentinel-auto-release
+  cancel-in-progress: false
+
+jobs:
+  select:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.select.outputs.version }}
+      ref: ${{ steps.select.outputs.ref }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: false
+      - name: Select tested commit and create immutable version tag
+        id: select
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          VERSION: ${{ inputs.version }}
+          RELEASE_REF: ${{ inputs.ref }}
+        run: python3 scripts/manual_release.py --repository "$REPOSITORY" --version "$VERSION" --ref "$RELEASE_REF"
+  publish:
+    needs: select
+    uses: ./.github/workflows/release.yml
+    with:
+      version: ${{ needs.select.outputs.version }}
+      ref: ${{ needs.select.outputs.ref }}
+    secrets: inherit

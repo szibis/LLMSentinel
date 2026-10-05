@@ -11,6 +11,11 @@ permissions:
   pull-requests: write
 
 jobs:
+  qwen-metal:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    uses: ./.github/workflows/qwen-metal.yml
+    with:
+      source_ref: ${{ github.sha }}
   build:
     runs-on: ubuntu-latest
     strategy:

@@ -17,6 +17,17 @@ go run golang.org/x/vuln/cmd/govulncheck@v1.8.0 ./...
 docker build -t sentinel:check .
 ```
 
-The Docker context excludes `.sentinel-lab`, client settings, generated binaries and model caches. Model weights and lab runtime state are never release assets. Hardware inference checks remain separate from CI; run `make lab-model-check` on an Apple Silicon Mac with Metal access.
+The Docker context excludes `.sentinel-lab`, client settings, generated binaries and model caches. Model weights and lab runtime state are never release assets. The Qwen Metal workflow checks real generation on an explicitly enabled Apple Silicon runner; see `qwen-metal-ci.md`. Run `make lab-model-check` to check an already running interactive lab.
+
+## Manual publishing
+
+`Publish Tested Release` provides an Actions button for operator-selected versions. Run it from main, entering a stable version such as `v3.1.0` and a ref such as `main`, an immutable main commit, or an existing release tag. The selector resolves the ref once and requires a successful completed Build for that exact commit on main. A new version must exceed existing stable tags. A retry can reuse its existing tag only when it still names the selected commit; release tags never move. The reusable publisher receives the immutable commit SHA, so later merges cannot change the published source.
+
+```sh
+gh workflow run publish.yml --repo szibis/LLMSentinel --ref main \
+  -f version=v3.1.0 -f ref=main
+```
+
+The manual workflow shares the automatic release lock and calls the publisher directly after creating its tag. It does not depend on a workflow-token tag push creating another Actions run.
 
 The older dependency PRs' failed security checks use an older Go standard library. After these fixes reach main, refresh those branches against main and rerun checks. PR #32 carries its own older workflows and substantial additional changes; its lint, security and frontend failures need evaluation on a refreshed branch rather than disabling required checks.
