@@ -28,6 +28,8 @@ class ReleaseDecisionTests(unittest.TestCase):
                 "gh": '''#!/bin/sh
 case "$*" in
   *branches/main*) printf '%s\\n' "$MOCK_MAIN" ;;
+  *matching-refs/tags/v*) printf '%s\\n' "$MOCK_LATEST" ;;
+  release*) printf 'gh %s\\n' "$*" >> "$MOCK_CALLS" ;;
   *) printf '%s\\n' "$MOCK_TITLE" ;;
 esac
 ''',
@@ -104,6 +106,14 @@ esac
                                            VERSION=version, IMAGE="ghcr.io/example/sentinel",
                                            MOCK_LATEST="v4.3.0")
                 self.assertEqual("docker buildx imagetools create" in calls, promoted)
+
+    def test_older_github_release_does_not_become_latest(self):
+        workflow = WORKFLOW.with_name("release.yml")
+        for version, promoted in (("v4.2.9", False), ("v4.3.0", True)):
+            with self.subTest(version=version):
+                _, calls = self.run_script("Publish release binaries", workflow=workflow,
+                                           VERSION=version, MOCK_LATEST="v4.3.0")
+                self.assertEqual("gh release edit" in calls, promoted)
 
 
 if __name__ == "__main__":

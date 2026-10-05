@@ -107,12 +107,16 @@ def stop_process(process):
             os.killpg(process.pid, 0)
         except ProcessLookupError:
             break
-        except PermissionError:
+        except PermissionError as error:
             # An exited group can no longer be probed in a restricted runner.
             # Do not escalate signals without permission to verify ownership.
             if process.poll() is not None:
                 return
-            raise
+            try:
+                process.wait(timeout=max(.01, deadline - time.monotonic()))
+            except subprocess.TimeoutExpired:
+                raise error
+            return
         if time.monotonic() >= deadline:
             try:
                 os.killpg(process.pid, signal.SIGKILL)

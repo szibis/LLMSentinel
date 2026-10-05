@@ -170,6 +170,7 @@ with r.LabLock(root):
             with self.subTest(returncode=returncode):
                 owned = Mock(pid=98765)
                 owned.poll.return_value = returncode
+                owned.wait.side_effect = subprocess.TimeoutExpired("owned", 4)
                 with patch.object(runner.os, "killpg", side_effect=[None, PermissionError()]) as kill:
                     if returncode is None:
                         with self.assertRaises(PermissionError):
@@ -177,6 +178,15 @@ with r.LabLock(root):
                     else:
                         runner.stop_process(owned)
                     self.assertEqual(kill.call_count, 2)
+
+    def test_denied_group_probe_waits_for_owned_leader_after_term(self):
+        owned = Mock(pid=98765)
+        owned.poll.return_value = None
+        owned.wait.return_value = 0
+        with patch.object(runner.os, "killpg", side_effect=[None, PermissionError()]) as kill:
+            runner.stop_process(owned)
+            owned.wait.assert_called_once()
+            self.assertEqual(kill.call_count, 2)
 
     def test_owned_descendant_is_stopped_after_leader_exits(self):
         with tempfile.TemporaryDirectory() as directory:

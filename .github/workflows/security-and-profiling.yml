@@ -77,7 +77,8 @@ jobs:
 
       - name: Fuzz Testing
         run: |
-          for TARGET in $(go test ./internal/fuzz -list '^Fuzz' | grep '^Fuzz'); do
+          TARGETS=$(go test ./internal/fuzz -list '^Fuzz' | grep '^Fuzz')
+          for TARGET in $TARGETS; do
             go test ./internal/fuzz -run '^$' -fuzz="^${TARGET}$" -parallel=2 -fuzztime=10s -timeout=60s
           done
 
