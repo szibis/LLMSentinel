@@ -90,7 +90,7 @@ jobs:
           echo "QWEN_JOB_VENV=$VENV" >> "$GITHUB_ENV"
           "$QWEN_CI_PYTHON" -m venv --system-site-packages "$VENV"
           "$VENV/bin/python" -m pip install setuptools wheel 'mlx==0.32.3' 'mlx-lm==0.32.0' 'transformers==5.18.0'
-          "$VENV/bin/python" -m pip install --no-build-isolation --no-deps -e .qwen-mlx-source
+          "$VENV/bin/python" -m pip install --no-build-isolation -e .qwen-mlx-source
           echo "QWEN_MLX_FLASH_BIN=$VENV/bin/mlx-flash" >> "$GITHUB_ENV"
       - name: Run real offline Messages and validated tool smoke
         shell: bash
