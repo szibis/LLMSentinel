@@ -76,8 +76,8 @@ func FuzzLearnerRecording(f *testing.F) {
 			classify.TaskDebugging,
 		}
 
-		predIdx := int(predicted) % len(taskTypes)
-		actIdx := int(actual) % len(taskTypes)
+		predIdx := (int(predicted)%len(taskTypes) + len(taskTypes)) % len(taskTypes)
+		actIdx := (int(actual)%len(taskTypes) + len(taskTypes)) % len(taskTypes)
 
 		event := classify.LearningEvent{
 			ID:              id,

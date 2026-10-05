@@ -29,6 +29,8 @@ dist/
 
 # Claude Code
 .claude/
+.sentinel-lab/
+__pycache__/
 
 # Prevent new root-level Markdown files (use docs/ folder instead)
 # Allowed root docs: README.md, CHANGELOG.md, CONTRIBUTING.md, SECURITY.md, LICENSE
@@ -41,3 +43,4 @@ dist/
 !/CLAUDE.md
 !/CODEOWNERS
 !/EXECUTION_PATTERNS.md
+!/UPSTREAM.md

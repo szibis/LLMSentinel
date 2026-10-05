@@ -242,7 +242,7 @@ func normalizeVector(v []float64) {
 func hashWord(word string) uint32 {
 	hash := uint32(5381)
 	for _, c := range word {
-		hash = ((hash << 5) + hash) + uint32(c)
+		hash = ((hash << 5) + hash) + uint32(c) // #nosec G115 -- String range yields nonnegative Unicode code points.
 	}
 	return hash
 }

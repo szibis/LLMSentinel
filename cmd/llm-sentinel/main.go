@@ -698,7 +698,7 @@ func runSessionStartup() {
 Once you've run operations in this project, patterns will be automatically generated.
 See CLAUDE.md for details on the execution feedback loop system.
 `
-		if err := os.WriteFile(patternsFile, []byte(content), 0600); err != nil {
+		if err := os.WriteFile(patternsFile, []byte(content), 0600); err != nil { // #nosec G703 -- Local CLI user selects project root; filename is fixed.
 			fmt.Fprintf(os.Stderr, "Warning: Could not create patterns file: %v\n", err)
 		}
 		fmt.Println("✅ Session initialized (no operations logged yet)")
@@ -706,8 +706,8 @@ See CLAUDE.md for details on the execution feedback loop system.
 	}
 
 	// Check if patterns file needs regeneration
-	logStat, _ := os.Stat(logFile)
-	patternsStat, _ := os.Stat(patternsFile)
+	logStat, _ := os.Stat(logFile)           // #nosec G703 -- Local CLI user selects project root; filename is fixed.
+	patternsStat, _ := os.Stat(patternsFile) // #nosec G703 -- Local CLI user selects project root; filename is fixed.
 
 	needsRegenerate := patternsStat == nil || logStat.ModTime().After(patternsStat.ModTime())
 

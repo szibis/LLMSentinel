@@ -1,0 +1,13 @@
+.git
+.sentinel-lab
+.claude
+bin
+dist
+**/__pycache__
+**/*.pyc
+**/node_modules
+**/.pytest_cache
+profiles
+coverage.out
+*.test
+.execution-log.jsonl

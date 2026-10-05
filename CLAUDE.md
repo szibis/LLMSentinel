@@ -2,7 +2,7 @@
 
 ## System Requirements
 
-- **Go 1.26.2** (required, enforced in `go.mod`)
+- **Go 1.27.1** (current local distribution, enforced in `go.mod`; older references below describe upstream tooling)
 - **SQLite 3.x** (for analytics storage)
 - **Make** (optional, for helper targets)
 
@@ -11,22 +11,22 @@
 ```bash
 # 1. Clone and enter the project
 git clone <repo-url>
-cd claude-escalate
+cd LLMSentinel
 
 # 2. Verify Go version
-go version  # Should be go1.26.2
+go version  # Should be go1.27.1
 
 # 3. Download dependencies
 go mod download
 
 # 4. Build the binary
-go build -o escalate ./cmd/claude-escalate
+go build -o bin/llm-sentinel ./cmd/llm-sentinel
 
 # 5. Run tests
 go test ./...
 
 # 6. Start the service
-./escalate service --port 9000
+./bin/llm-sentinel dashboard --port 8077
 ```
 
 ## Local Development
@@ -35,7 +35,7 @@ go test ./...
 
 ```bash
 # Build binary
-go build -o escalate ./cmd/claude-escalate
+go build -o bin/llm-sentinel ./cmd/llm-sentinel
 
 # Run tests with coverage
 go test -v -coverprofile=coverage.out ./...
@@ -50,18 +50,11 @@ go test -race ./...
 
 ### Linting & Type Checking
 
-The project uses golangci-lint for linting. Due to Go 1.26.2 compatibility constraints:
+The project uses golangci-lint v2.13.2, compiled with the Go version in go.mod:
 
 ```bash
-# Run linting (uses build-from-source workaround)
-# See .github/workflows/build.yml for the full approach
-make lint  # If Makefile available, otherwise use manual approach
-
-# Manual linting (build from source)
-git clone --depth 1 https://github.com/golangci/golangci-lint.git /tmp/golangci-lint
-cd /tmp/golangci-lint
-make build
-./golangci-lint run ../..
+make lint
+go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.13.2 run ./... --timeout 5m
 ```
 
 ### Type Checking
@@ -78,7 +71,7 @@ staticcheck ./...
 
 ```bash
 # Enable debug logging
-ESCALATION_LOG_LEVEL=debug ./escalate service --port 9000
+ESCALATION_LOG_LEVEL=debug ./bin/llm-sentinel dashboard --port 8077
 
 # Get analytics for validation ID
 curl http://localhost:9000/api/analytics/phase-1/{validation_id}
@@ -148,21 +141,9 @@ To add a new statusline source:
 
 ## Known Issues & Workarounds
 
-### Go 1.26.2 Lint Compatibility
+### Go and lint compatibility
 
-**Issue**: golangci-lint v1.x (released binaries) were built with Go 1.23-1.24, incompatible with Go 1.26.2 compiler.
-
-**Current Workaround**: `.github/workflows/build.yml` builds golangci-lint from source at CI time:
-```bash
-git clone --depth 1 https://github.com/golangci/golangci-lint.git /tmp/golangci-lint
-cd /tmp/golangci-lint
-make build
-./golangci-lint run
-```
-
-**Cost**: Adds 5-10 minutes to each CI run.
-
-**Longer-term**: Monitor [golangci-lint releases](https://github.com/golangci/golangci-lint/releases) for v2.0 with native Go 1.26 support (likely Q2-Q3 2026).
+Use Go 1.27.1 and the pinned golangci-lint v2.13.2 command above. `.golangci.yml` uses the v2 format. Running through Go builds the linter with the project's toolchain. See [CI and release checks](docs/ci-release.md).
 
 **Disabled Linters** (planned for re-enabling in v3.0.1):
 
@@ -285,9 +266,7 @@ go test -v ./internal/budgets -run TestBudget
 
 Run from inside the repository:
 ```bash
-git clone --depth 1 https://github.com/golangci/golangci-lint.git /tmp/golangci-lint
-cd /tmp/golangci-lint && make build && cd -
-/tmp/golangci-lint/golangci-lint run ./...
+make lint
 ```
 
 ### "Webhook validation failed: URL must be HTTPS"
@@ -306,7 +285,7 @@ webhook_url: https://api.example.com/metrics  # ✅ HTTPS required
 Ensure only one service instance is running:
 ```bash
 pkill -f "escalate service"
-./escalate service --port 9000
+./bin/llm-sentinel dashboard --port 8077
 ```
 
 ## Execution Feedback Loop: Patterns & Optimization

@@ -2,6 +2,7 @@ package graph
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -96,8 +97,8 @@ func TestGraphDBConcurrency(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		go func(id int) {
 			node := &Node{
-				ID:   string(rune('a' + id)),
-				Name: string(rune('a' + id)),
+				ID:   fmt.Sprintf("%c", 'a'+id),
+				Name: fmt.Sprintf("%c", 'a'+id),
 				Type: NodeTypeFunction,
 			}
 			_ = db.CreateNode(ctx, node)

@@ -1,8 +1,79 @@
 BINARY=llm-sentinel
+.DEFAULT_GOAL := lab-help
+GO ?= go
+PYTHON ?= python3
+export MODEL_PATH SMALL_MODEL_PATH MODEL_ROLE MLX_FLASH_BIN ATTACH_RUNTIME PROMPT LAB_WORKSPACE
+
+.PHONY: lab-clients-update
+.PHONY: lab-model-check
+lab-model-check:
+	$(PYTHON) scripts/check_qwen_roles.py
+
+lab-clients-update:
+	$(PYTHON) scripts/sentinel_lab.py clients-update
+
+.PHONY: lab-help lab-init lab-test lab-run lab-start lab-restart lab-foreground lab-rebuild lab-stop lab-status lab-logs lab-follow lab-ask lab-doctor lab-codex lab-claude
+lab-help:
+	@printf '%s\n' 'Qwen roles: Haiku = small, Sonnet = large, Opus = large with thinking.' '  make lab-model-check  Opt-in real generation check for all three roles' 'Two-model setup: pass MODEL_PATH (large) and SMALL_MODEL_PATH (small); selections are saved.'
+	@printf '%s\n' 'Isolated Sentinel lab:' '  make lab-clients-update  Install/update latest isolated Codex and Claude' '  make lab-init     Prepare separate client profiles' '  make lab-test     Fast gateway/race/vet and isolation checks' '  make lab-run      Build and start server in background' '  make lab-rebuild  Stop owned lab, rebuild, and restart server' '  make lab-restart  Restart server without rebuilding' '  make lab-foreground  Optional foreground debugging' '  make lab-stop     Stop only this lab' '  make lab-status   Gateway and real runtime health' '  make lab-logs     Recent gateway/runtime logs' '  make lab-follow   Follow logs' '  make lab-ask      Send PROMPT to the local model' '  make lab-doctor   Isolated client versions and gateway health' '  make lab-claude   Open real interactive Claude Code with the local stack' '' 'First runtime start: make lab-run MODEL_PATH=/absolute/cached/model MLX_FLASH_BIN=/path/to/mlx-flash' 'Selections are saved locally for rebuilds. ATTACH_RUNTIME=1 uses an existing runtime on 19091.' 'No automatic installs or weight downloads.'
+
+lab-init:
+	$(PYTHON) scripts/sentinel_lab.py prepare
+
+lab-test: gateway-check
+	$(PYTHON) -m unittest discover -s scripts -p 'test_sentinel_*.py' -v
+
+lab-run: lab-start
+
+lab-start: gateway-build
+	$(PYTHON) scripts/sentinel_runner.py start
+
+lab-restart:
+	$(PYTHON) scripts/sentinel_runner.py restart
+
+lab-foreground: gateway-build
+	$(PYTHON) scripts/sentinel_runner.py run
+
+lab-rebuild:
+	$(PYTHON) scripts/sentinel_runner.py stop
+	$(MAKE) gateway-build
+	$(PYTHON) scripts/sentinel_runner.py start
+
+lab-stop:
+	$(PYTHON) scripts/sentinel_runner.py stop
+
+lab-status:
+	$(PYTHON) scripts/sentinel_runner.py status
+
+lab-logs:
+	$(PYTHON) scripts/sentinel_runner.py logs
+
+lab-follow:
+	$(PYTHON) scripts/sentinel_runner.py logs --follow
+
+lab-ask:
+	$(PYTHON) scripts/sentinel_runner.py ask
+
+lab-doctor:
+	$(PYTHON) scripts/sentinel_lab.py doctor
+
+lab-codex:
+	$(PYTHON) scripts/sentinel_lab.py codex
+
+lab-claude: lab-start
+	$(PYTHON) scripts/sentinel_lab.py claude
 VERSION?=$(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
 LDFLAGS=-ldflags "-s -w -X github.com/szibis/claude-escalate/internal/config.Version=$(VERSION)"
 
 .PHONY: build test lint clean install install-hook
+
+.PHONY: gateway-build gateway-check
+gateway-build:
+	CGO_ENABLED=0 $(GO) build -trimpath -o bin/sentinel-gateway ./cmd/sentinel-gateway
+
+gateway-check:
+	$(GO) test -race ./internal/localgateway ./cmd/sentinel-gateway
+	$(GO) vet ./internal/localgateway ./cmd/sentinel-gateway
 
 ## Build
 
@@ -54,7 +125,7 @@ slo-test:
 ## Security Testing
 
 security-lint:
-	go run github.com/golangci/golangci-lint/cmd/golangci-lint@latest run ./... --enable gosec --timeout 10m
+	go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.13.2 run ./... --enable gosec --timeout 10m
 
 security-test:
 	go test -v ./internal/security/...
@@ -72,7 +143,7 @@ ci-local: security-lint memory-leak-test slo-test
 ## Lint
 
 lint:
-	golangci-lint run ./...
+	go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.13.2 run ./... --timeout 5m
 
 fmt:
 	gofmt -w .
