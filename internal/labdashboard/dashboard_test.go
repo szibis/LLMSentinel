@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 )
 
@@ -71,5 +72,28 @@ func TestDashboardRejectsRemoteBind(t *testing.T) {
 	}
 	if !validListen("127.0.0.1:8077") {
 		t.Fatal("rejected loopback")
+	}
+}
+
+func TestFastRefreshCachesHeavyTelemetryButPollsActivity(t *testing.T) {
+	var snapshots, polls atomic.Int32
+	client := &http.Client{Transport: testTransport(func(r *http.Request) (*http.Response, error) {
+		polls.Add(1)
+		return &http.Response{StatusCode: 200, Body: io.NopCloser(strings.NewReader(`{}`))}, nil
+	})}
+	handler := newHandler(client, func() (json.RawMessage, error) {
+		snapshots.Add(1)
+		return json.RawMessage(`{}`), nil
+	})
+	for i := 0; i < 3; i++ {
+		response := httptest.NewRecorder()
+		handler.ServeHTTP(response, httptest.NewRequest("GET", "/api/status", nil))
+		var data map[string]json.RawMessage
+		if json.Unmarshal(response.Body.Bytes(), &data) != nil || string(data["history"]) != "[]" || string(data["attempts"]) != "[]" {
+			t.Fatalf("history must preserve empty lists: %s", response.Body.String())
+		}
+	}
+	if snapshots.Load() != 1 || polls.Load() != 6 {
+		t.Fatalf("heavy telemetry polled too fast or activity cached: %d snapshots, %d endpoint polls", snapshots.Load(), polls.Load())
 	}
 }

@@ -12,7 +12,11 @@ only this dashboard. The gateway and MLX runtimes remain managed by the lab
 supervisor. This live view is separate from the older configuration dashboard
 served by `llm-sentinel dashboard`; they cannot occupy the same port.
 
-The view refreshes every five seconds and shows:
+Live gateway activity refreshes every second by default; choose 1, 2 or 5 seconds
+in the browser. Runtime and machine telemetry is cached for four seconds, shared
+across browser clients, so faster refresh does not increase heavy system polls.
+Navigation links lead to overview, models, history, configuration, attempts and
+tools/capabilities. The view shows:
 
 - Actual active local adapter role, selected upstream, thinking profile, elapsed
   time, output budget, waiting count and most recent completed attempt.
@@ -20,11 +24,32 @@ The view refreshes every five seconds and shows:
   time and native time to first token.
 - Shared machine memory, swap and pressure, displayed once.
 - Gateway mode, policy, capture state, role budgets and current quality-gate scope.
+- Four history graphs: observed completion decode speed, interval output
+  throughput, MLX requests per minute, and shared available RAM/swap.
+- Current role profiles, paid startup opt-in and reported adapter capabilities.
+- Recent observed local attempts with protocol result, latency and input/output
+  usage, without prompts, responses or tool arguments.
+
+History is retained in this dashboard process for 15 minutes (at most 900
+telemetry points and 100 observed attempts). It survives page reloads and can
+display a five-minute window. It resets on dashboard restart and is populated
+only while `/api/status` is polled. A polling dashboard can miss completions
+between polls; this is not a durable or exhaustive traffic ledger. It uses no
+external chart libraries or assets.
+
+Counter deltas produce interval rates only across fresh, consecutive samples
+with the same lab run, runtime endpoint and model. Stale samples, counter or
+uptime resets, and sampling gaps over eight seconds leave unknown rate gaps.
+Completion decode points are recorded only when the fresh request counter
+advances and native completion metadata is present; they are observed sample
+times, not invented completion timestamps. The runtime cards still show the
+last native completion with unknown age. Graphs do not connect different models.
 
 No inference, commercial traffic or control mutations are sent by the dashboard.
 It reads only fixed loopback endpoints. Request and response bodies are not
 included in activity telemetry. `GET /api/status` returns the displayed JSON;
-`GET /health` describes the dashboard process, not model readiness.
+`GET /health` describes the dashboard process, not model readiness. Status JSON
+includes bounded `history` and sanitized `attempts` arrays.
 
 Actual activity comes from `GET /sentinel/activity` on the gateway. Its scope is
 local Messages, Responses and Chat adapters. It does not claim to monitor
@@ -45,9 +70,9 @@ fabricated healthy or zero states. Gateway and activity availability remain
 explicit. Browser refresh failures mark the displayed sample stale.
 
 Commercial cost stays unknown without a billing feed. Jes is not trained or
-connected; the current quality gate checks protocol and tool schemas, not
-reasoning quality. Valid tool calls can still lead to repetitive or unhelpful
-exploration.
+connected; the current quality gate checks protocol, tool schemas, repeated
+unchanged lookups and short unfinished finals. It does not score reasoning or
+factual accuracy. Valid tool calls can still lead to unhelpful exploration.
 
 For repository-specific work, open the isolated client in the intended checkout:
 

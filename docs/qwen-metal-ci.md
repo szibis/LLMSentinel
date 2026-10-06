@@ -27,7 +27,7 @@ Machine environment settings stay outside Git:
 | --- | --- |
 | `QWEN_CI_PYTHON` | Absolute Python executable in the cached native MLX runtime |
 | `QWEN_SMALL_MODEL_PATH` | Absolute cached Qwen3.5 4B MLX 4-bit directory |
-| `QWEN_LARGE_MODEL_PATH` | Absolute cached Qwen3.6 35B A3B MLX 4-bit snapshot directory |
+| `QWEN_LARGE_MODEL_PATH` | Absolute cached Qwen3.8 27B MLX 4-bit directory, including its thinking template |
 | `QWEN_CI_LOCK_PATH` | Shared lock, default `/private/tmp/qwen-metal-ci.lock` |
 
 The inference dependency is pinned to MLX-Flash main commit
