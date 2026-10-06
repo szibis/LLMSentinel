@@ -1,4 +1,4 @@
-name: Real Qwen Metal roles
+name: Real MLX Metal integration
 
 on:
   workflow_call:
@@ -47,7 +47,7 @@ jobs:
           fi
 
   qwen-metal:
-    name: Real Qwen Claude roles and tool bridge
+    name: Real MLX client API and cache proofs
     needs: harness
     if: vars.QWEN_METAL_ENABLED == 'true' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/'))
     runs-on: [self-hosted, macOS, ARM64, qwen-metal]
@@ -64,7 +64,7 @@ jobs:
         uses: actions/checkout@v5
         with:
           repository: szibis/MLX-Flash
-          ref: 6b9c102c2ad07a585b5d414a50f36a1e5bd64103
+          ref: 626d702970ef46284185401a1144af1607b0fe72
           path: .qwen-mlx-source
           persist-credentials: false
       - name: Check out current smoke controls for historical release retries
@@ -91,6 +91,21 @@ jobs:
       - name: Build trusted Go smoke controls
         working-directory: .qwen-ci-controls
         run: go build -o "$RUNNER_TEMP/qwen-sentinel-tools" ./cmd/sentinel-tools
+      - name: Select configured MLX integration model pair
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Generic runner settings override legacy Qwen paths for this expanded gate.
+          if [ -n "${MLX_SMALL_MODEL_PATH:-}" ] || [ -n "${MLX_LARGE_MODEL_PATH:-}" ]; then
+            : "${MLX_SMALL_MODEL_PATH:?Both MLX model paths are required}"
+            : "${MLX_LARGE_MODEL_PATH:?Both MLX model paths are required}"
+            {
+              printf 'QWEN_SMALL_MODEL_PATH=%s\n' "$MLX_SMALL_MODEL_PATH"
+              printf 'QWEN_LARGE_MODEL_PATH=%s\n' "$MLX_LARGE_MODEL_PATH"
+              printf 'QWEN_SMALL_MODEL_REVISION=%s\n' "${MLX_SMALL_MODEL_REVISION:-unknown}"
+              printf 'QWEN_LARGE_MODEL_REVISION=%s\n' "${MLX_LARGE_MODEL_REVISION:-unknown}"
+            } >> "$GITHUB_ENV"
+          fi
       - name: Install pinned MLX dependency in isolated runtime
         shell: bash
         run: |
@@ -104,9 +119,22 @@ jobs:
           "$VENV/bin/python" -m pip install setuptools wheel 'mlx==0.32.3' 'mlx-lm==0.32.0' 'transformers==5.18.0'
           "$VENV/bin/python" -m pip install --no-build-isolation -e .qwen-mlx-source
           echo "QWEN_MLX_FLASH_BIN=$VENV/bin/mlx-flash" >> "$GITHUB_ENV"
-      - name: Run real offline Messages and validated tool smoke
+      - name: Record immutable integration revisions
         shell: bash
-        run: '"$RUNNER_TEMP/qwen-sentinel-tools" smoke --gateway "$RUNNER_TEMP/qwen-sentinel-gateway"'
+        env:
+          CONTROLS_SHA: ${{ github.workflow_sha }}
+        run: |
+          mkdir -p qwen-metal-artifacts
+          jq -n --arg sentinel "$(git rev-parse HEAD)" \
+            --arg mlx "$(git -C .qwen-mlx-source rev-parse HEAD)" \
+            --arg controls "$CONTROLS_SHA" \
+            --arg small_revision "${QWEN_SMALL_MODEL_REVISION:-unknown}" \
+            --arg large_revision "${QWEN_LARGE_MODEL_REVISION:-unknown}" \
+            '{sentinel_sha:$sentinel,mlx_sha:$mlx,controls_sha:$controls,small_model_revision:$small_revision,large_model_revision:$large_revision}' \
+            > qwen-metal-artifacts/revisions.json
+      - name: Run real offline client API, tool continuation and cache proofs
+        shell: bash
+        run: '"$RUNNER_TEMP/qwen-sentinel-tools" smoke --gateway "$RUNNER_TEMP/qwen-sentinel-gateway" --integration-proofs'
       - name: Upload sanitized health, results, and server logs
         if: always()
         uses: actions/upload-artifact@v5

@@ -28,7 +28,7 @@
 
 - [ ] Unit tests pass (`make test`)
 - [ ] Linting passes (`make lint`)
-- [ ] Dashboard tested locally (`make dev`)
+- [ ] Current lab dashboard checked when telemetry/UI changes (`make lab-dashboard`)
 - [ ] Hook integration tested with Claude Code
 
 ## Checklist
@@ -38,6 +38,19 @@
 - [ ] Tests added for new functionality
 - [ ] Documentation updated (if applicable)
 - [ ] CHANGELOG.md updated
+
+## MLX integration evidence
+
+For gateway, model, cache or protocol changes, link the relevant regression test
+and update `docs/mlx-integration-verification.md` when its coverage changes.
+
+- [ ] Model-free contract/race tests cover the changed behavior and its failure cases
+- [ ] Real local Metal API proofs run, or explicitly reported as pending/skipped
+- [ ] Tested Sentinel/MLX revisions and selected model families recorded
+- [ ] Logical, reused and processed token counts remain distinct; unknown values stay unknown
+- [ ] API proof artifacts use synthetic traffic and contain no private captures or credentials
+
+Evidence (commands/results/artifact links):
 
 ## Related Issues
 

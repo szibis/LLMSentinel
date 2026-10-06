@@ -383,7 +383,7 @@ func childEnv() []string {
 	return append(env, "HF_HUB_OFFLINE=1", "TRANSFORMERS_OFFLINE=1", "HF_HUB_DISABLE_TELEMETRY=1")
 }
 
-func runSmoke(ctx context.Context, gateway, raw string, result document, out io.Writer) error {
+func runSmoke(ctx context.Context, gateway, raw string, result document, out io.Writer, integrationProofs ...bool) error {
 	if runtime.GOOS != "darwin" || runtime.GOARCH != "arm64" {
 		return errors.New("real local-model CI requires macOS Apple Silicon")
 	}
@@ -464,6 +464,9 @@ func runSmoke(ctx context.Context, gateway, raw string, result document, out io.
 				return errors.New("gateway did not advertise all Claude roles")
 			}
 			result["health"] = append(result["health"].([]any), document{"model_size": model[0], "scope": "gateway", "capabilities": state["capabilities"]})
+			if len(integrationProofs) > 0 && integrationProofs[0] {
+				return runIntegrationProofs(ctx, gatewayURL, model[0], result, out)
+			}
 			roles := []string{"haiku"}
 			if model[0] == "large" {
 				roles = []string{"sonnet", "opus"}
@@ -531,8 +534,13 @@ func Run(args []string, _ io.Reader, out, stderr io.Writer) int {
 	flags := flag.NewFlagSet("smoke", flag.ContinueOnError)
 	flags.SetOutput(stderr)
 	gateway := flags.String("gateway", "", "fresh gateway binary")
+	proofs := flags.Bool("integration-proofs", false, "verify provider API, tools, telemetry, and native cache contracts")
 	artifacts := flags.String("artifacts", "qwen-metal-artifacts", "sanitized output directory")
 	if flags.Parse(args) != nil || flags.NArg() != 0 {
+		return 2
+	}
+	if *proofs && *gateway == "" {
+		fmt.Fprintln(stderr, "--integration-proofs requires --gateway")
 		return 2
 	}
 	if err := os.MkdirAll(*artifacts, 0700); err != nil {
@@ -557,7 +565,7 @@ func Run(args []string, _ io.Reader, out, stderr io.Writer) int {
 			return errors.New("cannot create private smoke logs")
 		}
 		defer func() { _ = os.RemoveAll(raw) }()
-		e = runSmoke(ctx, *gateway, raw, result, out)
+		e = runSmoke(ctx, *gateway, raw, result, out, *proofs)
 		logsErr := sanitizedLogs(raw, *artifacts)
 		if e == nil {
 			e = logsErr
