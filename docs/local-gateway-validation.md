@@ -7,7 +7,7 @@
 - `make gateway-check` and `go vet ./...` passed.
 - Full ordinary upstream `go test ./...` completed successfully. Its mock-model tests do not establish real inference, semantic caching or MCP implementation quality.
 - Two Python isolation tests passed: existing edited lab config is preserved, and actual child processes do not receive inherited production-token/proxy markers.
-- The development workflow's `make lab-test gateway-build` passed: focused Go race/vet checks and all eight Python tests. Additional runner tests cover exclusive ownership, stop markers, invalid ownership state, complete cached model files/shards, and real child-process cleanup while an unrelated process stays alive.
+- This historical validation used the earlier Python lab helpers. Current Sentinel tooling is pure Go; `make lab-test gateway-build` runs the gateway and Go helper regression suite. The Go tests cover ownership, stop markers, preserved profiles, cached models/shards, private capture, controls and child-process cleanup. Historical live probes below do not establish a new Go lab deployment.
 - `make lab-help lab-init lab-stop lab-logs` completed. Separate profiles were prepared; no owned lab was running and no runtime logs existed.
 - Installed Codex 0.160.0 and Claude Code 2.1.286 returned their versions using the separate lab environments. No client generation/agent session or inference runtime was launched.
 - Jade working tree remained unchanged. Global Codex/Claude settings, login, installation and running sessions were not deliberately modified.

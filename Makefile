@@ -1,16 +1,16 @@
 BINARY=llm-sentinel
 .DEFAULT_GOAL := lab-help
 GO ?= go
-PYTHON ?= python3
+TOOLS = ./bin/sentinel-tools
 export MODEL_PATH SMALL_MODEL_PATH MODEL_ROLE MLX_FLASH_BIN ATTACH_RUNTIME PROMPT LAB_WORKSPACE
 
 .PHONY: lab-clients-update
 .PHONY: lab-model-check
-lab-model-check:
-	$(PYTHON) scripts/check_qwen_roles.py
+lab-model-check: tools-build
+	$(TOOLS) role-check
 
-lab-clients-update:
-	$(PYTHON) scripts/sentinel_lab.py clients-update
+lab-clients-update: tools-build
+	$(TOOLS) lab clients-update
 
 .PHONY: lab-help lab-init lab-test lab-run lab-start lab-restart lab-foreground lab-rebuild lab-stop lab-status lab-logs lab-follow lab-ask lab-doctor lab-codex lab-claude
 lab-help:
@@ -18,65 +18,68 @@ lab-help:
 	@printf '%s\n' 'Qwen roles: Haiku = small, Sonnet = large, Opus = large with thinking.' '  make lab-model-check  Opt-in real generation check for all three roles' 'Two-model setup: pass MODEL_PATH (large) and SMALL_MODEL_PATH (small); selections are saved.'
 	@printf '%s\n' 'Isolated Sentinel lab:' '  make lab-clients-update  Install/update latest isolated Codex and Claude' '  make lab-init     Prepare separate client profiles' '  make lab-test     Fast gateway/race/vet and isolation checks' '  make lab-run      Build and start server in background' '  make lab-rebuild  Stop owned lab, rebuild, and restart server' '  make lab-restart  Restart server without rebuilding' '  make lab-foreground  Optional foreground debugging' '  make lab-stop     Stop only this lab' '  make lab-status   Gateway and real runtime health' '  make lab-logs     Recent gateway/runtime logs' '  make lab-follow   Follow logs' '  make lab-ask      Send PROMPT to the local model' '  make lab-doctor   Isolated client versions and gateway health' '  make lab-claude   Open real interactive Claude Code with the local stack' '' 'First runtime start: make lab-run MODEL_PATH=/absolute/cached/model MLX_FLASH_BIN=/path/to/mlx-flash' 'Selections are saved locally for rebuilds. ATTACH_RUNTIME=1 uses an existing runtime on 19091.' 'No automatic installs or weight downloads.'
 
-lab-init:
-	$(PYTHON) scripts/sentinel_lab.py prepare
+lab-init: tools-build
+	$(TOOLS) lab prepare
 
 lab-test: gateway-check
-	$(PYTHON) -m unittest discover -s scripts -p 'test_sentinel_*.py' -v
+	$(GO) test -race ./internal/clientcapture ./internal/clientcontrol ./internal/lab ./internal/labstatus ./internal/qwensmoke ./internal/release ./cmd/sentinel-tools
 
 lab-run: lab-start
 
-lab-start: gateway-build
-	$(PYTHON) scripts/sentinel_runner.py start
+lab-start: gateway-build tools-build
+	$(TOOLS) runner start
 
-lab-restart:
-	$(PYTHON) scripts/sentinel_runner.py restart
+lab-restart: tools-build
+	$(TOOLS) runner restart
 
-lab-foreground: gateway-build
-	$(PYTHON) scripts/sentinel_runner.py run
+lab-foreground: gateway-build tools-build
+	$(TOOLS) runner run
 
-lab-rebuild:
-	$(PYTHON) scripts/sentinel_runner.py stop
+lab-rebuild: tools-build
+	$(TOOLS) runner stop
 	$(MAKE) gateway-build
-	$(PYTHON) scripts/sentinel_runner.py start
+	$(TOOLS) runner start
 
-lab-stop:
-	$(PYTHON) scripts/sentinel_runner.py stop
+lab-stop: tools-build
+	$(TOOLS) runner stop
 
-lab-status:
-	$(PYTHON) scripts/sentinel_runner.py status
+lab-status: tools-build
+	$(TOOLS) runner status
 
 .PHONY: lab-live-status lab-statusline
-lab-live-status:
-	$(PYTHON) scripts/sentinel_statusline.py --json
+lab-live-status: tools-build
+	$(TOOLS) statusline --json
 
 lab-statusline: lab-init
-	$(PYTHON) scripts/sentinel_statusline.py --install
+	$(TOOLS) statusline --install
 	@printf '%s\n' 'Lab status line enabled if no custom statusLine exists. Claude reloads settings automatically.'
 
-lab-logs:
-	$(PYTHON) scripts/sentinel_runner.py logs
+lab-logs: tools-build
+	$(TOOLS) runner logs
 
-lab-follow:
-	$(PYTHON) scripts/sentinel_runner.py logs --follow
+lab-follow: tools-build
+	$(TOOLS) runner logs --follow
 
-lab-ask:
-	$(PYTHON) scripts/sentinel_runner.py ask
+lab-ask: tools-build
+	$(TOOLS) runner ask
 
-lab-doctor:
-	$(PYTHON) scripts/sentinel_lab.py doctor
+lab-doctor: tools-build
+	$(TOOLS) lab doctor
 
-lab-codex:
-	$(PYTHON) scripts/sentinel_lab.py codex
+lab-codex: tools-build
+	$(TOOLS) lab codex
 
 lab-claude: lab-start
-	$(PYTHON) scripts/sentinel_lab.py claude
+	$(TOOLS) lab claude
 VERSION?=$(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
 LDFLAGS=-ldflags "-s -w -X github.com/szibis/claude-escalate/internal/config.Version=$(VERSION)"
 
 .PHONY: build test lint clean install install-hook
 
-.PHONY: gateway-build gateway-check
+.PHONY: gateway-build gateway-check tools-build
+tools-build:
+	CGO_ENABLED=0 $(GO) build -trimpath -o bin/sentinel-tools ./cmd/sentinel-tools
+
 gateway-build:
 	CGO_ENABLED=0 $(GO) build -trimpath -o bin/sentinel-gateway ./cmd/sentinel-gateway
 
@@ -86,7 +89,7 @@ gateway-check:
 
 ## Build
 
-build:
+build: gateway-build tools-build
 	CGO_ENABLED=0 go build $(LDFLAGS) -o bin/$(BINARY) ./cmd/llm-sentinel
 
 build-static:

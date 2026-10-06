@@ -2,16 +2,16 @@
 
 Learning mode keeps the original CLI connected directly to Anthropic or OpenAI. An optional local hook copies conversation evidence to a private JSONL spool, then optionally to Sentinel's learning collector. It never changes authentication, model/provider selection, subscription routing, or provider base URLs, and it never makes another commercial model request. Serving is the separate CLI → Sentinel → local model route. Start with the [mode guide](client-modes.md) to choose the path.
 
-Nothing is enabled or installed automatically. No global CLI configuration or running lab session is modified. `scripts/sentinel_capture.py` uses Python's standard library; it does not require credentials.
+Nothing is enabled or installed automatically. No global CLI configuration or running lab session is modified. `sentinel-tools capture` uses Go's standard library; it does not require Python, credentials, or external packages. Private file handling supports macOS and Linux; other platforms fail closed.
 
 ## Preview and enable
 
-Run from the Sentinel repository. Choose an existing private directory and a canonical absolute output filename. On macOS `/tmp` and `/var` are aliases; use their resolved `/private/...` paths. Keep capture data outside tracked source files; `.sentinel-lab/` is suitable for this local lab.
+Run from the Sentinel repository. Build the utility with `rtk go build -o bin/sentinel-tools ./cmd/sentinel-tools`. Choose an existing private directory and a canonical absolute output filename. On macOS `/tmp` and `/var` are aliases; use their resolved `/private/...` paths. Keep capture data outside tracked source files; `.sentinel-lab/` is suitable for this local lab. Previews embed the executable's absolute path; rebuild it in the same location to preserve installed hooks.
 
 Preview the complete Claude settings fragment (prints JSON, creates no files):
 
 ```sh
-rtk python3 scripts/sentinel_capture.py --client claude \
+rtk ./bin/sentinel-tools capture --client claude \
   --output /Users/slawomirskowron/projects/model_training/Sentinel/.sentinel-lab/client-capture.jsonl \
   --collector http://127.0.0.1:19094/sentinel/training/events --preview-config
 ```
@@ -21,7 +21,7 @@ Review and merge its `UserPromptSubmit` and `Stop` handlers into the desired Cla
 For installed Codex CLI 0.160.1, preview native hook JSON:
 
 ```sh
-rtk python3 scripts/sentinel_capture.py --client codex --native-hooks \
+rtk ./bin/sentinel-tools capture --client codex --native-hooks \
   --output /Users/slawomirskowron/projects/model_training/Sentinel/.sentinel-lab/client-capture.jsonl \
   --collector http://127.0.0.1:19094/sentinel/training/events --preview-config
 ```
@@ -30,7 +30,7 @@ Review and merge the generated JSON into the chosen `.codex/hooks.json` scope, p
 
 Codex also supports a simpler legacy `notify` adapter. Omit `--native-hooks` to preview a TOML `notify = [...]` array. Review it and pass its array as a one-invocation override using Codex's supported `-c 'notify=[...]'`, or merge it into a deliberately selected user config. Codex appends a JSON notification as the final command argument. The notification contains `input-messages` and `last-assistant-message`, thread ID and turn ID, but does not report model, actual tokens or latency. Choose native hooks **or** notify to avoid overlapping records; neither installs itself.
 
-Keep ordinary commercial provider configuration unchanged. Send copies to the dedicated learning collector on port 19094, separate from the serving lab on port 19090. A collector outage does not stop the provider conversation: the hook first appends its spool record, attempts a direct loopback HTTP POST, and retains the spool on failure. Each socket operation has a 0.3-second timeout; no proxy, DNS lookup, redirect or response body is used. Only literal `http://127.0.0.1/...` and `http://[::1]/...` URLs are accepted. There is no automatic spool replay yet.
+Keep ordinary commercial provider configuration unchanged. Send copies to the dedicated learning collector on port 19094, separate from the serving lab on port 19090. A collector outage does not stop the provider conversation: the hook first appends its spool record, attempts a direct loopback HTTP POST, and retains the spool on failure. The complete HTTP attempt has a 0.3-second timeout; no proxy, DNS lookup, redirect or response body is used. Only literal `http://127.0.0.1/...` and `http://[::1]/...` URLs are accepted. There is no automatic spool replay yet.
 
 ## What the evidence contains
 
@@ -52,7 +52,7 @@ Capture is opt-in and includes personal text after best-effort redaction. Common
 
 The spool is mode 0600, owned by the current user, a regular singly linked file, and protected with an advisory exclusive append lock and fsync. Paths must be absolute and canonical; symlinks are rejected. Use a trusted private parent directory that other users cannot replace. The transcript is opened read-only, must be a user-owned regular file, and is never discovered by scanning home directories. No credentials or unrelated sessions are read. Malformed capture input produces a generic stderr diagnostic without printing private content or injecting hook decisions.
 
-Limits: 1 MiB hook input, final 8 MiB/512 transcript rows, 32 KiB per captured text string, at most 64 input/output entries per record, and 512 KiB serialized record. Oversized records are skipped rather than written partially. The spool has no automatic rotation: arrange retention explicitly. Concurrent records are serialized by a lock; process crashes or disk errors can still leave an incomplete final line, so downstream importers must validate JSONL records. Tests use fixtures only.
+Limits: 1 MiB hook input, final 8 MiB/512 transcript rows plus at most 256 KiB for the first Codex metadata row, 32,768 Unicode characters per captured text string, at most 64 input/output entries per record, and 512 KiB serialized record. Oversized records are skipped rather than written partially. The spool has no automatic rotation: arrange retention explicitly. Concurrent records are serialized by a lock; process crashes or disk errors can still leave an incomplete final line, so downstream importers must validate JSONL records. Tests use fixtures only.
 
 ## Official interfaces and remaining telemetry work
 
@@ -67,5 +67,6 @@ Codex OTel can export opted-in `codex.user_prompt` content (`log_user_prompt = t
 Verification:
 
 ```sh
-rtk python3 -m unittest discover -s scripts -p test_sentinel_capture.py
+rtk go test -race ./internal/clientcapture
+rtk go vet ./internal/clientcapture
 ```

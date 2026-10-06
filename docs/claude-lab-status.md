@@ -1,7 +1,7 @@
 # Live Claude lab status
 
 The isolated lab's native Claude Code status line polls local telemetry every five
-seconds. New profiles include it automatically. Enable it in an existing profile:
+seconds through the Go `sentinel-tools statusline` command. New profiles include it automatically. Enable it in an existing profile:
 
 ```sh
 make lab-statusline
@@ -9,7 +9,12 @@ make lab-statusline
 
 Claude reloads the lab settings without restarting the conversation. Installation
 preserves permissions, theme and other preferences, and leaves an existing custom
-`statusLine` untouched. This only edits `.sentinel-lab/claude/settings.json`.
+`statusLine` untouched. The known old Sentinel Python command is migrated to the absolute Go binary. This only edits `.sentinel-lab/claude/settings.json`.
+
+The direct equivalent is `bin/sentinel-tools statusline --root /absolute/lab --install`.
+Pass `--root` explicitly outside the repository: its default is `.sentinel-lab`
+relative to the current directory. Installed commands always use an absolute root
+and shell-quoted absolute binary path.
 
 The display includes the Claude-selected model/mode and context percentage,
 Sentinel reachability, both loaded Qwen artifacts, MLX call and generated-token
@@ -42,6 +47,12 @@ make lab-live-status
 
 Polling only reads local health/status endpoints and bounded local logs. It sends
 no inference requests or credentials, bypasses proxies, rejects HTTP redirects,
-and never displays conversation bodies. Samples live in
+and never displays conversation bodies. Each refresh ends after at most three
+concurrent requests with 600 ms deadlines and 64 KiB response limits. Cached
+samples younger than four seconds are reused. Cache files use mode 0600 in a
+private directory and are replaced atomically; symlink targets are refused.
+Samples live in
 `.sentinel-lab/tmp/statusline.json`, outside version control. Claude status-line
 behavior is documented at <https://code.claude.com/docs/en/statusline>.
+
+Model-free fixtures: `rtk go test -race ./internal/labstatus`.

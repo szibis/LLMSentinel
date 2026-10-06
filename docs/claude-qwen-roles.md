@@ -25,11 +25,11 @@ make lab-model-check
 make lab-claude
 ```
 
-Normal launch never downloads models. Rebuild stops only this lab's owned processes. The currently running old lab was preserved during setup; the next rebuild/Claude launch refreshes it to the role gateway. Occupied unowned ports are refused.
+Normal launch never downloads models. Rebuild stops only this lab's owned processes. The currently running old lab was preserved during setup; an explicit rebuild migrates it to the Go supervisor and updated role gateway. Occupied unowned ports are refused.
 
 The launcher sets `ANTHROPIC_DEFAULT_HAIKU_MODEL=sentinel-haiku`, `ANTHROPIC_DEFAULT_SONNET_MODEL=sentinel-sonnet`, and `ANTHROPIC_DEFAULT_OPUS_MODEL=sentinel-opus`. Claude sees Haiku/Sonnet/Opus display names. Main mode is `opusplan`: Opus during Plan Mode and Sonnet during implementation. `/model haiku`, `/model sonnet`, `/model opus` and `/model opusplan` use the same mappings. The lab defines a read-only Explore agent on Haiku and a read-only Plan agent on Opus; other agents can select their appropriate role. The Agent tool is enabled alongside repository tools with normal permissions. Production Claude settings stay separate.
 
-`scripts/mlx_flash_roles.py` adds request-scoped `enable_thinking` for older installations that lack native profile handling, and uses the server's native handling when present. Inference remains in MLX-Flash/MLX. Profile support was merged in [MLX-Flash PR #17](https://github.com/szibis/mlx-flash/pull/17); native accounting/sampling improvements are in [PR #19](https://github.com/szibis/mlx-flash/pull/19). Merging a PR does not update an already running installation. Children use cached paths, offline Hub settings and speculation disabled.
+Sentinel calls the external `mlx-flash` executable directly. It has no Python profile shim and requires native request-scoped `enable_thinking` support. Missing support produces an actionable update/rebuild refusal; it never restarts an active runtime automatically. Native profile support was merged in [MLX-Flash PR #17](https://github.com/szibis/mlx-flash/pull/17), and native accounting/sampling improvements are in [PR #19](https://github.com/szibis/mlx-flash/pull/19). A merged PR does not update a running installation. Children use cached paths, offline Hub settings and speculation disabled.
 
 For another machine, select existing complete paths:
 
@@ -37,11 +37,11 @@ For another machine, select existing complete paths:
 make lab-rebuild MODEL_PATH=/absolute/large/qwen SMALL_MODEL_PATH=/absolute/small/qwen MLX_FLASH_BIN=/absolute/venv/bin/mlx-flash
 ```
 
-Role startup validates weight shard inventory, tokenizer metadata and an embedded/external Qwen thinking template before spawning either native process. It requires the installation's Python executable beside mlx-flash. It preflights ports 19090/19091/19092 and owns both runtime process groups. Logs include `runtime.log` and `runtime-small.log`; `/sentinel/status` reports separate native health for the profiles.
+Role startup validates weight shard inventory, tokenizer metadata and an embedded/external Qwen thinking template before spawning either native process. It requires only the existing external mlx-flash executable. It preflights ports 19090/19091/19092 and owns both runtime process groups. Logs include `runtime.log` and `runtime-small.log`; `/sentinel/status` reports separate native health for the profiles.
 
 ## Evidence and remaining verification
 
-Model-free gateway tests exercise endpoint selection, profile budgets, unknown/remote role refusal, route-pinned correction with actual tool-history evidence, incomplete-thinking refusal and separate native status. Python tests exercise role settings, opusplan/agent definitions, nested model context, complete template checks, request-scoped effort and cleanup of descendants after an owned leader exits. Run `make lab-test` for race, vet and isolation checks.
+Model-free gateway tests exercise endpoint selection, profile budgets, unknown/remote role refusal, route-pinned correction with actual tool-history evidence, incomplete-thinking refusal and separate native status. Go lab tests exercise isolated settings, nested model context, complete model/template checks, ownership locks, run-specific stop markers and process-group cleanup. Run `make lab-test` for race, vet and isolation checks.
 
 Both tokenizer templates were checked; real Claude Read-tool probes subsequently ran across all three roles. Those probes still exhibited incorrect path recovery and exact-answer formatting. See [the dated client inspection](client-quality-inspection.md). `make lab-model-check` deliberately generates with each profile and checks an exact final answer; it is an opt-in smoke, not a quality benchmark. Full read/edit/check/recovery acceptance remains open and requires inspecting real files/check output.
 

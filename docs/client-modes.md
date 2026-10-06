@@ -86,7 +86,7 @@ decode tokens. Existing model metadata warnings can still appear in Codex.
 Build and start a separate collector; it needs no model runtime or provider key:
 
 ```sh
-rtk make gateway-build
+rtk make gateway-build tools-build
 rtk ./bin/sentinel-gateway --listen 127.0.0.1:19094 \
   --mode learning --training-dir /private/tmp/sentinel-reference-data
 ```
@@ -96,12 +96,12 @@ local lab launcher is for local serving, not for subscription-backed learning.
 Preview the opt-in hooks before adding them to the chosen normal CLI settings:
 
 ```sh
-rtk python3 scripts/sentinel_capture.py --client claude \
+rtk ./bin/sentinel-tools capture --client claude \
   --output /private/tmp/sentinel-client-capture/claude.jsonl \
   --collector http://127.0.0.1:19094/sentinel/training/events \
   --billing-class subscription --preview-config
 
-rtk python3 scripts/sentinel_capture.py --client codex --native-hooks \
+rtk ./bin/sentinel-tools capture --client codex --native-hooks \
   --output /private/tmp/sentinel-client-capture/codex.jsonl \
   --collector http://127.0.0.1:19094/sentinel/training/events \
   --billing-class subscription --preview-config
@@ -174,10 +174,10 @@ Commands target port 19090 by default. For a collector or hybrid gateway, genera
 assets with its explicit endpoint or use terminal controls directly:
 
 ```sh
-rtk python3 scripts/sentinel_control.py --endpoint http://127.0.0.1:19094 status
-rtk python3 scripts/sentinel_control.py --endpoint http://127.0.0.1:19094 training off
-rtk python3 scripts/sentinel_control.py --endpoint http://127.0.0.1:19100 policy balanced
-rtk python3 scripts/sentinel_control.py --endpoint http://127.0.0.1:19100 profile opus 8192
+rtk ./bin/sentinel-tools control --endpoint http://127.0.0.1:19094 status
+rtk ./bin/sentinel-tools control --endpoint http://127.0.0.1:19094 training off
+rtk ./bin/sentinel-tools control --endpoint http://127.0.0.1:19100 policy balanced
+rtk ./bin/sentinel-tools control --endpoint http://127.0.0.1:19100 profile opus 8192
 ```
 
 Capture-on requires storage configured at startup; policy changes require

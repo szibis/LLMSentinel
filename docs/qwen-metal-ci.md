@@ -31,13 +31,20 @@ Machine environment settings stay outside Git:
 | `QWEN_CI_LOCK_PATH` | Shared lock, default `/private/tmp/qwen-metal-ci.lock` |
 
 The inference dependency is pinned to MLX-Flash main commit
-`a45ae99464aa2ddd82158042043f91b6966bdec3`. The job checks out that exact source
+`6b9c102c2ad07a585b5d414a50f36a1e5bd64103` (merged MLX-Flash PR #19). The job checks out that exact source
 and installs it editable into a temporary venv with MLX 0.32.3, mlx-lm 0.32.0,
 and transformers 5.18.0. It sets `QWEN_MLX_FLASH_BIN` to that job's executable.
 Build tools may be downloaded; models must already exist locally, with intact
 shard indexes and Qwen thinking templates. Offline mode disables model downloads.
 Missing models, missing native profiles, or unavailable Metal fail the enabled
 hardware job instead of skipping the generation test.
+
+Sentinel's smoke harness is the native Go `sentinel-tools smoke` command. It
+invokes only the external `mlx-flash` executable and its HTTP API. The workflow's
+temporary Python environment belongs solely to that separately checked-out
+MLX-Flash dependency; Sentinel contains no Python source, hook, adapter or test.
+The Go harness establishes readiness and performs real generation without
+importing MLX or running inline Python preflight code.
 
 The small model serves Haiku first. The process is cleaned up before the large
 model serves Sonnet and Opus. Each request goes through the actual Claude
@@ -66,13 +73,14 @@ do not establish general coding or tool reliability.
 Model-free lifecycle tests:
 
 ```sh
-python3 -m unittest discover -s scripts -p test_qwen_metal_smoke.py -v
+go test -race ./internal/qwensmoke ./internal/release
 ```
 
 Direct real smoke, with an already installed pinned inference venv:
 
 ```sh
 go build -o /tmp/qwen-sentinel-gateway ./cmd/sentinel-gateway
+go build -o /tmp/qwen-sentinel-tools ./cmd/sentinel-tools
 QWEN_MLX_FLASH_BIN=/absolute/venv/bin/mlx-flash \
-  python3 scripts/qwen_metal_smoke.py --gateway /tmp/qwen-sentinel-gateway
+  /tmp/qwen-sentinel-tools smoke --gateway /tmp/qwen-sentinel-gateway
 ```
