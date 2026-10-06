@@ -43,6 +43,7 @@ type Gateway struct {
 	training        *trainingRecorder
 	hybrid          *hybridRouter
 	roleBudgets     map[string]*atomic.Int64
+	activityState   activityState
 }
 
 func New(cfg Config) (*Gateway, error) {
@@ -136,7 +137,7 @@ func (g *Gateway) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := withTrainingRequestID(r.Context(), newID("req_"))
 	client := map[string]string{"/v1/messages": "anthropic_messages", "/v1/responses": "openai_responses", "/v1/chat/completions": "openai_chat_completions"}[r.URL.Path]
 	r = r.WithContext(withTrainingClient(ctx, client))
-	if g.cfg.LearningOnly && r.URL.Path != "/health" && r.URL.Path != "/sentinel/training/events" && r.URL.Path != "/sentinel/control" {
+	if g.cfg.LearningOnly && r.URL.Path != "/health" && r.URL.Path != "/sentinel/training/events" && r.URL.Path != "/sentinel/control" && r.URL.Path != "/sentinel/activity" {
 		apiError(w, 403, "learning_only", "Learning mode only accepts copied events; inference remains direct with the original provider")
 		return
 	}
@@ -149,6 +150,9 @@ func (g *Gateway) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	switch r.URL.Path {
+	case "/sentinel/activity":
+		g.activity(w, r)
+		return
 	case "/sentinel/control":
 		g.control(w, r)
 		return

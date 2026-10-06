@@ -10,6 +10,7 @@ import (
 	"io"
 	"math"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -47,21 +48,52 @@ func (s *RuntimeStats) UnmarshalJSON(raw []byte) error {
 }
 
 type Runtime struct {
-	ModelLoaded bool           `json:"model_loaded"`
-	Model       string         `json:"model"`
-	Stats       RuntimeStats   `json:"stats"`
-	Memory      map[string]any `json:"memory,omitempty"`
-	Endpoint    string         `json:"endpoint,omitempty"`
+	LastGeneration map[string]any `json:"last_generation,omitempty"`
+	SampleTime     float64        `json:"sample_time,omitempty"`
+	Stale          bool           `json:"stale,omitempty"`
+	ModelLoaded    bool           `json:"model_loaded"`
+	Model          string         `json:"model"`
+	Stats          RuntimeStats   `json:"stats"`
+	Memory         map[string]any `json:"memory,omitempty"`
+	Endpoint       string         `json:"endpoint,omitempty"`
 }
+
+func (r *Runtime) UnmarshalJSON(raw []byte) error {
+	type plain Runtime
+	var value plain
+	if err := json.Unmarshal(raw, &value); err != nil {
+		return err
+	}
+	var nested struct {
+		Stats struct {
+			LastGeneration map[string]any `json:"last_generation"`
+		} `json:"stats"`
+	}
+	if err := json.Unmarshal(raw, &nested); err != nil {
+		return err
+	}
+	if value.LastGeneration == nil {
+		value.LastGeneration = nested.Stats.LastGeneration
+	}
+	*r = Runtime(value)
+	return nil
+}
+
 type Snapshot struct {
-	SampleTime        float64             `json:"sample_time"`
-	RunID             string              `json:"run_id"`
-	Gateway           bool                `json:"gateway"`
-	Runtimes          map[string]*Runtime `json:"runtimes"`
-	RecentCorrections int                 `json:"recent_corrections"`
-	RecentErrors      int                 `json:"recent_errors"`
-	LastSpeed         map[string]float64  `json:"last_speed"`
-	Rates             map[string]float64  `json:"rates,omitempty"`
+	RuntimeEndpoints   map[string]string   `json:"runtime_endpoints,omitempty"`
+	Activity           map[string]any      `json:"activity,omitempty"`
+	ActivityStale      bool                `json:"activity_stale,omitempty"`
+	ActivitySampleTime float64             `json:"activity_sample_time,omitempty"`
+	GatewayStale       bool                `json:"gateway_stale,omitempty"`
+	GatewaySampleTime  float64             `json:"gateway_sample_time,omitempty"`
+	SampleTime         float64             `json:"sample_time"`
+	RunID              string              `json:"run_id"`
+	Gateway            bool                `json:"gateway"`
+	Runtimes           map[string]*Runtime `json:"runtimes"`
+	RecentCorrections  int                 `json:"recent_corrections"`
+	RecentErrors       int                 `json:"recent_errors"`
+	LastSpeed          map[string]float64  `json:"last_speed"`
+	Rates              map[string]float64  `json:"rates,omitempty"`
 }
 
 func readFile(path string, limit int64) ([]byte, error) {
@@ -285,7 +317,7 @@ func collect(root string, client *http.Client) Snapshot {
 	if raw, e := readFile(filepath.Join(root, "state.json"), maxBytes); e == nil {
 		_ = json.Unmarshal(raw, &state)
 	}
-	endpoints := map[string]string{"gateway": "http://127.0.0.1:19090/health"}
+	endpoints := map[string]string{"gateway": "http://127.0.0.1:19090/health", "activity": "http://127.0.0.1:19090/sentinel/activity"}
 	if len(state.Models) == 0 {
 		endpoints["large"] = "http://127.0.0.1:19091/status"
 	}
@@ -296,6 +328,12 @@ func collect(root string, client *http.Client) Snapshot {
 		}
 	}
 	snapshot := Snapshot{SampleTime: float64(time.Now().UnixNano()) / 1e9, RunID: state.RunID, Runtimes: map[string]*Runtime{}, LastSpeed: map[string]float64{}}
+	snapshot.RuntimeEndpoints = map[string]string{}
+	for name, endpoint := range endpoints {
+		if name != "gateway" && name != "activity" {
+			snapshot.RuntimeEndpoints[name] = endpoint
+		}
+	}
 	var mutex sync.Mutex
 	var group sync.WaitGroup
 	for name, endpoint := range endpoints {
@@ -305,11 +343,20 @@ func collect(root string, client *http.Client) Snapshot {
 			raw := fetch(client, endpoint)
 			mutex.Lock()
 			defer mutex.Unlock()
+			if name == "activity" {
+				if json.Unmarshal(raw, &snapshot.Activity) == nil && snapshot.Activity != nil {
+					snapshot.ActivitySampleTime = snapshot.SampleTime
+				}
+				return
+			}
 			if name == "gateway" {
 				var value struct {
 					Status string `json:"status"`
 				}
 				snapshot.Gateway = json.Unmarshal(raw, &value) == nil && value.Status == "ok"
+				if snapshot.Gateway {
+					snapshot.GatewaySampleTime = snapshot.SampleTime
+				}
 				return
 			}
 			var runtime *Runtime
@@ -318,6 +365,7 @@ func collect(root string, client *http.Client) Snapshot {
 			}
 			if runtime != nil {
 				runtime.Endpoint = endpoint
+				runtime.SampleTime = snapshot.SampleTime
 			}
 			snapshot.Runtimes[name] = runtime
 		}()
@@ -341,6 +389,151 @@ func collect(root string, client *http.Client) Snapshot {
 	}
 	return snapshot
 }
+
+// retainRecent tolerates brief poll failures without calling retained data healthy.
+func retainRecent(current *Snapshot, previous Snapshot) {
+	if current.RunID != previous.RunID {
+		return
+	}
+	for name, runtime := range current.Runtimes {
+		old := previous.Runtimes[name]
+		if runtime == nil || old == nil {
+			continue
+		}
+		uptime, has := runtime.Stats["uptime_s"]
+		before, had := old.Stats["uptime_s"]
+		if runtime.Endpoint != old.Endpoint || (has && had && uptime < before) {
+			return
+		}
+	}
+	recent := func(stamp float64) bool { age := current.SampleTime - stamp; return stamp > 0 && age >= 0 && age <= 15 }
+	for name, runtime := range current.Runtimes {
+		if runtime != nil {
+			continue
+		}
+		old := previous.Runtimes[name]
+		if old == nil {
+			continue
+		}
+		if expected := current.RuntimeEndpoints[name]; expected != "" && expected != old.Endpoint {
+			continue
+		}
+		stamp := old.SampleTime
+		if stamp == 0 {
+			stamp = previous.SampleTime
+		}
+		if !recent(stamp) {
+			continue
+		}
+		copy := *old
+		copy.Stale = true
+		copy.SampleTime = stamp
+		current.Runtimes[name] = &copy
+	}
+	stamp := previous.GatewaySampleTime
+	if stamp == 0 && previous.Gateway {
+		stamp = previous.SampleTime
+	}
+	if !current.Gateway && recent(stamp) {
+		current.GatewayStale = true
+		current.GatewaySampleTime = stamp
+	}
+	stamp = previous.ActivitySampleTime
+	if stamp == 0 && previous.Activity != nil {
+		stamp = previous.SampleTime
+	}
+	if current.Activity == nil && recent(stamp) {
+		current.Activity = previous.Activity
+		current.ActivityStale = true
+		current.ActivitySampleTime = stamp
+	}
+}
+func number(value any) (float64, bool) {
+	n, ok := value.(float64)
+	return n, ok && !math.IsNaN(n) && !math.IsInf(n, 0) && n >= 0
+}
+func activityLabel(snapshot Snapshot) string {
+	if snapshot.Activity == nil {
+		return "activity unknown"
+	}
+	route := func(attempt map[string]any) string {
+		role := clean(attempt["role"])
+		if attempt["role"] == nil || role == "" {
+			role = "unknown role"
+		}
+		upstream, _ := attempt["upstream"].(string)
+		target := "unknown runtime"
+		if u, err := url.Parse(upstream); err == nil && u.Host != "" {
+			for _, name := range sortedKeys(snapshot.RuntimeEndpoints) {
+				endpoint, err := url.Parse(snapshot.RuntimeEndpoints[name])
+				if err == nil && endpoint.Host == u.Host {
+					target = name
+					break
+				}
+			}
+			for _, name := range sortedKeys(snapshot.Runtimes) {
+				runtime := snapshot.Runtimes[name]
+				if runtime == nil {
+					continue
+				}
+				endpoint, err := url.Parse(runtime.Endpoint)
+				if err == nil && endpoint.Host == u.Host {
+					target = name
+					break
+				}
+			}
+			if target == "unknown runtime" {
+				target = clean(u.Host)
+			}
+		}
+		return role + "→" + target
+	}
+	suffix := ""
+	if snapshot.ActivityStale {
+		suffix = fmt.Sprintf(" (stale %.0fs)", snapshot.SampleTime-snapshot.ActivitySampleTime)
+	}
+	if active, ok := snapshot.Activity["active"].([]any); ok && len(active) > 0 {
+		var routes []string
+		for _, item := range active {
+			if attempt, ok := item.(map[string]any); ok {
+				routes = append(routes, route(attempt))
+			}
+		}
+		if len(routes) > 0 {
+			prefix := "active "
+			if snapshot.ActivityStale {
+				prefix = "last observed active "
+			}
+			return prefix + strings.Join(routes, ", ") + suffix
+		}
+	}
+	if last, ok := snapshot.Activity["last_completed"].(map[string]any); ok {
+		return "idle; last " + route(last) + suffix
+	}
+	if _, known := snapshot.Activity["active"].([]any); !known {
+		return "activity unknown" + suffix
+	}
+	return "idle" + suffix
+}
+
+// Color only the final human-facing output; telemetry JSON remains plain.
+func colorize(text string) string {
+	if os.Getenv("NO_COLOR") != "" {
+		return text
+	}
+	color := func(code, word string) { text = strings.ReplaceAll(text, word, "\x1b["+code+"m"+word+"\x1b[0m") }
+	color("36", "LAB")
+	color("32", "Sentinel online")
+	for _, word := range []string{"gateway offline", "unavailable", "pressure critical"} {
+		color("31", word)
+	}
+	for _, word := range []string{"stale", "loading", "pressure warning"} {
+		color("33", word)
+	}
+	color("32", "ready")
+	return text
+}
+
 func addRates(current *Snapshot, previous Snapshot) {
 	current.Rates = map[string]float64{}
 	elapsed := current.SampleTime - previous.SampleTime
@@ -351,7 +544,7 @@ func addRates(current *Snapshot, previous Snapshot) {
 	seen := map[string]bool{}
 	for name, runtime := range current.Runtimes {
 		old := previous.Runtimes[name]
-		if runtime == nil || old == nil || runtime.Endpoint != old.Endpoint {
+		if runtime == nil || old == nil || runtime.Stale || old.Stale || runtime.Endpoint != old.Endpoint {
 			return
 		}
 		for _, key := range []string{"uptime_s", "tokens_generated", "requests"} {
@@ -423,7 +616,10 @@ func render(session map[string]any, snapshot Snapshot) string {
 	if snapshot.Gateway {
 		state = "Sentinel online"
 	}
-	first := []string{"LAB", label, state}
+	if snapshot.GatewayStale {
+		state = fmt.Sprintf("gateway unavailable; last seen %.0fs ago", snapshot.SampleTime-snapshot.GatewaySampleTime)
+	}
+	first := []string{"LAB", "selected " + label, state, activityLabel(snapshot)}
 	if context, ok := session["context_window"].(map[string]any); ok {
 		if used, ok := context["used_percentage"].(float64); ok && !math.IsNaN(used) && !math.IsInf(used, 0) {
 			first = append(first, fmt.Sprintf("ctx %.0f%%", used))
@@ -444,7 +640,11 @@ func render(session map[string]any, snapshot Snapshot) string {
 			memory = runtime.Memory
 		}
 		if !runtime.ModelLoaded {
-			first = append(first, name+" loading")
+			if runtime.Stale {
+				first = append(first, fmt.Sprintf("%s stale %.0fs (was loading)", name, snapshot.SampleTime-runtime.SampleTime))
+			} else {
+				first = append(first, name+" loading")
+			}
 			ready = false
 			continue
 		}
@@ -452,7 +652,12 @@ func render(session map[string]any, snapshot Snapshot) string {
 		if artifact != "" {
 			artifact = " " + artifact
 		}
-		first = append(first, name+artifact+" ready")
+		if runtime.Stale {
+			first = append(first, fmt.Sprintf("%s%s stale %.0fs", name, artifact, snapshot.SampleTime-runtime.SampleTime))
+			ready = false
+		} else {
+			first = append(first, name+artifact+" ready")
+		}
 		req, hasReq := runtime.Stats["requests"]
 		tok, hasTok := runtime.Stats["tokens_generated"]
 		if !hasReq || !hasTok || math.IsNaN(req) || math.IsNaN(tok) || math.IsInf(req, 0) || math.IsInf(tok, 0) {
@@ -476,8 +681,26 @@ func render(session map[string]any, snapshot Snapshot) string {
 	if speed, ok := snapshot.Rates["tokens_per_s"]; ok {
 		second = append(second, fmt.Sprintf("%.1f tok/s interval", speed), fmt.Sprintf("%.1f req/min", snapshot.Rates["requests_per_min"]))
 	}
-	for _, name := range sortedKeys(snapshot.LastSpeed) {
-		second = append(second, fmt.Sprintf("%s last %.1f tok/s", name, snapshot.LastSpeed[name]))
+	for _, name := range sortedKeys(snapshot.Runtimes) {
+		runtime := snapshot.Runtimes[name]
+		if runtime == nil {
+			continue
+		}
+		metadata := runtime.LastGeneration
+		if speed, ok := number(metadata["generation_tps"]); ok {
+			text := fmt.Sprintf("%s last %.1f decode tok/s", name, speed)
+			if duration, ok := number(metadata["time_s"]); ok {
+				text += fmt.Sprintf(" / %.1fs generation", duration)
+			}
+			if stamp, ok := number(metadata["timestamp"]); ok && stamp <= snapshot.SampleTime {
+				text += fmt.Sprintf(" (%.0fs ago)", snapshot.SampleTime-stamp)
+			} else {
+				text += " (age unknown)"
+			}
+			second = append(second, text)
+		} else if speed, ok := snapshot.LastSpeed[name]; ok {
+			second = append(second, fmt.Sprintf("%s legacy log %.1f tok/s (age unknown)", name, speed))
+		}
 	}
 	var third []string
 	if len(memory) > 0 {
@@ -557,18 +780,26 @@ func Run(args []string, in io.Reader, out, stderr io.Writer) int {
 		_ = json.Unmarshal(raw, &previous)
 	}
 	snapshot := previous
+	// Even a young cache cannot cross a known lab restart.
+	var currentState struct {
+		RunID string `json:"run_id"`
+	}
+	if raw, e := readFile(filepath.Join(absolute, "state.json"), maxBytes); e == nil && json.Unmarshal(raw, &currentState) == nil && currentState.RunID != previous.RunID {
+		previous = Snapshot{}
+	}
 	age := float64(time.Now().UnixNano())/1e9 - previous.SampleTime
 	if age < 0 || age >= 4 || previous.SampleTime == 0 {
 		client := statusClient()
 		snapshot = collect(absolute, client)
 		client.CloseIdleConnections()
+		retainRecent(&snapshot, previous)
 		addRates(&snapshot, previous)
 		_ = atomicJSON(cache, snapshot)
 	}
 	if *jsonFlag {
 		err = json.NewEncoder(out).Encode(snapshot)
 	} else {
-		_, err = fmt.Fprintln(out, render(session, snapshot))
+		_, err = fmt.Fprintln(out, colorize(render(session, snapshot)))
 	}
 	if err != nil {
 		fmt.Fprintln(stderr, err)
