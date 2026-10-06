@@ -222,6 +222,7 @@ func responseInputText(raw json.RawMessage) (string, error) {
 
 func prepareResponses(req responsesRequest, roleEndpoints bool, defaultBudget int) (claudeRequest, []map[string]string, error) {
 	converted := claudeRequest{Model: req.Model, MaxTokens: defaultBudget, System: mustJSON(req.Instructions)}
+	converted.Metadata.UserID = req.Metadata["session_id"]
 	if req.Model == "local" && roleEndpoints {
 		converted.Model = "sentinel-sonnet"
 		if req.Reasoning.Effort == "high" || req.Reasoning.Effort == "xhigh" {

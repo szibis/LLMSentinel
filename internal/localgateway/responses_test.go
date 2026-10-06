@@ -244,6 +244,10 @@ func TestResponsesCallOutputTypeMustMatchHistory(t *testing.T) {
 func TestResponsesConfiguredRoleDefaultBudget(t *testing.T) {
 	for _, effort := range []string{"", "high"} {
 		s := claudeServer(t, func(w http.ResponseWriter, r *http.Request) {
+			if r.URL.Path == "/health" {
+				fmt.Fprint(w, `{"capabilities":{"model_family":"qwen3_5","thinking_control":true,"reasoning_format":"think"}}`)
+				return
+			}
 			var payload map[string]any
 			json.NewDecoder(r.Body).Decode(&payload)
 			want := 4096

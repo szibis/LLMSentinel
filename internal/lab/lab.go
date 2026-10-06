@@ -467,6 +467,27 @@ func (e *environment) launch(client string) error {
 
 func validateNativeProfiles(health map[string]any) error {
 	capabilities, _ := health["capabilities"].(map[string]any)
+	if family, ok := capabilities["model_family"].(string); ok && family != "" {
+		switch family {
+		case "lfm2_moe":
+			if capabilities["thinking_control"] == false && capabilities["reasoning_format"] == "think" {
+				return nil
+			}
+		case "gemma4":
+			if capabilities["thinking_control"] != true || capabilities["reasoning_format"] != "gemma" {
+				return errors.New("MLX-Flash Gemma profile capabilities do not match the model")
+			}
+		case "qwen", "qwen3", "qwen3_moe", "qwen3_5", "qwen3_5_moe", "qwen3_next":
+			if capabilities["thinking_control"] != true || capabilities["reasoning_format"] != "think" {
+				return errors.New("MLX-Flash Qwen profile capabilities do not match the model")
+			}
+		default:
+			return errors.New("MLX-Flash advertises an unsupported model family")
+		}
+		if family == "lfm2_moe" {
+			return errors.New("MLX-Flash LFM profile must not advertise a thinking toggle")
+		}
+	}
 	options, _ := capabilities["chat_template_kwargs"].([]any)
 	for _, option := range options {
 		if option == "enable_thinking" {

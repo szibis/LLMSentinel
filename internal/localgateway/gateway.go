@@ -136,6 +136,7 @@ func apiError(w http.ResponseWriter, status int, code, message string) {
 }
 
 func (g *Gateway) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	r = r.WithContext(withCacheSession(r.Context(), r))
 	ctx := withTrainingRequestID(r.Context(), newID("req_"))
 	client := map[string]string{"/v1/messages": "anthropic_messages", "/v1/responses": "openai_responses", "/v1/chat/completions": "openai_chat_completions"}[r.URL.Path]
 	r = r.WithContext(withTrainingClient(ctx, client))
@@ -186,7 +187,7 @@ func (g *Gateway) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if g.cfg.LearningOnly {
 			policy = "copies-only"
 		}
-		_ = json.NewEncoder(w).Encode(map[string]any{"status": "ok", "scope": "gateway", "mode": mode, "training": g.training.captureEnabled(), "policy": policy, "controls": g.controlStatus(), "routing": g.cfg.Router.Name(), "roles": g.roleProfiles(), "claude_max_tokens": g.cfg.ClaudeMaxTokens, "tool_mode": "validated-qwen-and-json", "capabilities": map[string]any{"plain_text": !g.cfg.LearningOnly, "tools": adapter, "responses": adapter, "messages": adapter, "claude_roles": len(g.roles) == 3 && !g.cfg.LearningOnly, "streaming": streaming}})
+		_ = json.NewEncoder(w).Encode(map[string]any{"status": "ok", "scope": "gateway", "mode": mode, "training": g.training.captureEnabled(), "policy": policy, "controls": g.controlStatus(), "routing": g.cfg.Router.Name(), "roles": g.roleProfiles(), "claude_max_tokens": g.cfg.ClaudeMaxTokens, "tool_mode": "validated-local-tools", "capabilities": map[string]any{"plain_text": !g.cfg.LearningOnly, "tools": adapter, "responses": adapter, "messages": adapter, "claude_roles": len(g.roles) == 3 && !g.cfg.LearningOnly, "streaming": streaming}})
 		return
 	case "/sentinel/status":
 		if r.Method != http.MethodGet {
@@ -236,7 +237,7 @@ func (g *Gateway) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	case "/v1/chat/completions":
-		if g.cfg.ClaudeAdapter {
+		if g.cfg.ClaudeAdapter || len(g.roles) > 0 {
 			g.chatCompletions(w, r)
 			return
 		}
@@ -307,7 +308,16 @@ func (g *Gateway) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			}
 			routed["model"] = "local"
 			routed["max_tokens"] = min(int(budget), route.MaxTokens)
-			routed["chat_template_kwargs"] = map[string]bool{"enable_thinking": route.Thinking}
+			capabilities, capabilityErr := g.modelCapabilities(r.Context(), target)
+			if capabilityErr != nil {
+				apiError(w, 503, "runtime_unavailable", capabilityErr.Error())
+				return
+			}
+			delete(routed, "chat_template_kwargs")
+			if capabilities.ThinkingControl {
+				routed["chat_template_kwargs"] = map[string]bool{"enable_thinking": route.Thinking}
+			}
+			routed["cache_scope"] = inferenceCacheScope(r.Context(), "")
 			body = mustJSON(routed)
 			r.Body = io.NopCloser(bytes.NewReader(body))
 			r.ContentLength = int64(len(body))

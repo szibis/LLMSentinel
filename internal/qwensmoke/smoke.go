@@ -28,6 +28,46 @@ const gatewayURL = "http://127.0.0.1:19190"
 
 type document map[string]any
 
+type nativeProfile struct {
+	Family          string
+	ThinkingControl bool
+	ReasoningFormat string
+}
+
+func (p nativeProfile) requests() []bool {
+	if !p.ThinkingControl {
+		return []bool{false}
+	}
+	return []bool{false, true}
+}
+
+func runtimeProfile(health document, expected string) (nativeProfile, error) {
+	capabilities := mapping(health["capabilities"])
+	option := false
+	for _, key := range list(capabilities["chat_template_kwargs"]) {
+		option = option || key == "enable_thinking"
+	}
+	family := text(capabilities["model_family"])
+	if family == "" && qwenFamily(expected) && option {
+		return nativeProfile{Family: expected, ThinkingControl: true, ReasoningFormat: "think"}, nil
+	}
+	control, controlKnown := capabilities["thinking_control"].(bool)
+	profile := nativeProfile{Family: family, ThinkingControl: control, ReasoningFormat: text(capabilities["reasoning_format"])}
+	valid := family == expected && controlKnown
+	switch family {
+	case "lfm2_moe":
+		valid = valid && !control && !option && profile.ReasoningFormat == "think"
+	case "gemma4":
+		valid = valid && control && option && profile.ReasoningFormat == "gemma"
+	default:
+		valid = valid && qwenFamily(family) && control && option && profile.ReasoningFormat == "think"
+	}
+	if !valid {
+		return nativeProfile{}, errors.New("native runtime family capabilities do not match the cached model")
+	}
+	return profile, nil
+}
+
 func mapping(v any) document {
 	if m, ok := v.(map[string]any); ok {
 		return m
@@ -161,10 +201,47 @@ func validateModel(path string) error {
 	} else if err != nil {
 		return errors.New("cached model has unreadable thinking template")
 	}
-	if !bytes.Contains(template, []byte("enable_thinking")) {
-		return errors.New("cached model must have a Qwen thinking template")
+	family, err := cachedFamily(path)
+	if err != nil {
+		return err
+	}
+	switch family {
+	case "lfm2_moe":
+		if !bytes.Contains(template, []byte("<think>")) || !bytes.Contains(template, []byte("</think>")) {
+			return errors.New("cached LFM model must have its reasoning template")
+		}
+	case "gemma4":
+		if !bytes.Contains(template, []byte("enable_thinking")) || !bytes.Contains(template, []byte("<|channel>thought")) || !bytes.Contains(template, []byte("<channel|>")) {
+			return errors.New("cached Gemma model must have its thinking channel template")
+		}
+	default:
+		if !qwenFamily(family) || !bytes.Contains(template, []byte("enable_thinking")) {
+			return errors.New("cached model needs a supported model_type and matching thinking template")
+		}
 	}
 	return nil
+}
+
+func qwenFamily(family string) bool {
+	switch family {
+	case "qwen3", "qwen3_moe", "qwen3_5", "qwen3_5_moe", "qwen3_next":
+		return true
+	}
+	return false
+}
+
+func cachedFamily(path string) (string, error) {
+	data, err := os.ReadFile(filepath.Join(path, "config.json")) // #nosec G703 -- Explicit cached model directory, fixed configuration basename.
+	var config struct {
+		ModelType string `json:"model_type"`
+	}
+	if err != nil || json.Unmarshal(data, &config) != nil {
+		return "", errors.New("cached model has invalid configuration")
+	}
+	if config.ModelType != "lfm2_moe" && config.ModelType != "gemma4" && !qwenFamily(config.ModelType) {
+		return "", errors.New("cached model has unsupported model_type")
+	}
+	return config.ModelType, nil
 }
 
 func preflightPorts(ports []int) error {
@@ -184,16 +261,31 @@ func preflightPorts(ports []int) error {
 	return nil
 }
 
-func finalText(value string, thinking bool) error {
-	_, after, found := strings.Cut(value, "</think>")
+func finalText(value string, thinking bool, format ...string) error {
+	closeMarker := "</think>"
+	if strings.Contains(value, "<|channel>") || strings.Contains(value, "<channel|>") {
+		closeMarker = "<channel|>"
+	}
+	if thinking && len(format) > 0 {
+		switch format[0] {
+		case "gemma":
+			closeMarker = "<channel|>"
+		case "think":
+			closeMarker = "</think>"
+		}
+	}
+	before, after, found := strings.Cut(value, closeMarker)
 	if thinking && !found {
-		return errors.New("qwen thinking generation did not finish reasoning")
+		return errors.New("local generation did not finish reasoning")
 	}
 	if found {
+		if closeMarker == "<channel|>" && strings.Contains(before, "<|channel>") && !strings.HasPrefix(strings.TrimSpace(before), "<|channel>thought\n") {
+			return errors.New("local generation has an unsupported reasoning channel")
+		}
 		value = after
 	}
 	if strings.TrimSpace(value) != marker {
-		return errors.New("qwen generation failed the exact final-answer marker")
+		return errors.New("local generation failed the exact final-answer marker")
 	}
 	return nil
 }
@@ -236,34 +328,46 @@ func generateRole(ctx context.Context, base, role string, tool bool) (document, 
 				answer.WriteString(text(b["text"]))
 			}
 		}
-		if err = finalText(answer.String(), false); err != nil {
-			return nil, err
+		if strings.TrimSpace(answer.String()) != marker {
+			return nil, errors.New("sentinel role leaked reasoning or failed the exact final-answer marker")
 		}
 	}
 	return mapping(result["usage"]), nil
 }
 
-func generateChat(ctx context.Context, thinking bool) (document, error) {
+func generateChat(ctx context.Context, thinking bool, profiles ...nativeProfile) (document, error) {
+	profile := nativeProfile{ThinkingControl: true, ReasoningFormat: "think"}
+	if len(profiles) > 0 {
+		profile = profiles[0]
+	}
+	return generateChatAt(ctx, runtimeURL, thinking, profile)
+}
+
+func generateChatAt(ctx context.Context, base string, thinking bool, profile nativeProfile) (document, error) {
 	budget := 256
-	if thinking {
+	if thinking || profile.Family == "lfm2_moe" {
 		budget = 8192
 	}
-	result, err := request(ctx, runtimeURL+"/v1/chat/completions", document{"model": "local", "messages": []any{document{"role": "user", "content": "Reply with exactly " + marker + " and no other final text."}}, "max_tokens": budget, "temperature": 0, "chat_template_kwargs": document{"enable_thinking": thinking}, "stream": false}, 10*time.Minute)
+	payload := document{"model": "local", "messages": []any{document{"role": "user", "content": "Reply with exactly " + marker + " and no other final text."}}, "max_tokens": budget, "temperature": 0, "stream": false}
+	if profile.ThinkingControl {
+		payload["chat_template_kwargs"] = document{"enable_thinking": thinking}
+	}
+	result, err := request(ctx, base+"/v1/chat/completions", payload, 10*time.Minute)
 	if err != nil {
 		return nil, err
 	}
-	return validateChatResult(result, budget, thinking)
+	return validateChatResult(result, budget, thinking || profile.Family == "lfm2_moe", profile.ReasoningFormat)
 }
 
-func validateChatResult(result document, budget int, thinking bool) (document, error) {
+func validateChatResult(result document, budget int, thinking bool, format ...string) (document, error) {
 	choices := list(result["choices"])
 	usage := mapping(result["usage"])
 	nativeEOS := mapping(result["mlx_flash_compress"])["native_generation_metadata"] == true
 	count, known := usage["completion_tokens"].(float64)
 	if len(choices) != 1 || mapping(choices[0])["finish_reason"] != "stop" || !known || count < 0 || count > float64(budget) || (count == float64(budget) && !nativeEOS) {
-		return nil, errors.New("qwen chat generation was truncated or lacked token accounting")
+		return nil, errors.New("local chat generation was truncated or lacked token accounting")
 	}
-	if err := finalText(text(mapping(mapping(choices[0])["message"])["content"]), thinking); err != nil {
+	if err := finalText(text(mapping(mapping(choices[0])["message"])["content"]), thinking, format...); err != nil {
 		return nil, err
 	}
 	return usage, nil
@@ -281,7 +385,7 @@ func childEnv() []string {
 
 func runSmoke(ctx context.Context, gateway, raw string, result document, out io.Writer) error {
 	if runtime.GOOS != "darwin" || runtime.GOARCH != "arm64" {
-		return errors.New("real Qwen CI requires macOS Apple Silicon")
+		return errors.New("real local-model CI requires macOS Apple Silicon")
 	}
 	executable := os.Getenv("QWEN_MLX_FLASH_BIN")
 	info, err := os.Stat(executable) // #nosec G703 -- Explicit operator-selected model/runtime path and fixed metadata or validated shard basename.
@@ -302,7 +406,11 @@ func runSmoke(ctx context.Context, gateway, raw string, result document, out io.
 	}
 	for _, model := range models {
 		err = func() (phaseErr error) {
-			fmt.Fprintf(out, "Starting owned %s Qwen runtime on isolated CI ports.\n", model[0])
+			family, e := cachedFamily(model[1])
+			if e != nil {
+				return e
+			}
+			fmt.Fprintf(out, "Starting owned %s local runtime on isolated CI ports.\n", model[0])
 			process, e := startOwned([]string{executable, "--model", model[1], "--host", "127.0.0.1", "--port", "19191", "--speculative", "none", "--request-timeout", "600"}, filepath.Join(raw, model[0]+"-runtime.log"), childEnv())
 			if e != nil {
 				return e
@@ -317,21 +425,24 @@ func runSmoke(ctx context.Context, gateway, raw string, result document, out io.
 				return e
 			}
 			capabilities := mapping(health["capabilities"])
-			thinking := false
-			for _, key := range list(capabilities["chat_template_kwargs"]) {
-				thinking = thinking || key == "enable_thinking"
-			}
-			if !thinking {
-				return errors.New("native runtime does not advertise Qwen thinking profiles")
+			profile, e := runtimeProfile(health, family)
+			if e != nil {
+				return e
 			}
 			result["health"] = append(result["health"].([]any), document{"model_size": model[0], "status": health["status"], "capabilities": capabilities})
 			if gateway == "" {
-				for _, profile := range []bool{false, true} {
-					usage, e := generateChat(ctx, profile)
+				for _, thinking := range profile.requests() {
+					usage, e := generateChat(ctx, thinking, profile)
 					if e != nil {
 						return e
 					}
-					result["checks"] = append(result["checks"].([]any), document{"model_size": model[0], "thinking": profile, "usage": usage, "passed": true})
+					check := document{"model_size": model[0], "model_family": family, "thinking_control": profile.ThinkingControl, "usage": usage, "passed": true}
+					if profile.ThinkingControl {
+						check["thinking"] = thinking
+					} else {
+						check["profile"] = "native-default"
+					}
+					result["checks"] = append(result["checks"].([]any), check)
 				}
 				return nil
 			}
@@ -455,7 +566,7 @@ func Run(args []string, _ io.Reader, out, stderr io.Writer) int {
 	}()
 	if err != nil {
 		result["error"] = err.Error()
-		fmt.Fprintf(stderr, "Real Qwen smoke failed: %s; see sanitized server logs.\n", err)
+		fmt.Fprintf(stderr, "Real local-model smoke failed: %s; see sanitized server logs.\n", err)
 	} else {
 		result["passed"] = true
 	}
@@ -467,7 +578,7 @@ func Run(args []string, _ io.Reader, out, stderr io.Writer) int {
 	if err != nil {
 		return 1
 	}
-	fmt.Fprintln(out, "Real Qwen generation checks passed; all owned processes cleaned up.")
+	fmt.Fprintln(out, "Real local-model generation checks passed; all owned processes cleaned up.")
 	return 0
 }
 

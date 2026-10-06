@@ -48,6 +48,8 @@ func (s *RuntimeStats) UnmarshalJSON(raw []byte) error {
 }
 
 type Runtime struct {
+	PromptCache    map[string]any `json:"prompt_cache,omitempty"`
+	Optimizations  map[string]any `json:"optimizations,omitempty"`
 	LastGeneration map[string]any `json:"last_generation,omitempty"`
 	SampleTime     float64        `json:"sample_time,omitempty"`
 	Stale          bool           `json:"stale,omitempty"`
@@ -66,6 +68,8 @@ func (r *Runtime) UnmarshalJSON(raw []byte) error {
 	}
 	var nested struct {
 		Stats struct {
+			PromptCache    map[string]any `json:"prompt_cache"`
+			Optimizations  map[string]any `json:"optimizations"`
 			LastGeneration map[string]any `json:"last_generation"`
 		} `json:"stats"`
 	}
@@ -74,6 +78,12 @@ func (r *Runtime) UnmarshalJSON(raw []byte) error {
 	}
 	if value.LastGeneration == nil {
 		value.LastGeneration = nested.Stats.LastGeneration
+	}
+	if value.PromptCache == nil {
+		value.PromptCache = nested.Stats.PromptCache
+	}
+	if value.Optimizations == nil {
+		value.Optimizations = nested.Stats.Optimizations
 	}
 	*r = Runtime(value)
 	return nil

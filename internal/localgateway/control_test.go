@@ -83,6 +83,10 @@ func TestCopiedCapturePreservesUnknownUsageAndPause(t *testing.T) {
 func TestLiveBudgetControlsActualNextInference(t *testing.T) {
 	var observed int
 	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/health" {
+			_, _ = w.Write([]byte(`{"capabilities":{"model_family":"qwen3_5","thinking_control":true,"reasoning_format":"think"}}`))
+			return
+		}
 		var request struct {
 			MaxTokens int `json:"max_tokens"`
 		}

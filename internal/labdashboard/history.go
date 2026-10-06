@@ -13,6 +13,9 @@ import (
 const historyWindow = 15 * time.Minute
 
 type runtimePoint struct {
+	CacheReuseRatio   *float64 `json:"cache_reuse_ratio"`
+	ColdTTFT          *float64 `json:"cold_ttft_ms"`
+	WarmTTFT          *float64 `json:"warm_ttft_ms"`
 	Model             string   `json:"model"`
 	Decode            *float64 `json:"decode_tps"`
 	TokensPerSecond   *float64 `json:"tokens_per_s"`
@@ -80,10 +83,25 @@ func (h *history) record(raw, activity json.RawMessage, now time.Time) {
 					oldUptime, hadUptime := old.Stats["uptime_s"]
 					elapsed := s.SampleTime - h.previous.SampleTime
 					if elapsed <= 8 && ok && had && tokOK && oldTokOK && requests >= before && tokens >= oldTokens && !(hasUptime && hadUptime && uptime < oldUptime) {
+						reused, oldReused := measurement(r.PromptCache["reused_tokens"]), measurement(old.PromptCache["reused_tokens"])
+						processed, oldProcessed := measurement(r.PromptCache["processed_tokens"]), measurement(old.PromptCache["processed_tokens"])
+						if reused != nil && oldReused != nil && processed != nil && oldProcessed != nil && *reused >= *oldReused && *processed >= *oldProcessed {
+							saved, worked := *reused-*oldReused, *processed-*oldProcessed
+							if saved+worked > 0 {
+								rp.CacheReuseRatio = measurement(saved / (saved + worked))
+							}
+						}
 						rp.RequestsPerMinute = measurement((requests - before) * 60 / elapsed)
 						rp.TokensPerSecond = measurement((tokens - oldTokens) / elapsed)
 						if requests > before && r.LastGeneration["native_generation_metadata"] == true {
 							rp.Decode = measurement(r.LastGeneration["generation_tps"])
+							if cached := measurement(r.LastGeneration["cached_prompt_tokens"]); cached != nil {
+								if *cached == 0 {
+									rp.ColdTTFT = measurement(r.LastGeneration["ttft_ms"])
+								} else {
+									rp.WarmTTFT = measurement(r.LastGeneration["ttft_ms"])
+								}
+							}
 						}
 					}
 				}

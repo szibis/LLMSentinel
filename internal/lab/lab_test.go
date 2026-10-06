@@ -3,6 +3,7 @@ package lab
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"net"
 	"os"
 	"os/exec"
@@ -365,8 +366,49 @@ func model(t *testing.T, name string) string {
 	for _, file := range []string{"config.json", "tokenizer.json", "model.safetensors"} {
 		os.WriteFile(filepath.Join(dir, file), []byte("{}"), 0600)
 	}
+	os.WriteFile(filepath.Join(dir, "config.json"), []byte(`{"model_type":"qwen3_5"}`), 0600)
 	os.WriteFile(filepath.Join(dir, "tokenizer_config.json"), []byte(`{"chat_template":"{{ enable_thinking }}"}`), 0600)
 	return dir
+}
+func TestRoleModelsValidateActualFamilyTemplates(t *testing.T) {
+	for _, tc := range []struct {
+		family, template string
+		invalid          bool
+	}{
+		{"lfm2_moe", "<think>reasoning</think>", false},
+		{"gemma4", "{{ enable_thinking }}<|channel>thought\n<channel|>", false},
+		{"qwen3_5", "{{ enable_thinking }}<think></think>", false},
+		{"unknown", "{{ enable_thinking }}<think></think>", true},
+		{"gemma4", "{{ enable_thinking }}<think></think>", true},
+	} {
+		t.Run(tc.family+tc.template, func(t *testing.T) {
+			dir := model(t, "model")
+			os.WriteFile(filepath.Join(dir, "config.json"), []byte(fmt.Sprintf(`{"model_type":%q}`, tc.family)), 0600)
+			os.WriteFile(filepath.Join(dir, "tokenizer_config.json"), []byte(fmt.Sprintf(`{"chat_template":%q}`, tc.template)), 0600)
+			err := validateModel(dir, true)
+			if (err != nil) != tc.invalid {
+				t.Fatalf("validation=%v want invalid=%t", err, tc.invalid)
+			}
+		})
+	}
+}
+func TestLFMNativeProfileDoesNotRequireThinkingToggle(t *testing.T) {
+	err := validateNativeProfiles(map[string]any{"capabilities": map[string]any{"model_family": "lfm2_moe", "thinking_control": false, "reasoning_format": "think", "chat_template_kwargs": []any{}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestNativeProfilesRejectMismatchedFamilyCapabilities(t *testing.T) {
+	for _, capabilities := range []map[string]any{
+		{"model_family": "unknown", "thinking_control": true, "reasoning_format": "think", "chat_template_kwargs": []any{"enable_thinking"}},
+		{"model_family": "gemma4", "thinking_control": true, "reasoning_format": "think", "chat_template_kwargs": []any{"enable_thinking"}},
+		{"model_family": "lfm2_moe", "thinking_control": true, "reasoning_format": "think", "chat_template_kwargs": []any{"enable_thinking"}},
+	} {
+		if err := validateNativeProfiles(map[string]any{"capabilities": capabilities}); err == nil {
+			t.Fatalf("accepted mismatched capabilities: %v", capabilities)
+		}
+	}
 }
 func TestNativeRuntimePlanAndIncompleteShardRefusal(t *testing.T) {
 	e := fixture(t)

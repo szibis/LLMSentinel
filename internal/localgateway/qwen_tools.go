@@ -159,7 +159,7 @@ func decodeToolOutput(req claudeRequest, text string) (localToolEnvelope, error)
 	if json.Unmarshal([]byte(text), &envelope) == nil && envelope.Calls != nil {
 		return envelope, nil
 	}
-	if qwenRole(req.Model) {
+	if qwenRole(req.Model) && !req.JSONTools {
 		return parseQwenToolOutput(text, req.Tools)
 	}
 	return envelope, errors.New("invalid JSON tool envelope")

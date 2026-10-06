@@ -24,8 +24,14 @@ tools/capabilities. The view shows:
   time and native time to first token.
 - Shared machine memory, swap and pressure, displayed once.
 - Gateway mode, policy, capture state, role budgets and current quality-gate scope.
-- Four history graphs: observed completion decode speed, interval output
-  throughput, MLX requests per minute, and shared available RAM/swap.
+- Per-runtime prompt cache hits/misses, reused/processed prefill tokens and their
+  cumulative reuse ratio, memory/limit, entries and evictions. Last native TTFT
+  is accompanied by that prompt's reused, processed and full logical input counts.
+- Reported prompt cache, speculative decoding, batching and KV quantization settings.
+  Missing cache or optimization fields in older runtimes remain unavailable/unknown.
+- Six history graphs: observed completion decode speed, interval output
+  throughput, MLX requests per minute, shared available RAM/swap, interval
+  prefill token reuse ratio, and observed cold/warm native TTFT.
 - Current role profiles, paid startup opt-in and reported adapter capabilities.
 - Recent observed local attempts with protocol result, latency and input/output
   usage, without prompts, responses or tool arguments.
@@ -44,6 +50,22 @@ Completion decode points are recorded only when the fresh request counter
 advances and native completion metadata is present; they are observed sample
 times, not invented completion timestamps. The runtime cards still show the
 last native completion with unknown age. Graphs do not connect different models.
+
+Prompt cache counters are runtime-lifetime totals and reset on runtime restart.
+The interval reuse graph divides the increase in reused tokens by the combined
+increase in reused and processed tokens. Intervals without any prompt work are
+unknown, rather than zero reuse. Cache counter decreases leave a reuse gap.
+Cold TTFT requires explicit `cached_prompt_tokens: 0`; warm TTFT requires a
+positive count. Both require fresh native generation metadata and an advancing
+request counter. These are observed samples, not an exhaustive completion ledger
+or matched cold/warm benchmarks. No latency savings are inferred.
+
+Cache reuse avoids repeated prefill processing. Logical input usage still counts
+the complete prompt, and this view makes no billing, cost reduction or fixed
+percentage claims. The JSON runtime contract preserves `prompt_cache` and
+`optimizations` maps from either the top-level native status or nested `stats`;
+top-level values take precedence. History adds nullable `cache_reuse_ratio`
+(fraction), `cold_ttft_ms` and `warm_ttft_ms` fields per runtime.
 
 No inference, commercial traffic or control mutations are sent by the dashboard.
 It reads only fixed loopback endpoints. Request and response bodies are not

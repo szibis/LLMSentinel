@@ -30,7 +30,7 @@ type RouteDecision struct {
 // Sonnet and Opus share an artifact; Opus changes inference effort.
 type RoleRouter struct{}
 
-func (RoleRouter) Name() string { return "claude-roles; two local Qwen artifacts; Jes not trained" }
+func (RoleRouter) Name() string { return "claude-roles; two local model artifacts; Jes not trained" }
 func (RoleRouter) Select(_ context.Context, task RouteTask) (RouteDecision, error) {
 	role := task.Model
 	switch role {

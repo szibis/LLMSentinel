@@ -61,6 +61,10 @@ func TestActivityTracksAdapterRoutesAndCompletion(t *testing.T) {
 			var releaseOnce sync.Once
 			releaseBackend := func() { releaseOnce.Do(func() { close(release) }) }
 			backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.URL.Path == "/health" {
+					_, _ = w.Write([]byte(`{"capabilities":{"model_family":"qwen3_5","thinking_control":true,"reasoning_format":"think"}}`))
+					return
+				}
 				close(started)
 				<-release
 				if tc.fail {
