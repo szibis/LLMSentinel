@@ -60,7 +60,7 @@ jobs:
         run: |
           go build -o "$RUNNER_TEMP/sentinel-release-tools" ./cmd/sentinel-tools
           gh api --paginate --slurp "repos/${REPOSITORY}/commits/${COMMIT_SHA}/pulls?per_page=100" \
-            --jq 'add' > "$RUNNER_TEMP/release-prs.json"
+            | jq 'add' > "$RUNNER_TEMP/release-prs.json"
           "$RUNNER_TEMP/sentinel-release-tools" release prepare --plan \
             --prs "$RUNNER_TEMP/release-prs.json" --sha "$COMMIT_SHA" > "$RUNNER_TEMP/release-plan.json"
           jq -r '"mode=\(.mode)", "bump=\(.bump // "")", "version=\(.version // "")"' \
