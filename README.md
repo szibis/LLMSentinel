@@ -1,8 +1,23 @@
-# LLMSentinel v1.0.0
+# LLMSentinel
 
-> Start with [the local gateway and isolated Claude Code lab](docs/local-gateway.md), [Qwen roles](docs/claude-qwen-roles.md), and [build/release checks](docs/ci-release.md). See [source provenance](UPSTREAM.md) and the lab's recorded validation before relying on native inference.
+Start with [the Claude Code/Codex user guide](docs/client-modes.md): local serving,
+direct-provider learning capture, or explicitly authorized hybrid routing.
+The guide includes startup examples, slash controls, billing boundaries and
+what is implemented versus planned.
 
-> **Token optimization gateway for Claude API — 60-75% cost savings with Batch API, knowledge graphs, semantic caching, intelligent input compression, and visual tool management.**
+| New gateway capability | Documentation |
+| --- | --- |
+| Client protocols and two-model Qwen lab | [Local setup](docs/local-gateway.md), [model roles](docs/claude-qwen-roles.md) |
+| Subscription/direct learning and optional hybrid capture | [Capture hooks](docs/client-capture.md), [billing and policy](docs/hybrid-billing.md) |
+| Live telemetry and CLI controls | [Status line](docs/claude-lab-status.md), [commands](docs/client-controls.md) |
+| Small decision helpers → OSS bridge → our Jes | [Migration design](docs/jes-decision-design.md) |
+| Actual quality/accounting evidence | [Client inspection](docs/client-quality-inspection.md), [dataset admission](docs/training-mode.md) |
+
+The current decision policy is deterministic; Jes and the proposed Kev/Jeff
+decision adapters are not connected. Current Qwen models generate answers.
+Protocol compatibility does not establish equivalent Claude/OpenAI quality or
+measured cost savings. The older optimization-module documentation below is
+separate from this gateway's measured results.
 
 [![Go](https://img.shields.io/badge/Go-1.27.1-blue)](https://golang.org)
 [![License](https://img.shields.io/badge/license-Apache%202.0-green)](LICENSE)

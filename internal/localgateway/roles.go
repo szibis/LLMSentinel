@@ -69,6 +69,7 @@ func (g *Gateway) roleProfiles() map[string]any {
 			continue
 		}
 		decision, _ := (RoleRouter{}).Select(context.Background(), RouteTask{Model: role})
+		decision.MaxTokens = g.roleBudget(role, decision.MaxTokens)
 		profiles[role] = map[string]any{"model": "sentinel-" + role, "max_tokens": decision.MaxTokens, "thinking": decision.Thinking}
 	}
 	return profiles

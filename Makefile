@@ -14,6 +14,7 @@ lab-clients-update:
 
 .PHONY: lab-help lab-init lab-test lab-run lab-start lab-restart lab-foreground lab-rebuild lab-stop lab-status lab-logs lab-follow lab-ask lab-doctor lab-codex lab-claude
 lab-help:
+	@printf '%s\n' '  make lab-live-status  Live telemetry as JSON' '  make lab-statusline   Add Claude live status to an existing profile' '  make lab-init         Prepare isolated Sentinel slash controls (new CLI session loads them)'
 	@printf '%s\n' 'Qwen roles: Haiku = small, Sonnet = large, Opus = large with thinking.' '  make lab-model-check  Opt-in real generation check for all three roles' 'Two-model setup: pass MODEL_PATH (large) and SMALL_MODEL_PATH (small); selections are saved.'
 	@printf '%s\n' 'Isolated Sentinel lab:' '  make lab-clients-update  Install/update latest isolated Codex and Claude' '  make lab-init     Prepare separate client profiles' '  make lab-test     Fast gateway/race/vet and isolation checks' '  make lab-run      Build and start server in background' '  make lab-rebuild  Stop owned lab, rebuild, and restart server' '  make lab-restart  Restart server without rebuilding' '  make lab-foreground  Optional foreground debugging' '  make lab-stop     Stop only this lab' '  make lab-status   Gateway and real runtime health' '  make lab-logs     Recent gateway/runtime logs' '  make lab-follow   Follow logs' '  make lab-ask      Send PROMPT to the local model' '  make lab-doctor   Isolated client versions and gateway health' '  make lab-claude   Open real interactive Claude Code with the local stack' '' 'First runtime start: make lab-run MODEL_PATH=/absolute/cached/model MLX_FLASH_BIN=/path/to/mlx-flash' 'Selections are saved locally for rebuilds. ATTACH_RUNTIME=1 uses an existing runtime on 19091.' 'No automatic installs or weight downloads.'
 
@@ -44,6 +45,14 @@ lab-stop:
 
 lab-status:
 	$(PYTHON) scripts/sentinel_runner.py status
+
+.PHONY: lab-live-status lab-statusline
+lab-live-status:
+	$(PYTHON) scripts/sentinel_statusline.py --json
+
+lab-statusline: lab-init
+	$(PYTHON) scripts/sentinel_statusline.py --install
+	@printf '%s\n' 'Lab status line enabled if no custom statusLine exists. Claude reloads settings automatically.'
 
 lab-logs:
 	$(PYTHON) scripts/sentinel_runner.py logs

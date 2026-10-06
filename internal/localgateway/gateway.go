@@ -14,6 +14,7 @@ import (
 	"net/http/httputil"
 	"net/url"
 	"strings"
+	"sync/atomic"
 	"time"
 )
 
@@ -26,6 +27,9 @@ type Config struct {
 	ClaudeBufferedValidation bool
 	Router                   DecisionRouter
 	RoleUpstreams            map[string]string
+	Training                 *TrainingConfig
+	LearningOnly             bool
+	Hybrid                   *HybridConfig
 }
 
 type Gateway struct {
@@ -36,9 +40,23 @@ type Gateway struct {
 	inference       chan struct{}
 	claudeTransport http.RoundTripper // Optional in-process transport for protocol tests.
 	roles           map[string]*url.URL
+	training        *trainingRecorder
+	hybrid          *hybridRouter
+	roleBudgets     map[string]*atomic.Int64
 }
 
 func New(cfg Config) (*Gateway, error) {
+	training, err := newTrainingRecorder(cfg.Training)
+	if err != nil {
+		return nil, err
+	}
+	if cfg.LearningOnly && training == nil {
+		return nil, errors.New("learning mode requires training storage")
+	}
+	hybrid, err := newHybridRouter(cfg.Hybrid, training)
+	if err != nil {
+		return nil, err
+	}
 	u, err := localUpstream(cfg.Upstream)
 	if err != nil {
 		return nil, errors.New("invalid upstream URL")
@@ -71,10 +89,11 @@ func New(cfg Config) (*Gateway, error) {
 			cfg.Router = LocalRouter{}
 		}
 	}
-	g := &Gateway{cfg: cfg, upstream: u, roles: roles, inference: make(chan struct{}, 1), transport: &http.Transport{
+	g := &Gateway{cfg: cfg, upstream: u, roles: roles, training: training, hybrid: hybrid, inference: make(chan struct{}, 1), transport: &http.Transport{
 		Proxy: nil, DialContext: (&net.Dialer{Timeout: 5 * time.Second}).DialContext,
 		IdleConnTimeout: 30 * time.Second, MaxIdleConnsPerHost: 2,
 	}}
+	g.roleBudgets = map[string]*atomic.Int64{"haiku": new(atomic.Int64), "sonnet": new(atomic.Int64), "opus": new(atomic.Int64)}
 	g.proxy = &httputil.ReverseProxy{
 		Rewrite: func(pr *httputil.ProxyRequest) {
 			target := u
@@ -100,7 +119,12 @@ func New(cfg Config) (*Gateway, error) {
 	return g, nil
 }
 
-func (g *Gateway) Close() { g.transport.CloseIdleConnections() }
+func (g *Gateway) Close() {
+	g.transport.CloseIdleConnections()
+	if g.hybrid != nil {
+		g.hybrid.Close()
+	}
+}
 
 func apiError(w http.ResponseWriter, status int, code, message string) {
 	w.Header().Set("Content-Type", "application/json")
@@ -109,7 +133,28 @@ func apiError(w http.ResponseWriter, status int, code, message string) {
 }
 
 func (g *Gateway) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	ctx := withTrainingRequestID(r.Context(), newID("req_"))
+	client := map[string]string{"/v1/messages": "anthropic_messages", "/v1/responses": "openai_responses", "/v1/chat/completions": "openai_chat_completions"}[r.URL.Path]
+	r = r.WithContext(withTrainingClient(ctx, client))
+	if g.cfg.LearningOnly && r.URL.Path != "/health" && r.URL.Path != "/sentinel/training/events" && r.URL.Path != "/sentinel/control" {
+		apiError(w, 403, "learning_only", "Learning mode only accepts copied events; inference remains direct with the original provider")
+		return
+	}
+	if !g.cfg.LearningOnly && g.hybrid != nil {
+		ctx, cancel := context.WithTimeout(r.Context(), g.cfg.Timeout)
+		defer cancel()
+		r = r.WithContext(ctx)
+		if g.hybrid.serve(w, r) {
+			return
+		}
+	}
 	switch r.URL.Path {
+	case "/sentinel/control":
+		g.control(w, r)
+		return
+	case "/sentinel/training/events":
+		g.trainingIngest(w, r)
+		return
 	case "/health":
 		if r.Method != http.MethodGet {
 			apiError(w, 405, "method_not_allowed", "Use GET")
@@ -120,7 +165,22 @@ func (g *Gateway) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if g.cfg.ClaudeBufferedValidation {
 			streaming = "validated-buffered-model"
 		}
-		_ = json.NewEncoder(w).Encode(map[string]any{"status": "ok", "scope": "gateway", "policy": "strict-local", "routing": g.cfg.Router.Name(), "roles": g.roleProfiles(), "claude_max_tokens": g.cfg.ClaudeMaxTokens, "tool_mode": "experimental-validated-json", "capabilities": map[string]any{"plain_text": true, "tools": g.cfg.ClaudeAdapter, "responses": false, "messages": g.cfg.ClaudeAdapter, "claude_roles": len(g.roles) == 3, "streaming": streaming}})
+		mode := "serving"
+		if g.cfg.Hybrid != nil {
+			mode = "hybrid"
+		}
+		if g.cfg.LearningOnly {
+			mode = "learning"
+		}
+		adapter := g.cfg.ClaudeAdapter && !g.cfg.LearningOnly
+		policy := "strict-local"
+		if g.hybrid != nil {
+			policy = "hybrid-" + g.hybrid.policyName()
+		}
+		if g.cfg.LearningOnly {
+			policy = "copies-only"
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{"status": "ok", "scope": "gateway", "mode": mode, "training": g.training.captureEnabled(), "policy": policy, "controls": g.controlStatus(), "routing": g.cfg.Router.Name(), "roles": g.roleProfiles(), "claude_max_tokens": g.cfg.ClaudeMaxTokens, "tool_mode": "validated-qwen-and-json", "capabilities": map[string]any{"plain_text": !g.cfg.LearningOnly, "tools": adapter, "responses": adapter, "messages": adapter, "claude_roles": len(g.roles) == 3 && !g.cfg.LearningOnly, "streaming": streaming}})
 		return
 	case "/sentinel/status":
 		if r.Method != http.MethodGet {
@@ -147,6 +207,10 @@ func (g *Gateway) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		apiError(w, 501, "token_count_unavailable", "Exact token counting is unavailable; Claude Code can use its context estimate")
 		return
 	case "/v1/responses":
+		if g.cfg.ClaudeAdapter {
+			g.responses(w, r)
+			return
+		}
 		apiError(w, 501, "protocol_not_ready", "Codex Responses adapter is pending; no request was sent to inference.")
 		return
 	case "/v1/models":
@@ -166,6 +230,10 @@ func (g *Gateway) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	case "/v1/chat/completions":
+		if g.cfg.ClaudeAdapter {
+			g.chatCompletions(w, r)
+			return
+		}
 		if r.Method != http.MethodPost {
 			apiError(w, 405, "method_not_allowed", "Use POST")
 			return

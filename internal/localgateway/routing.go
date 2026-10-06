@@ -12,9 +12,11 @@ type DecisionRouter interface {
 	Select(context.Context, RouteTask) (RouteDecision, error)
 }
 type RouteTask struct {
-	Model    string
-	HasTools bool
-	Messages int
+	Model     string
+	HasTools  bool
+	Messages  int
+	Client    string
+	MaxTokens int
 }
 type RouteDecision struct {
 	Model     string
