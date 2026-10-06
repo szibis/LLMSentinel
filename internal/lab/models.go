@@ -72,6 +72,12 @@ func validateModel(path string, role bool) error {
 		}
 	}
 	if role {
+		var architecture struct {
+			ModelType string `json:"model_type"`
+		}
+		if readJSON(filepath.Join(path, "config.json"), &architecture) != nil {
+			return errors.New("invalid config.json")
+		}
 		var config struct {
 			Template string `json:"chat_template"`
 		}
@@ -85,8 +91,21 @@ func validateModel(path string, role bool) error {
 		if data, err := os.ReadFile(filepath.Join(path, "chat_template.jinja")); err == nil {
 			template = string(data)
 		}
-		if !strings.Contains(template, "enable_thinking") {
-			return errors.New("role model needs a Qwen thinking chat template")
+		switch architecture.ModelType {
+		case "lfm2_moe":
+			if !strings.Contains(template, "<think>") || !strings.Contains(template, "</think>") {
+				return errors.New("LFM role model needs its reasoning chat template")
+			}
+		case "gemma4":
+			if !strings.Contains(template, "enable_thinking") || !strings.Contains(template, "<|channel>thought") || !strings.Contains(template, "<channel|>") {
+				return errors.New("gemma role model needs its thinking channel chat template")
+			}
+		case "qwen3", "qwen3_moe", "qwen3_5", "qwen3_5_moe", "qwen3_next":
+			if !strings.Contains(template, "enable_thinking") {
+				return errors.New("qwen role model needs its thinking chat template")
+			}
+		default:
+			return fmt.Errorf("unsupported role model_type %q", architecture.ModelType)
 		}
 	}
 	return nil

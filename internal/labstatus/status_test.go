@@ -365,3 +365,44 @@ func TestStaleActivityAndEndpointsRemainHonest(t *testing.T) {
 		t.Fatal("memory warning colors absent")
 	}
 }
+
+func TestRuntimePreservesCacheAndOptimizationTelemetry(t *testing.T) {
+	for _, raw := range []string{
+		`{"prompt_cache":{"enabled":true,"hits":2},"optimizations":{"prompt_cache":true,"speculative":"disabled"}}`,
+		`{"stats":{"prompt_cache":{"enabled":true,"hits":2},"optimizations":{"prompt_cache":true,"speculative":"disabled"}}}`,
+	} {
+		var r Runtime
+		if err := json.Unmarshal([]byte(raw), &r); err != nil {
+			t.Fatal(err)
+		}
+		encoded, _ := json.Marshal(r)
+		var fields map[string]any
+		json.Unmarshal(encoded, &fields)
+		cache, ok := fields["prompt_cache"].(map[string]any)
+		if !ok || cache["enabled"] != true || cache["hits"] != float64(2) {
+			t.Fatalf("cache lost: %s", encoded)
+		}
+		opts, ok := fields["optimizations"].(map[string]any)
+		if !ok || opts["speculative"] != "disabled" {
+			t.Fatalf("optimizations lost: %s", encoded)
+		}
+	}
+}
+
+func TestRuntimeCacheTopLevelWinsAndOlderRuntimeStaysUnknown(t *testing.T) {
+	for _, tc := range []struct {
+		raw  string
+		want any
+	}{
+		{`{"prompt_cache":{"hits":9},"stats":{"prompt_cache":{"hits":1}}}`, float64(9)},
+		{`{"stats":{"requests":1}}`, nil},
+	} {
+		var r Runtime
+		if err := json.Unmarshal([]byte(tc.raw), &r); err != nil {
+			t.Fatal(err)
+		}
+		if r.PromptCache["hits"] != tc.want {
+			t.Fatalf("cache precedence/unknown violated: %+v", r.PromptCache)
+		}
+	}
+}

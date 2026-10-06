@@ -49,15 +49,98 @@ func (g *Gateway) routeUpstream(route RouteDecision) (*url.URL, error) {
 
 // Qwen thinking can start in the generation prompt, so output may contain only
 // the closing marker. Accept only a completed section for an Opus generation.
-func finalRoleText(text string, thinking bool) (string, error) {
-	if !thinking {
-		return text, nil
+func finalRoleText(text string, thinking bool, format ...string) (string, error) {
+	marker := "</think>"
+	if strings.Contains(text, "<|channel>") || strings.Contains(text, "<channel|>") {
+		marker = "<channel|>"
 	}
-	before, after, ok := strings.Cut(text, "</think>")
-	if !ok || strings.Contains(before, "</think>") || strings.Contains(after, "<think>") || strings.Contains(after, "</think>") || strings.TrimSpace(after) == "" {
-		return "", invalidOutput("local Opus reasoning did not complete; no partial answer or tool input accepted")
+	if len(format) > 0 && thinking {
+		switch format[0] {
+		case "gemma":
+			marker = "<channel|>"
+		case "think":
+			marker = "</think>"
+		}
 	}
-	return strings.TrimSpace(after), nil
+	before, after, complete := strings.Cut(text, marker)
+	if complete {
+		if marker == "<channel|>" && strings.Contains(before, "<|channel>") && !strings.HasPrefix(strings.TrimSpace(before), "<|channel>thought\n") {
+			return "", invalidOutput("unsupported local reasoning channel")
+		}
+		if strings.Contains(after, "<think") || strings.Contains(after, "</think") || strings.Contains(after, "<|channel") || strings.Contains(after, "<channel|") || strings.TrimSpace(after) == "" {
+			return "", invalidOutput("local reasoning did not complete; no partial answer or tool input accepted")
+		}
+		return strings.TrimSpace(after), nil
+	}
+	if thinking || strings.Contains(text, "<think") || strings.Contains(text, "</think") || strings.Contains(text, "<|channel") || strings.Contains(text, "<channel|") {
+		return "", invalidOutput("local reasoning did not complete; no partial answer or tool input accepted")
+	}
+	return text, nil
+}
+
+type modelCapabilities struct {
+	Family          string `json:"model_family"`
+	ThinkingControl bool   `json:"thinking_control"`
+	ReasoningFormat string `json:"reasoning_format"`
+}
+type modelCapabilitiesKey struct{}
+
+// Resolve once per incoming role turn and pin through format recovery. This
+// avoids stale family controls if an operator replaces a runtime at its port.
+func (g *Gateway) modelCapabilities(ctx context.Context, endpoint *url.URL) (modelCapabilities, error) {
+	legacy := modelCapabilities{Family: "qwen", ThinkingControl: true, ReasoningFormat: "think"}
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
+	defer cancel()
+	u := *endpoint
+	u.Path = "/health"
+	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
+	transport := http.RoundTripper(g.transport)
+	if g.claudeTransport != nil {
+		transport = g.claudeTransport
+	}
+	client := &http.Client{Transport: transport, CheckRedirect: func(*http.Request, []*http.Request) error { return errors.New("runtime redirects are disabled") }}
+	res, err := client.Do(req)
+	if err != nil {
+		return modelCapabilities{}, errors.New("runtime family health unavailable; no inference dispatched")
+	}
+	defer res.Body.Close()
+	var health struct {
+		Capabilities modelCapabilities `json:"capabilities"`
+	}
+	body, readErr := io.ReadAll(io.LimitReader(res.Body, 64*1024+1))
+	if res.StatusCode != 200 || readErr != nil || len(body) > 64*1024 || json.Unmarshal(body, &health) != nil {
+		return modelCapabilities{}, errors.New("invalid runtime family health; no inference dispatched")
+	}
+	if health.Capabilities.Family == "" {
+		// Older native Qwen runtimes advertise only the template option.
+		var old struct {
+			Capabilities struct {
+				Options []string `json:"chat_template_kwargs"`
+			} `json:"capabilities"`
+		}
+		if json.Unmarshal(body, &old) == nil {
+			for _, option := range old.Capabilities.Options {
+				if option == "enable_thinking" {
+					return legacy, nil
+				}
+			}
+		}
+		return modelCapabilities{}, errors.New("runtime lacks model-family capabilities; update MLX-Flash")
+	}
+	caps := health.Capabilities
+	valid := false
+	switch caps.Family {
+	case "lfm2_moe":
+		valid = !caps.ThinkingControl && caps.ReasoningFormat == "think"
+	case "gemma4":
+		valid = caps.ThinkingControl && caps.ReasoningFormat == "gemma"
+	case "qwen", "qwen3", "qwen3_moe", "qwen3_5", "qwen3_5_moe", "qwen3_next":
+		valid = caps.ThinkingControl && caps.ReasoningFormat == "think"
+	}
+	if !valid {
+		return modelCapabilities{}, errors.New("unsupported or inconsistent runtime family capabilities; no inference dispatched")
+	}
+	return caps, nil
 }
 
 type upstreamContextKey struct{}

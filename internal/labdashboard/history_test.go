@@ -84,3 +84,38 @@ func TestHistoryDeduplicatesOutOfOrderClientPolls(t *testing.T) {
 		t.Fatalf("concurrent poll order duplicated/reordered attempts: %+v", events)
 	}
 }
+
+func TestHistoryCacheReuseAndExplicitColdWarmTTFT(t *testing.T) {
+	h := newHistory()
+	sample := func(at, requests, reused, processed int, cached any, stale bool, uptime int) {
+		r := map[string]any{"sample_time": at, "model": "Qwen", "endpoint": "large", "stale": stale, "stats": map[string]any{"requests": requests, "tokens_generated": requests * 20, "uptime_s": uptime}, "prompt_cache": map[string]any{"reused_tokens": reused, "processed_tokens": processed}, "last_generation": map[string]any{"native_generation_metadata": true, "ttft_ms": 125, "cached_prompt_tokens": cached}}
+		raw, _ := json.Marshal(map[string]any{"sample_time": at, "run_id": "one", "runtimes": map[string]any{"large": r}})
+		h.record(raw, nil, time.Unix(int64(at), 0))
+	}
+	sample(100, 1, 0, 100, 0, false, 10)
+	sample(104, 2, 300, 200, 300, false, 14)
+	sample(108, 3, 300, 300, 0, false, 18)
+	sample(112, 3, 300, 300, 0, false, 22)
+	sample(116, 4, 500, 400, nil, false, 26)
+	sample(120, 5, 600, 500, 100, true, 30)
+	sample(124, 6, 700, 600, 100, false, 34)
+	sample(128, 7, 800, 700, 100, false, 1)
+	points, _ := h.snapshot(time.Unix(128, 0))
+	raw, _ := json.Marshal(points)
+	var decoded []map[string]any
+	json.Unmarshal(raw, &decoded)
+	point := func(i int) map[string]any { return decoded[i]["runtimes"].(map[string]any)["large"].(map[string]any) }
+	if point(1)["cache_reuse_ratio"] != 0.75 || point(1)["warm_ttft_ms"] != float64(125) || point(2)["cold_ttft_ms"] != float64(125) {
+		t.Fatalf("cache measurements lost: %s", raw)
+	}
+	for _, i := range []int{0, 3, 4, 5, 6, 7} {
+		if point(i)["warm_ttft_ms"] != nil || point(i)["cold_ttft_ms"] != nil {
+			t.Fatalf("invented TTFT at %d: %s", i, raw)
+		}
+	}
+	for _, i := range []int{0, 3, 5, 6, 7} {
+		if point(i)["cache_reuse_ratio"] != nil {
+			t.Fatalf("invented reuse ratio at %d: %s", i, raw)
+		}
+	}
+}

@@ -2,7 +2,7 @@
 
 Learning mode keeps the primary commercial conversation direct: Claude Code talks to Anthropic and Codex talks to OpenAI. Client hooks send copies of completed turns to Sentinel's local collector. Sentinel does not proxy those commercial requests, receive provider credentials, or replace either client's provider settings.
 
-Serving mode routes a client through Sentinel to the configured local model. The current lab uses its selected Qwen models; this does not establish that Jes matches a proprietary model. Switching a client to Jes serving is a later, explicit step after evaluation. Learning records are training candidates, not proof of correctness, commercial parity, or automatic permission to train.
+Serving mode routes a client through Sentinel to the configured local model. The current lab uses its selected local models; this does not establish that Jes matches a proprietary model. Switching a client to Jes serving is a later, explicit step after evaluation. Learning records are training candidates, not proof of correctness, commercial parity, or automatic permission to train.
 
 ## Start an independent collector
 

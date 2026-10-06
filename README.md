@@ -14,14 +14,14 @@ services use the same boundary, without Python adapters inside Sentinel.
 
 | New gateway capability | Documentation |
 | --- | --- |
-| Client protocols and two-model Qwen lab | [Local setup](docs/local-gateway.md), [model roles](docs/claude-qwen-roles.md) |
+| Client protocols and local model roles | [Local setup](docs/local-gateway.md), [model roles](docs/claude-qwen-roles.md) |
 | Subscription/direct learning and optional hybrid capture | [Capture hooks](docs/client-capture.md), [billing and policy](docs/hybrid-billing.md) |
 | Live backend UI, telemetry and CLI controls | [Browser dashboard](docs/live-backend-dashboard.md), [status line](docs/claude-lab-status.md), [commands](docs/client-controls.md) |
 | Small decision helpers → OSS bridge → our Jes | [Migration design](docs/jes-decision-design.md) |
 | Actual quality/accounting evidence | [Client inspection](docs/client-quality-inspection.md), [progress checks](docs/agent-progress-quality.md), [dataset admission](docs/training-mode.md) |
 
 The current decision policy is deterministic; Jes and the proposed Kev/Jeff
-decision adapters are not connected. Current Qwen models generate answers.
+decision adapters are not connected. Selected local models generate answers.
 Protocol compatibility does not establish equivalent Claude/OpenAI quality or
 measured cost savings. The older optimization-module documentation below is
 separate from this gateway's measured results.
@@ -665,3 +665,5 @@ MIT License — See [LICENSE](LICENSE) file for details.
 **Performance**: <10ms graph queries, <200ms fresh requests  
 
 **[Get Started Now →](docs/GETTING_STARTED.md)**
+
+See [native prompt reuse and local role profiles](docs/gemma-lfm-lab.md) for cache accounting, model compatibility and measured checks.

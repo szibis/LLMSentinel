@@ -14,6 +14,223 @@ import (
 	"time"
 )
 
+func TestReasoningNeverLeaksFromAnyRole(t *testing.T) {
+	for _, tc := range []struct {
+		text, want        string
+		thinking, invalid bool
+	}{
+		{"<think>private</think>answer", "answer", false, false},
+		{"private</think>answer", "answer", false, false},
+		{"<think>unfinished", "", false, true},
+		{"<|channel>thought\nprivate\n<channel|>answer", "answer", true, false},
+		{"<|channel>thought\nprivate\n<channel|>answer", "answer", false, false},
+		{"<|channel>thought\nunfinished", "", false, true},
+		{"<|channel>thought\nprivate<channel|><|channel>analysis", "", true, true},
+	} {
+		t.Run(tc.text, func(t *testing.T) {
+			got, err := finalRoleText(tc.text, tc.thinking)
+			if (err != nil) != tc.invalid || got != tc.want {
+				t.Fatalf("got %q, %v; want %q invalid=%t", got, err, tc.want, tc.invalid)
+			}
+		})
+	}
+	if _, err := finalRoleText("private</think>answer", true, "gemma"); err == nil {
+		t.Fatal("Gemma accepted a Qwen reasoning delimiter")
+	}
+}
+
+func TestCacheScopePartitionsSessionsAndKeepsCorrectionTogether(t *testing.T) {
+	var scopes []string
+	g, err := New(Config{Upstream: "http://127.0.0.1:19091/v1", Timeout: time.Second, MaxRequestBytes: 4096, ClaudeAdapter: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer g.Close()
+	g.claudeTransport = handlerTransport{func(w http.ResponseWriter, r *http.Request) {
+		var p map[string]any
+		json.NewDecoder(r.Body).Decode(&p)
+		scope, _ := p["cache_scope"].(string)
+		scopes = append(scopes, scope)
+		answer := `{"text":"done","tool_calls":[]}`
+		if len(scopes) == 1 {
+			answer = "bad tool format"
+		}
+		json.NewEncoder(w).Encode(map[string]any{"choices": []any{map[string]any{"message": map[string]string{"content": answer}, "finish_reason": "stop"}}})
+	}}
+	for _, session := range []string{"private-session-a", "private-session-a", "private-session-b", "", ""} {
+		r := httptest.NewRequest("POST", "/v1/messages", strings.NewReader(`{"model":"local","max_tokens":512,"messages":[{"role":"user","content":"Finish"}],"tools":[{"name":"Read","input_schema":{"type":"object"}}]}`))
+		r.Header.Set("X-Session-ID", session)
+		w := httptest.NewRecorder()
+		g.ServeHTTP(w, r)
+		if w.Code != 200 {
+			t.Fatalf("%d %s", w.Code, w.Body.String())
+		}
+	}
+	if len(scopes) != 6 || scopes[0] == "" || scopes[0] != scopes[1] || scopes[1] != scopes[2] || scopes[2] == scopes[3] || scopes[4] == scopes[5] {
+		t.Fatalf("session partition/recovery scopes: %q", scopes)
+	}
+	for _, scope := range scopes {
+		if strings.Contains(scope, "private-session") {
+			t.Fatal("raw session exposed")
+		}
+	}
+}
+
+func TestRoleHealthFailureDoesNotGuessThinkingSupport(t *testing.T) {
+	g, err := New(Config{Upstream: "http://127.0.0.1:19091/v1", RoleUpstreams: map[string]string{"haiku": "http://127.0.0.1:19091/v1"}, Timeout: time.Second, MaxRequestBytes: 4096, ClaudeAdapter: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer g.Close()
+	inferences := 0
+	g.claudeTransport = handlerTransport{func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/health" {
+			inferences++
+		}
+		w.WriteHeader(http.StatusServiceUnavailable)
+	}}
+	w := httptest.NewRecorder()
+	g.ServeHTTP(w, httptest.NewRequest("POST", "/v1/messages", strings.NewReader(`{"model":"sentinel-haiku","max_tokens":512,"messages":[{"role":"user","content":"Hello"}]}`)))
+	if w.Code < 400 || inferences != 0 {
+		t.Fatalf("health failure dispatched %d requests; status %d", inferences, w.Code)
+	}
+}
+
+func TestRoleHealthRejectsUnsupportedOrInconsistentFamilies(t *testing.T) {
+	for _, body := range []string{
+		`{"capabilities":{"model_family":"unknown","thinking_control":true,"reasoning_format":"think"}}`,
+		`{"capabilities":{"model_family":"gemma4","thinking_control":true,"reasoning_format":"think"}}`,
+		`{"capabilities":{"model_family":"lfm2_moe","thinking_control":true,"reasoning_format":"think"}}`,
+		`{"capabilities":{"model_family":"qwen3_5","thinking_control":false,"reasoning_format":"think"}}`,
+	} {
+		g, err := New(Config{Upstream: "http://127.0.0.1:19091/v1", RoleUpstreams: map[string]string{"haiku": "http://127.0.0.1:19091/v1"}, Timeout: time.Second, MaxRequestBytes: 4096, ClaudeAdapter: true})
+		if err != nil {
+			t.Fatal(err)
+		}
+		inferences := 0
+		g.claudeTransport = handlerTransport{func(w http.ResponseWriter, r *http.Request) {
+			if r.URL.Path == "/health" {
+				fmt.Fprint(w, body)
+				return
+			}
+			inferences++
+			fmt.Fprint(w, `{"choices":[{"message":{"content":"Hello"},"finish_reason":"stop"}]}`)
+		}}
+		w := httptest.NewRecorder()
+		g.ServeHTTP(w, httptest.NewRequest("POST", "/v1/messages", strings.NewReader(`{"model":"sentinel-haiku","max_tokens":512,"messages":[{"role":"user","content":"Hello"}]}`)))
+		g.Close()
+		if w.Code < 400 || inferences != 0 {
+			t.Errorf("accepted %s: status %d, inference calls %d", body, w.Code, inferences)
+		}
+	}
+}
+
+func TestPlainRoleChatBuffersAndValidatesReasoning(t *testing.T) {
+	for _, family := range []string{"lfm2_moe", "gemma4"} {
+		for _, stream := range []bool{false, true} {
+			for _, complete := range []bool{false, true} {
+				t.Run(fmt.Sprintf("%s/stream=%t/complete=%t", family, stream, complete), func(t *testing.T) {
+					backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+						if r.URL.Path == "/health" {
+							format := "think"
+							if family == "gemma4" {
+								format = "gemma"
+							}
+							json.NewEncoder(w).Encode(map[string]any{"capabilities": map[string]any{"model_family": family, "thinking_control": family == "gemma4", "reasoning_format": format}})
+							return
+						}
+						answer := "<think>private-reasoning"
+						if family == "gemma4" {
+							answer = "<|channel>thought\nprivate-reasoning"
+						}
+						if complete {
+							if family == "gemma4" {
+								answer += "\n<channel|>Hello"
+							} else {
+								answer += "</think>Hello"
+							}
+						}
+						json.NewEncoder(w).Encode(map[string]any{"choices": []any{map[string]any{"message": map[string]string{"content": answer}, "finish_reason": "stop"}}})
+					}))
+					defer backend.Close()
+					role := "haiku"
+					if family == "gemma4" {
+						role = "opus"
+					}
+					g, err := New(Config{Upstream: backend.URL + "/v1", RoleUpstreams: map[string]string{role: backend.URL + "/v1"}, Timeout: time.Second, MaxRequestBytes: 4096})
+					if err != nil {
+						t.Fatal(err)
+					}
+					defer g.Close()
+					w := httptest.NewRecorder()
+					g.ServeHTTP(w, httptest.NewRequest("POST", "/v1/chat/completions", strings.NewReader(fmt.Sprintf(`{"model":"sentinel-%s","max_tokens":512,"stream":%t,"messages":[{"role":"user","content":"Hello"}]}`, role, stream))))
+					if strings.Contains(w.Body.String(), "private-reasoning") {
+						t.Fatal("raw role reasoning leaked")
+					}
+					if complete {
+						if w.Code != 200 || !strings.Contains(w.Body.String(), "Hello") {
+							t.Fatalf("%d %s", w.Code, w.Body.String())
+						}
+					} else {
+						if w.Code != 422 || strings.Contains(w.Body.String(), "data:") {
+							t.Fatalf("incomplete output accepted: %d %s", w.Code, w.Body.String())
+						}
+					}
+				})
+			}
+		}
+	}
+}
+
+func TestModelFamiliesUseAdvertisedThinkingAndJSONTools(t *testing.T) {
+	for _, family := range []string{"lfm2_moe", "gemma4"} {
+		t.Run(family, func(t *testing.T) {
+			handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.URL.Path == "/health" {
+					format := "think"
+					if family == "gemma4" {
+						format = "gemma"
+					}
+					json.NewEncoder(w).Encode(map[string]any{"capabilities": map[string]any{"model_family": family, "thinking_control": family == "gemma4", "reasoning_format": format}})
+					return
+				}
+				var p map[string]any
+				json.NewDecoder(r.Body).Decode(&p)
+				if family == "lfm2_moe" && p["chat_template_kwargs"] != nil {
+					t.Error("LFM received unsupported thinking option")
+				}
+				if family == "gemma4" && p["chat_template_kwargs"].(map[string]any)["enable_thinking"] != true {
+					t.Error("Gemma thinking not enabled")
+				}
+				msgs, _ := json.Marshal(p["messages"])
+				if strings.Contains(string(msgs), "Qwen tool format") || !strings.Contains(string(msgs), "tool_calls") {
+					t.Errorf("wrong family instructions: %s", msgs)
+				}
+				answer := `<think>private</think>{"text":"","tool_calls":[{"name":"Read","input":{"file_path":"hello.txt"}}]}`
+				if family == "gemma4" {
+					answer = "<|channel>thought\nprivate\n<channel|>" + `{"text":"","tool_calls":[{"name":"Read","input":{"file_path":"hello.txt"}}]}`
+				}
+				json.NewEncoder(w).Encode(map[string]any{"choices": []any{map[string]any{"message": map[string]string{"content": answer}, "finish_reason": "stop"}}})
+			})
+			role := "haiku"
+			if family == "gemma4" {
+				role = "opus"
+			}
+			g, err := New(Config{Upstream: "http://127.0.0.1:19091/v1", RoleUpstreams: map[string]string{role: "http://127.0.0.1:19091/v1"}, Timeout: time.Second, MaxRequestBytes: 4096, ClaudeAdapter: true})
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer g.Close()
+			g.claudeTransport = handlerTransport{handler}
+			w := httptest.NewRecorder()
+			g.ServeHTTP(w, httptest.NewRequest("POST", "/v1/messages", strings.NewReader(fmt.Sprintf(`{"model":"sentinel-%s","max_tokens":512,"messages":[{"role":"user","content":"Read hello.txt"}],"tools":[{"name":"Read","input_schema":{"type":"object","properties":{"file_path":{"type":"string"}},"required":["file_path"]}}]}`, role))))
+			if w.Code != 200 || !strings.Contains(w.Body.String(), `"type":"tool_use"`) || strings.Contains(w.Body.String(), "private") {
+				t.Fatalf("%d %s", w.Code, w.Body.String())
+			}
+		})
+	}
+}
+
 type changingRoleRouter struct{ calls atomic.Int32 }
 
 func (r *changingRoleRouter) Name() string { return "test-changing-route" }
@@ -28,6 +245,10 @@ func (r *changingRoleRouter) Select(_ context.Context, _ RouteTask) (RouteDecisi
 func TestRoleCorrectionPinsEndpointAndPreservesToolEvidence(t *testing.T) {
 	var calls atomic.Int32
 	small := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/health" {
+			fmt.Fprint(w, `{"capabilities":{"model_family":"qwen3_5","thinking_control":true,"reasoning_format":"think"}}`)
+			return
+		}
 		var p struct {
 			Messages []map[string]string `json:"messages"`
 		}
@@ -61,6 +282,10 @@ func TestRoleCorrectionPinsEndpointAndPreservesToolEvidence(t *testing.T) {
 
 func TestIncompleteOpusReasoningNeverDispatchesToolInput(t *testing.T) {
 	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/health" {
+			fmt.Fprint(w, `{"capabilities":{"model_family":"qwen3_5","thinking_control":true,"reasoning_format":"think"}}`)
+			return
+		}
 		json.NewEncoder(w).Encode(map[string]any{"choices": []any{map[string]any{"message": map[string]string{"content": `<think>Perhaps {"text":"","tool_calls":[{"name":"Read","input":{"file_path":"invented"}}]}`}, "finish_reason": "stop"}}})
 	}))
 	defer backend.Close()
@@ -109,6 +334,10 @@ func TestClaudeRolesSelectEndpointsAndEffort(t *testing.T) {
 	calls := map[string][]map[string]any{}
 	backend := func(name string) *httptest.Server {
 		return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.URL.Path == "/health" {
+				fmt.Fprint(w, `{"capabilities":{"model_family":"qwen3_5","thinking_control":true,"reasoning_format":"think"}}`)
+				return
+			}
 			var p map[string]any
 			json.NewDecoder(r.Body).Decode(&p)
 			mu.Lock()
@@ -179,6 +408,10 @@ func TestRoleEndpointsRemainStrictLocal(t *testing.T) {
 
 func TestRoleChatCompletionsUseSmallEndpoint(t *testing.T) {
 	small := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/health" {
+			fmt.Fprint(w, `{"capabilities":{"model_family":"qwen3_5","thinking_control":true,"reasoning_format":"think"}}`)
+			return
+		}
 		var p map[string]any
 		json.NewDecoder(r.Body).Decode(&p)
 		if p["model"] != "local" || p["max_tokens"] != float64(1024) {

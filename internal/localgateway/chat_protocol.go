@@ -135,6 +135,16 @@ func (g *Gateway) chatCompletions(w http.ResponseWriter, r *http.Request) {
 		responsesError(w, 400, "invalid Chat Completions request")
 		return
 	}
+	if !g.cfg.ClaudeAdapter {
+		needsTools := len(req.Tools) > 0 || requestedCall(req.Functions) || requestedCall(req.ToolChoice)
+		for _, message := range req.Messages {
+			needsTools = needsTools || message.Role == "tool" || message.Role == "function" || len(message.ToolCalls) > 0
+		}
+		if needsTools {
+			responsesError(w, 501, "tool adapter is disabled; no inference dispatched")
+			return
+		}
+	}
 	converted, messages, err := prepareChatProtocol(req, len(g.roles) > 0, g.cfg.ClaudeMaxTokens)
 	if err != nil {
 		responsesError(w, 400, err.Error())
