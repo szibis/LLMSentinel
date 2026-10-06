@@ -21,6 +21,28 @@ func fixture(t *testing.T) *environment {
 	return &environment{project: project, root: filepath.Join(root, "lab"), executable: "/tmp/sentinel-tools", out: new(bytes.Buffer), stderr: new(bytes.Buffer)}
 }
 
+func TestClaudeFeatureModesKeepClientPolicyAndIsolation(t *testing.T) {
+	for _, mode := range []string{"", "full", "minimal"} {
+		args, err := claudeArguments("/synthetic/lab", mode)
+		if err != nil {
+			t.Fatal(err)
+		}
+		joined := strings.Join(args, " ")
+		for _, required := range []string{"--plugin-dir /synthetic/lab/control-plugin", "--setting-sources user", "--strict-mcp-config", `{"mcpServers":{}}`, "--permission-mode default", "--agents"} {
+			if !strings.Contains(joined, required) {
+				t.Fatalf("mode %q lost %q: %v", mode, required, args)
+			}
+		}
+		minimal := mode == "minimal"
+		if strings.Contains(joined, "--bare") != minimal || strings.Contains(joined, "--tools") != minimal {
+			t.Fatalf("incorrect tool/feature mode %q: %v", mode, args)
+		}
+	}
+	if _, err := claudeArguments("/synthetic/lab", "unknown"); err == nil {
+		t.Fatal("unknown feature mode accepted")
+	}
+}
+
 func TestPrepareRejectsSymlinkedProfileWithoutWritingTarget(t *testing.T) {
 	e := fixture(t)
 	target := t.TempDir()

@@ -53,6 +53,7 @@ Use the actual highest stable tag, intended bump, and review date for your relea
 
 | New gateway capability | Documentation |
 | --- | --- |
+| Model translation and CLI feature reuse | [Compatibility matrix](docs/model-client-translation.md) |
 | Client protocols and local model roles | [Local setup](docs/local-gateway.md), [model roles](docs/claude-qwen-roles.md) |
 | Subscription/direct learning and optional hybrid capture | [Capture hooks](docs/client-capture.md), [billing and policy](docs/hybrid-billing.md) |
 | Live backend UI, telemetry and CLI controls | [Browser dashboard](docs/live-backend-dashboard.md), [status line](docs/claude-lab-status.md), [commands](docs/client-controls.md) |

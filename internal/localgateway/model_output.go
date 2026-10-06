@@ -1,0 +1,229 @@
+package localgateway
+
+import (
+	"encoding/json"
+	"errors"
+	"strings"
+)
+
+// Normalize recognized model formats into one internal envelope. Tool names,
+// schemas and client policy are still validated before any client tool is emitted.
+func normalizeModelOutput(req claudeRequest, raw string) (localToolEnvelope, error) {
+	out := localToolEnvelope{Calls: []localToolCall{}}
+	value := strings.TrimSpace(raw)
+	jsonValue := strings.HasPrefix(value, "{") || strings.HasPrefix(value, "[")
+	taggedStart := strings.Index(value, "<tool_call>")
+	gemmaStart := strings.Index(value, gemmaCallStart)
+	gemmaOuter := taggedStart < 0 || (gemmaStart >= 0 && gemmaStart < taggedStart)
+	if !jsonValue && gemmaOuter && (strings.Contains(value, "<|tool_call") || strings.Contains(value, "<tool_call|") || strings.Contains(value, "<|tool_response>")) {
+		return parseGemmaToolOutput(value)
+	}
+	if !jsonValue && (strings.Contains(value, "<tool_call") || strings.Contains(value, "<function=") || strings.Contains(value, "<parameter=") || strings.Contains(value, "</tool_call>")) {
+		first := strings.Index(value, "<tool_call>")
+		if first < 0 {
+			return out, errors.New("incomplete tagged tool call")
+		}
+		if strings.HasPrefix(strings.TrimSpace(value[first+len("<tool_call>"):]), "<function=") {
+			return parseQwenToolOutput(value, req.Tools)
+		}
+		out.Text = strings.TrimSpace(value[:first])
+		remaining := value[first:]
+		for remaining != "" {
+			if len(out.Calls) >= 8 || !strings.HasPrefix(remaining, "<tool_call>") {
+				return out, errors.New("invalid tagged tool suffix or count")
+			}
+			remaining = strings.TrimPrefix(remaining, "<tool_call>")
+
+			var call map[string]any
+			decoder := json.NewDecoder(strings.NewReader(remaining))
+			if decoder.Decode(&call) != nil {
+				return out, errors.New("invalid tagged tool JSON")
+			}
+			end := int(decoder.InputOffset())
+			if unmarshalModelJSON(remaining[:end], &call) != nil {
+				return out, errors.New("invalid tagged tool JSON")
+			}
+			suffix := strings.TrimSpace(remaining[end:])
+			if !strings.HasPrefix(suffix, "</tool_call>") {
+				return out, errors.New("incomplete tagged tool call")
+			}
+			parsed, err := normalizeToolCall(call)
+			if err != nil {
+				return out, err
+			}
+			out.Calls = append(out.Calls, parsed)
+			remaining = strings.TrimSpace(strings.TrimPrefix(suffix, "</tool_call>"))
+		}
+		return out, nil
+	}
+	if !strings.HasPrefix(value, "{") && !strings.HasPrefix(value, "[") {
+		out.Text = raw
+		return out, nil
+	}
+	var decoded any
+	if unmarshalModelJSON(value, &decoded) != nil {
+		return out, errors.New("invalid model JSON")
+	}
+	if object, ok := decoded.(map[string]any); ok {
+		if calls, present := object["tool_calls"]; present {
+			if content, present := object["content"]; present && content != nil {
+				text, ok := content.(string)
+				if !ok {
+					return out, errors.New("ambiguous model envelope")
+				}
+				if _, competing := object["text"]; competing {
+					return out, errors.New("ambiguous model envelope text")
+				}
+				out.Text = text
+			}
+			if _, competing := object["arguments"]; competing {
+				return out, errors.New("ambiguous model envelope")
+			}
+			items, ok := calls.([]any)
+			if !ok || len(items) > 8 {
+				return out, errors.New("tool_calls must be an array")
+			}
+			if text, present := object["text"]; present {
+				var ok bool
+				out.Text, ok = text.(string)
+				if !ok {
+					return out, errors.New("tool envelope text must be a string")
+				}
+			}
+			for _, item := range items {
+				call, ok := item.(map[string]any)
+				if !ok {
+					return out, errors.New("tool call must be an object")
+				}
+				parsed, err := normalizeToolCall(call)
+				if err != nil {
+					return out, err
+				}
+				out.Calls = append(out.Calls, parsed)
+			}
+			return out, nil
+		}
+		if content, ok := object["content"].([]any); ok {
+			if _, competing := object["arguments"]; competing {
+				return out, errors.New("ambiguous model envelope")
+			}
+			return normalizeContentBlocks(content)
+		}
+		if _, present := object["arguments"]; present {
+			call, err := normalizeToolCall(object)
+			out.Calls = append(out.Calls, call)
+			return out, err
+		}
+	}
+	out.Text = raw
+	return out, nil
+}
+
+func normalizeToolCall(object map[string]any) (localToolCall, error) {
+	var out localToolCall
+	if function, present := object["function"]; present {
+		_, hasName := object["name"]
+		_, hasInput := object["input"]
+		_, hasArguments := object["arguments"]
+		if hasName || hasInput || hasArguments || (object["type"] != nil && object["type"] != "function") {
+			return out, errors.New("ambiguous function call")
+		}
+		var ok bool
+		object, ok = function.(map[string]any)
+		if !ok {
+			return out, errors.New("function must be an object")
+		}
+	}
+	name, ok := object["name"].(string)
+	if !ok || name == "" {
+		return out, errors.New("tool name must be a nonempty string")
+	}
+	input, hasInput := object["input"]
+	arguments, hasArguments := object["arguments"]
+	if hasInput == hasArguments {
+		return out, errors.New("tool call requires one argument representation")
+	}
+	if hasArguments {
+		input = arguments
+		if serialized, ok := arguments.(string); ok {
+			if unmarshalModelJSON(serialized, &input) != nil {
+				return out, errors.New("invalid serialized tool arguments")
+			}
+		}
+	}
+	args, ok := input.(map[string]any)
+	if !ok || args == nil {
+		return out, errors.New("tool arguments must be an object")
+	}
+	return localToolCall{Name: name, Input: args}, nil
+}
+
+func unmarshalModelJSON(raw string, target any) error {
+	if err := json.Unmarshal([]byte(raw), target); err != nil {
+		return err
+	}
+	decoder := json.NewDecoder(strings.NewReader(raw))
+	var check func(int) error
+	check = func(depth int) error {
+		if depth > 128 {
+			return errors.New("model JSON nesting limit")
+		}
+		token, err := decoder.Token()
+		if err != nil {
+			return err
+		}
+		delim, container := token.(json.Delim)
+		if !container {
+			return nil
+		}
+		seen := map[string]bool{}
+		for decoder.More() {
+			if delim == '{' {
+				key, err := decoder.Token()
+				if err != nil {
+					return err
+				}
+				name, ok := key.(string)
+				if !ok || seen[name] {
+					return errors.New("duplicate model JSON key")
+				}
+				seen[name] = true
+			}
+			if err := check(depth + 1); err != nil {
+				return err
+			}
+		}
+		_, err = decoder.Token()
+		return err
+	}
+	return check(0)
+}
+
+func normalizeContentBlocks(blocks []any) (localToolEnvelope, error) {
+	out := localToolEnvelope{Calls: []localToolCall{}}
+	var text []string
+	for _, raw := range blocks {
+		block, ok := raw.(map[string]any)
+		if !ok {
+			return out, errors.New("content block must be an object")
+		}
+		switch block["type"] {
+		case "text":
+			value, ok := block["text"].(string)
+			if !ok {
+				return out, errors.New("text block must contain text")
+			}
+			text = append(text, value)
+		case "tool_use":
+			call, err := normalizeToolCall(block)
+			if err != nil {
+				return out, err
+			}
+			out.Calls = append(out.Calls, call)
+		default:
+			return out, errors.New("unsupported model content block")
+		}
+	}
+	out.Text = strings.Join(text, "\n")
+	return out, nil
+}

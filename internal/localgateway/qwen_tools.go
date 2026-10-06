@@ -134,7 +134,7 @@ func parseQwenToolOutput(text string, tools []claudeTool) (localToolEnvelope, er
 			kind, _ := property["type"].(string)
 			var value any = raw
 			if kind != "string" && kind != "" {
-				if json.Unmarshal([]byte(raw), &value) != nil {
+				if unmarshalModelJSON(raw, &value) != nil {
 					return result, errors.New("invalid typed Qwen parameter")
 				}
 			}
@@ -155,12 +155,5 @@ func parseQwenToolOutput(text string, tools []claudeTool) (localToolEnvelope, er
 }
 
 func decodeToolOutput(req claudeRequest, text string) (localToolEnvelope, error) {
-	var envelope localToolEnvelope
-	if json.Unmarshal([]byte(text), &envelope) == nil && envelope.Calls != nil {
-		return envelope, nil
-	}
-	if qwenRole(req.Model) && !req.JSONTools {
-		return parseQwenToolOutput(text, req.Tools)
-	}
-	return envelope, errors.New("invalid JSON tool envelope")
+	return normalizeModelOutput(req, text)
 }
