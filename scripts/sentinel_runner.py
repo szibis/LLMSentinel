@@ -353,7 +353,7 @@ def run():
             print(f"Lab processes started: {lab.ENDPOINT}\nRuntime: {state['runtime']} on port 19091\n"
                   f"Logs: {root}\nCtrl+C / make lab-stop to stop; make lab-status to inspect.\n"
                   "Run make lab-status to check readiness before sending a prompt.\n"
-                  "Claude Messages/tool bridge is experimental; Codex Responses is pending.", flush=True)
+                  "Anthropic Messages, OpenAI Responses and Chat Completions adapters are enabled; inspect health for capabilities.", flush=True)
             state["phase"] = "running"
             write_state(root, state)
             while not stopping and not (root / ("stop-" + state["run_id"])).exists():

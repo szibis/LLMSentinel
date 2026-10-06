@@ -36,7 +36,7 @@ func TestRoleCorrectionPinsEndpointAndPreservesToolEvidence(t *testing.T) {
 		if !strings.Contains(string(encoded), "toolu_original") || !strings.Contains(string(encoded), "FILE_EVIDENCE") {
 			t.Errorf("lost tool history: %s", encoded)
 		}
-		text := "not JSON"
+		text := "<tool_call><function=Read>"
 		if calls.Add(1) == 2 {
 			text = `{"text":"FILE_EVIDENCE","tool_calls":[]}`
 		}

@@ -29,6 +29,33 @@ class LabIsolationTests(unittest.TestCase):
         self.assertEqual(config.read_text(), "user edit\n")
         self.assertTrue((root / "workspace" / ".git").is_dir())
 
+    def test_prepare_seeds_isolated_controls_and_preserves_custom_commands(self):
+        root = lab.prepare()
+        for folder in (root / 'claude' / 'commands', root / 'codex' / 'prompts'):
+            status = folder / 'sentinel-status.md'
+            self.assertIn('http://127.0.0.1:19090', status.read_text())
+            self.assertEqual(len(list(folder.glob('sentinel-*.md'))), 9)
+            status.write_text('my custom status command\n')
+            lab.prepare()
+            self.assertEqual(status.read_text(), 'my custom status command\n')
+        manifest = root / 'control-plugin' / '.claude-plugin' / 'plugin.json'
+        self.assertEqual(json.loads(manifest.read_text())['name'], 'sentinel')
+        self.assertTrue((root / 'control-plugin' / 'skills' / 'status' / 'SKILL.md').is_file())
+
+    def test_prepare_refuses_symlink_profiles_before_writing_outside_lab(self):
+        for relative in ('claude', 'control-plugin', 'control-plugin/skills'):
+            with self.subTest(relative=relative), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory) / 'lab'
+                external = Path(directory) / 'external'
+                external.mkdir()
+                target = root / relative
+                target.parent.mkdir(parents=True)
+                target.symlink_to(external, target_is_directory=True)
+                with patch.object(lab, 'ROOT', root):
+                    with self.assertRaisesRegex(RuntimeError, 'symlink'):
+                        lab.prepare()
+                self.assertEqual(list(external.iterdir()), [])
+
     def test_prepare_allows_claude_preferences_without_rewriting_them(self):
         root = lab.prepare()
         config = root / "claude" / "settings.json"
@@ -80,6 +107,7 @@ class LabIsolationTests(unittest.TestCase):
         self.assertNotIn("-p", command)
         self.assertNotIn("--dangerously-skip-permissions", command)
         self.assertIn("--bare", command)
+        self.assertEqual(command[command.index('--plugin-dir') + 1], str(lab.ROOT / 'control-plugin'))
         self.assertIn("--strict-mcp-config", command)
         self.assertEqual(env["ANTHROPIC_BASE_URL"], lab.ENDPOINT)
         self.assertEqual(env["MAX_THINKING_TOKENS"], "0")

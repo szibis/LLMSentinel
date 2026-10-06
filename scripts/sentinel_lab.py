@@ -5,19 +5,32 @@ import json
 import os
 from pathlib import Path
 import shutil
+import shlex
 import subprocess
 import sys
 import time
 import urllib.request
+from sentinel_control import command_assets
 
 ROOT = Path(__file__).resolve().parents[1] / ".sentinel-lab"
 ENDPOINT = "http://127.0.0.1:19090"
 TOKEN = "sentinel-local-lab"  # Local placeholder, never a production credential.
 
 
+def owned_directory(directory):
+    """Check every owned ancestor before creating anything beneath it."""
+    directory.relative_to(ROOT)
+    for ancestor in (directory, *directory.parents):
+        if ancestor.is_symlink():
+            raise RuntimeError(f'Refusing symlink lab directory: {ancestor}')
+        if ancestor == ROOT:
+            break
+    directory.mkdir(parents=True, exist_ok=True, mode=0o700)
+
+
 def prepare():
     for name in ("codex", "claude", "workspace", "tmp"):
-        (ROOT / name).mkdir(parents=True, exist_ok=True, mode=0o700)
+        owned_directory(ROOT / name)
     # A workspace root prevents inheriting Sentinel's project settings/instructions.
     if not (ROOT / "workspace" / ".git").exists():
         subprocess.run(["git", "init", "-q", str(ROOT / "workspace")], check=True)
@@ -45,6 +58,10 @@ enabled = false
         ROOT / "claude" / "settings.json": json.dumps({
             "model": "local", "permissions": {"defaultMode": "default"},
             "enableAllProjectMcpServers": False,
+            "statusLine": {"type": "command", "command": shlex.join([
+                sys.executable, str(Path(__file__).with_name("sentinel_statusline.py").resolve()),
+                "--root", str(ROOT.resolve()),
+            ]), "refreshInterval": 5},
         }, indent=2) + "\n",
     }
     for path, content in configs.items():
@@ -54,6 +71,29 @@ enabled = false
             continue
         with path.open("x") as file:
             os.chmod(path, 0o600)
+            file.write(content)
+    for client, subdirectory in (("claude", "commands"), ("codex", "prompts")):
+        directory = ROOT / client / subdirectory
+        owned_directory(directory)
+        for name, content in command_assets(client, ENDPOINT).items():
+            path = directory / name
+            if path.exists() or path.is_symlink():
+                continue  # Client/user edits remain owned by them.
+            fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+            with os.fdopen(fd, "w") as file:
+                file.write(content)
+    plugin = ROOT / 'control-plugin'
+    files = {'.claude-plugin/plugin.json': json.dumps({'name': 'sentinel', 'version': '1.0.0'}) + '\n'}
+    for name, content in command_assets('claude', ENDPOINT).items():
+        skill = name.removeprefix('sentinel-').removesuffix('.md')
+        files[f'skills/{skill}/SKILL.md'] = content
+    for relative, content in files.items():
+        path = plugin / relative
+        owned_directory(path.parent)
+        if path.exists() or path.is_symlink():
+            continue
+        fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+        with os.fdopen(fd, 'w') as file:
             file.write(content)
     return ROOT
 
@@ -117,6 +157,7 @@ def launch_spec(client):
                      "tools":["Read","Glob","Grep"],"model":"opus"},
         }
         command += ["--bare", "--model", "opusplan", "--setting-sources", "user",
+                    "--plugin-dir", str(ROOT / "control-plugin"),
                     "--strict-mcp-config", "--mcp-config", '{"mcpServers":{}}',
                     "--tools", "Read,Write,Edit,Bash,Glob,Grep,Agent", "--agents",json.dumps(agents), "--permission-mode", "default"]
     workspace = Path(os.environ.get("LAB_WORKSPACE") or ROOT / "workspace").resolve()
