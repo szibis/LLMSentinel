@@ -36,7 +36,7 @@ func (g *Gateway) controlStatus() map[string]any {
 	if g.hybrid != nil {
 		policy = g.hybrid.policyName()
 	}
-	return map[string]any{"mode": g.mode(), "capture_enabled": g.training.captureEnabled(), "capture_configured": g.training != nil, "policy": policy, "role_budgets": budgets, "startup_billing_opt_in": g.cfg.Hybrid != nil && g.cfg.Hybrid.AllowPaidAPI, "jes": "not trained/connected", "quality_gate": "complete output, tool names, argument schemas and tool choice; semantic scoring pending", "mode_change": "requires relaunch; provider authentication is never changed by controls"}
+	return map[string]any{"mode": g.mode(), "capture_enabled": g.training.captureEnabled(), "capture_configured": g.training != nil, "policy": policy, "role_budgets": budgets, "startup_billing_opt_in": g.cfg.Hybrid != nil && g.cfg.Hybrid.AllowPaidAPI, "jes": "not trained/connected", "quality_gate": "protocol/schema validation plus repeated unchanged lookups and unfinished-final checks; semantic scoring pending", "quality_checks": map[string]uint64{"rejections": g.qualityRejections.Load(), "recovery_attempts": g.qualityRecoveries.Load()}, "mode_change": "requires relaunch; provider authentication is never changed by controls"}
 }
 func (g *Gateway) control(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet && r.Method != http.MethodPost {
