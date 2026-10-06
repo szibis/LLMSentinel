@@ -1,5 +1,10 @@
 # Real Qwen Metal CI
 
+Hardware jobs put Go build and module caches in their temporary job directory
+and remove them during cleanup. Actions cache upload is disabled on this runner;
+the Mac's shared Go caches are never archived by these jobs. Hosted build jobs
+retain their existing caching.
+
 For release retries, the gateway builds from the selected tested source SHA,
 while the smoke controls come from the publishing workflow's commit. This allows
 testing releases that predate the CI harness without changing their source.
