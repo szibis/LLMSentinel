@@ -33,17 +33,19 @@ type Config struct {
 }
 
 type Gateway struct {
-	cfg             Config
-	upstream        *url.URL
-	proxy           *httputil.ReverseProxy
-	transport       *http.Transport
-	inference       chan struct{}
-	claudeTransport http.RoundTripper // Optional in-process transport for protocol tests.
-	roles           map[string]*url.URL
-	training        *trainingRecorder
-	hybrid          *hybridRouter
-	roleBudgets     map[string]*atomic.Int64
-	activityState   activityState
+	qualityRejections atomic.Uint64
+	qualityRecoveries atomic.Uint64
+	cfg               Config
+	upstream          *url.URL
+	proxy             *httputil.ReverseProxy
+	transport         *http.Transport
+	inference         chan struct{}
+	claudeTransport   http.RoundTripper // Optional in-process transport for protocol tests.
+	roles             map[string]*url.URL
+	training          *trainingRecorder
+	hybrid            *hybridRouter
+	roleBudgets       map[string]*atomic.Int64
+	activityState     activityState
 }
 
 func New(cfg Config) (*Gateway, error) {

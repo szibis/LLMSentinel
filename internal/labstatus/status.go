@@ -80,6 +80,7 @@ func (r *Runtime) UnmarshalJSON(raw []byte) error {
 }
 
 type Snapshot struct {
+	QualityChecks      map[string]float64  `json:"quality_checks,omitempty"`
 	RuntimeEndpoints   map[string]string   `json:"runtime_endpoints,omitempty"`
 	Activity           map[string]any      `json:"activity,omitempty"`
 	ActivityStale      bool                `json:"activity_stale,omitempty"`
@@ -351,9 +352,13 @@ func collect(root string, client *http.Client) Snapshot {
 			}
 			if name == "gateway" {
 				var value struct {
-					Status string `json:"status"`
+					Status   string `json:"status"`
+					Controls struct {
+						QualityChecks map[string]float64 `json:"quality_checks"`
+					} `json:"controls"`
 				}
 				snapshot.Gateway = json.Unmarshal(raw, &value) == nil && value.Status == "ok"
+				snapshot.QualityChecks = value.Controls.QualityChecks
 				if snapshot.Gateway {
 					snapshot.GatewaySampleTime = snapshot.SampleTime
 				}
@@ -716,6 +721,9 @@ func render(session map[string]any, snapshot Snapshot) string {
 		third = append(third, "pressure "+pressure)
 	}
 	third = append(third, fmt.Sprintf("Format corrections %d / errors %d (log tail)", snapshot.RecentCorrections, snapshot.RecentErrors))
+	if rejects, ok := snapshot.QualityChecks["rejections"]; ok {
+		third = append(third, fmt.Sprintf("Quality rejects %.0f / recovery attempts %.0f", rejects, snapshot.QualityChecks["recovery_attempts"]))
+	}
 	rows := []string{strings.Join(first, " | ")}
 	if len(second) > 0 {
 		rows = append(rows, strings.Join(second, " | "))

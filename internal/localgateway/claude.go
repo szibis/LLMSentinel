@@ -89,6 +89,7 @@ func claudeError(w http.ResponseWriter, status int, message string) {
 
 type modelOutputError struct {
 	message, raw  string
+	quality       string
 	input, output int
 }
 
@@ -170,6 +171,7 @@ func prepareClaude(req claudeRequest) ([]map[string]string, error) {
 			instruction = qwenToolInstruction(req.Tools, req.ToolChoice)
 		}
 	}
+	instruction += "\n" + agentProgressInstruction
 	messages := []map[string]string{{"role": "system", "content": system + "\n\n" + instruction}}
 	known := map[string]bool{}
 	resolved := map[string]bool{}
@@ -350,12 +352,20 @@ func (g *Gateway) inferClaude(ctx context.Context, req claudeRequest, messages [
 		return response, err
 	}
 	// Correct formatting once; never guess arguments or execute malformed tools.
-	log.Print("Claude adapter: invalid model tool format; attempting one format correction")
+	if output.quality == "" {
+		log.Print("Claude adapter: invalid model tool format; attempting one format correction")
+	} else {
+		log.Print("Agent progress quality: attempting one progress recovery")
+	}
 	correction := `Your previous response was invalid JSON. Return exactly one valid JSON object with "text" and "tool_calls". For a text-only answer use {"text":"your answer","tool_calls":[]}. For a tool call use only a defined tool and valid required arguments. Do not execute tools or invent results. No Markdown fences or assignment syntax.`
 	if qwenRole(req.Model) {
 		correction = "Your previous tool-call format was invalid. Use complete <tool_call><function=NAME><parameter=ARG>VALUE</parameter></function></tool_call> blocks with only defined names and valid required arguments. No text after calls. If no tool is needed, answer normally in plain text. Do not invent tool results."
 	}
 	corrected := append([]map[string]string(nil), messages...)
+	if output.quality != "" {
+		g.qualityRecoveries.Add(1)
+		correction = "Your previous response failed the progress check (" + output.quality + "): it repeated unchanged evidence or gave an unfinished final answer. " + agentProgressInstruction + " Produce a usable answer now, or a specific honest limitation/clarification. Do not repeat the rejected lookup."
+	}
 	corrected = append(corrected,
 		map[string]string{"role": "assistant", "content": output.raw},
 		map[string]string{"role": "user", "content": correction})
@@ -389,7 +399,7 @@ func (g *Gateway) inferClaudeOnce(ctx context.Context, req claudeRequest, messag
 		g.activityState.finish(attempt, resultErr == nil, event.Usage)
 		event.LatencyMS = time.Since(started).Milliseconds()
 		event.Accepted = resultErr == nil
-		event.Quality["protocol_valid"] = event.Accepted
+		event.Quality["protocol_valid"] = event.Accepted || event.Quality["progress_check"] != nil
 		if resultErr != nil {
 			event.Error = "inference_or_validation_failed"
 		}
@@ -512,6 +522,12 @@ func (g *Gateway) inferClaudeOnce(ctx context.Context, req claudeRequest, messag
 		if err := req.ValidateResult(result); err != nil {
 			return claudeResponse{}, err
 		}
+	}
+	if issue := progressIssue(req, blocks); issue != "" {
+		g.qualityRejections.Add(1)
+		event.Quality["progress_check"] = issue
+		log.Printf("Agent progress quality rejection: %s", issue)
+		return claudeResponse{}, &modelOutputError{message: "local model failed agent progress check: " + issue, quality: issue, raw: choice.Message.Content, input: completion.Usage.Input, output: completion.Usage.Output}
 	}
 	return result, nil
 }
