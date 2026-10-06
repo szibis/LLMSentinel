@@ -21,7 +21,7 @@ produce tool arguments. These are different contracts:
 
 | Responsibility | Current implementation | Interim target | Long-term target |
 | --- | --- | --- | --- |
-| Answer generation and tools | Qwen3.5-4B for Haiku; Qwen3.6-35B-A3B for Sonnet/Opus | Keep these local generators; evaluate upgrades independently | Our evaluated generative checkpoints, optionally mixed with commercial APIs |
+| Answer generation and tools | Qwen3.5-4B for Haiku; Qwen3.8-27B for Sonnet/Opus | Keep these local generators; evaluate task quality independently of compatibility smokes | Our evaluated generative checkpoints, optionally mixed with commercial APIs |
 | Local role selection | `DecisionRouter` with `RoleRouter`/`LocalRouter` | OSS decision adapter behind the same policy boundary | Jes adapter without changing client protocols |
 | Hybrid commercial selection | Deterministic role/reasoning-effort policy | OSS advice constrained by operator permissions | Calibrated Jes advice under the same constraints |
 | Protocol quality | Complete-output/tool/schema/choice validation | Retain deterministic validators | Retain validators even after learned scoring is added |

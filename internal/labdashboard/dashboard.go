@@ -52,6 +52,9 @@ func readEndpoint(client *http.Client, path string) json.RawMessage {
 
 func newHandler(client *http.Client, snapshot func() (json.RawMessage, error)) http.Handler {
 	var snapshotMu sync.Mutex
+	var cachedTelemetry json.RawMessage
+	var cachedAt time.Time
+	history := newHistory()
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "no-store")
 		w.Header().Set("X-Content-Type-Options", "nosniff")
@@ -71,12 +74,24 @@ func newHandler(client *http.Client, snapshot func() (json.RawMessage, error)) h
 			var telemetry, gateway, activity json.RawMessage
 			var group sync.WaitGroup
 			group.Add(3)
-			go func() { defer group.Done(); snapshotMu.Lock(); defer snapshotMu.Unlock(); telemetry, _ = snapshot() }()
+			go func() {
+				defer group.Done()
+				snapshotMu.Lock()
+				defer snapshotMu.Unlock()
+				if time.Since(cachedAt) >= 4*time.Second {
+					cachedTelemetry, _ = snapshot()
+					cachedAt = time.Now()
+				}
+				telemetry = cachedTelemetry
+			}()
 			go func() { defer group.Done(); gateway = readEndpoint(client, "/health") }()
 			go func() { defer group.Done(); activity = readEndpoint(client, "/sentinel/activity") }()
 			group.Wait()
+			now := time.Now().UTC()
+			history.record(telemetry, activity, now)
+			points, attempts := history.snapshot(now)
 			w.Header().Set("Content-Type", "application/json")
-			_ = json.NewEncoder(w).Encode(map[string]any{"sample_time": time.Now().UTC().Format(time.RFC3339), "telemetry": telemetry, "gateway": gateway, "activity": activity})
+			_ = json.NewEncoder(w).Encode(map[string]any{"sample_time": now.Format(time.RFC3339), "telemetry": telemetry, "gateway": gateway, "activity": activity, "history": points, "attempts": attempts, "history_window_seconds": int(historyWindow.Seconds())})
 		default:
 			http.NotFound(w, r)
 		}
