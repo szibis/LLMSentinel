@@ -39,6 +39,10 @@ start marker within that tail), not durable lifetime totals. Errors can include
 client cancellations. Unavailable endpoints are explicitly marked; missing
 measurements are never substituted with zero or a healthy state.
 
+MLX statistics can also contain nested native-generation metadata. The status
+line retains numeric counters alongside these extensions; optional null or
+nonnumeric values remain unknown and do not mark a loaded runtime unavailable.
+
 Inspect the same data as JSON:
 
 ```sh

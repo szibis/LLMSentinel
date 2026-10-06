@@ -35,6 +35,31 @@ func TestStatusDisplayCountsRuntimeAndMachineMemory(t *testing.T) {
 	}
 }
 
+func TestStatusRetainsCountersWithNativeGenerationMetadata(t *testing.T) {
+	snapshot := snapshotFromJSON(t, `{"gateway":true,"runtimes":{"large":{"model_loaded":true,"stats":{"requests":4,"tokens_generated":486,"uptime_s":85,"last_generation":{"prompt_tokens":54,"generation_tokens":6,"native_generation_metadata":true,"usage_source":"exact_mlx_lm_generation"},"optional":null,"label":"native"},"memory":{"available_gb":11.6,"swap_used_gb":27,"pressure":"normal"}}}}`)
+	runtime := snapshot.Runtimes["large"]
+	if runtime == nil || runtime.Stats["requests"] != 4 || runtime.Stats["tokens_generated"] != 486 || runtime.Stats["uptime_s"] != 85 {
+		t.Fatalf("native metadata discarded runtime counters: %+v", runtime)
+	}
+	if _, exists := runtime.Stats["optional"]; exists {
+		t.Fatal("null counter became a known zero")
+	}
+	output := render(nil, snapshot)
+	for _, want := range []string{"large ready", "4 MLX req", "486 tok", "11.6 GB available", "27 GB swap"} {
+		if !strings.Contains(output, want) {
+			t.Errorf("missing %q: %s", want, output)
+		}
+	}
+	raw, err := json.Marshal(snapshot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	restored := snapshotFromJSON(t, string(raw))
+	if restored.Runtimes["large"].Stats["tokens_generated"] != 486 {
+		t.Fatal("status cache round trip lost counters")
+	}
+}
+
 func TestStatusRatesResetWithRuntimeAndRun(t *testing.T) {
 	previous := snapshotFromJSON(t, `{"sample_time":100,"run_id":"r","runtimes":{"large":{"stats":{"uptime_s":50,"tokens_generated":100,"requests":4}}}}`)
 	current := snapshotFromJSON(t, `{"sample_time":105,"run_id":"r","runtimes":{"large":{"stats":{"uptime_s":55,"tokens_generated":200,"requests":5}}}}`)
