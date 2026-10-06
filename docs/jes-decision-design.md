@@ -5,6 +5,14 @@ capture, deterministic routing and operator controls. It does **not** load an
 OSS decision checkpoint or a trained Jes checkpoint. This design separates
 what is running from the migration we intend to implement.
 
+Sentinel and all Sentinel-owned tooling remain pure Go. The proposed adapter
+validates a bounded, versioned HTTP decision response in Go. Kev, Jeff or Jes
+inference runs in a separately deployed service; its dependencies never become
+Sentinel dependencies. There are no embedded Python scripts, Python subprocess
+adapters or in-process inference imports. Switching the external backend must
+preserve the typed contract, permissions, calibration metadata and fallback
+behavior described below.
+
 ## Separate decisions from answers
 
 Sentinel needs a small decision service to classify work, select an allowed

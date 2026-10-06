@@ -57,7 +57,7 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
-      - name: Build Sentinel and local gateway
+      - name: Build Sentinel, local gateway and Go tools
         env:
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
@@ -65,7 +65,10 @@ jobs:
           VERSION: ${{ needs.metadata.outputs.version }}
         run: |
           mkdir -p dist
-          for BINARY in llm-sentinel sentinel-gateway; do
+          BINARIES="llm-sentinel sentinel-gateway"
+          # Historical selected commits predate the native tools binary.
+          if [ -d cmd/sentinel-tools ]; then BINARIES="$BINARIES sentinel-tools"; fi
+          for BINARY in $BINARIES; do
             go build -trimpath \
               -ldflags "-s -w -X github.com/szibis/claude-escalate/internal/config.Version=${VERSION}" \
               -o "dist/${BINARY}-${GOOS}-${GOARCH}" "./cmd/${BINARY}"

@@ -10,7 +10,7 @@ Your lab clients and cached model are already configured on this Mac. From `Sent
 make lab-claude
 ```
 
-This builds the gateway, starts the lab server if needed, refreshes an older owned gateway when its required capabilities are absent, and replaces the launcher with the actual lab Claude Code executable. Server processes stay in the background. Claude receives normal terminal input directly; this is not print mode. Its built-in Read, Write, Edit, Bash, Glob, Grep and Agent tools are enabled with normal permission prompts. Initial theme/API-key/workspace dialogs belong to the separate lab profile. The API key is a local placeholder, not a paid provider credential.
+This builds the Go tools and checks the existing lab gateway before replacing the launcher with the actual lab Claude Code executable. Server processes stay in the background. Claude receives normal terminal input directly; this is not print mode. Its built-in Read, Write, Edit, Bash, Glob, Grep and Agent tools are enabled with normal permission prompts. Initial theme/API-key/workspace dialogs belong to the separate lab profile. The API key is a local placeholder, not a paid provider credential.
 
 The default project is disposable `.sentinel-lab/workspace`. To work on a project of your choosing with the same separate profile:
 
@@ -22,11 +22,11 @@ To test the agent, ask it inside the UI to create `hello.py` and `test_hello.py`
 
 The adapter renders tool definitions/results into the local conversation and accepts complete Qwen-native function/parameter calls or the earlier JSON envelope, with known-name, schema and tool-choice validation. Claude Code executes tools; Sentinel never executes model commands itself. Malformed or truncated output fails before partial input is dispatched. Local responses remain buffered. Default role output limits are 1,024/4,096/8,192 for Haiku/Sonnet/Opus, further capped by the request and adjustable through controls. Updated MLX supplies native token metadata; older runtimes have unknown prompt accounting. See [accounting limitations](client-quality-inspection.md). Images, client Anthropic thinking blocks and provider built-ins are rejected. Opus's internal Qwen reasoning is separated from final text/tool input.
 
-Bare mode keeps the real coding UI while isolating inherited hooks, plugins, keychain access and ancestor instruction discovery. MCP is explicitly empty; advanced Claude features are not all enabled. Your global installation/profile is not used. The launcher declares the minimum configured model context window, including nested Qwen metadata. Sentinel owns the explicit role routing policy through `DecisionRouter`; this is not trained Jes inference. The lab starts in `opusplan`, with Haiku Explore and Opus Plan agents.
+Bare mode keeps the real coding UI while isolating inherited hooks, plugins, keychain access and ancestor instruction discovery. The launcher explicitly loads the isolated `.sentinel-lab/control-plugin` for Sentinel slash controls; Claude command files also live under `.sentinel-lab/claude/commands`. MCP is explicitly empty; advanced Claude features are not all enabled. Your global installation/profile is not used. The launcher declares the minimum configured model context window, including nested Qwen metadata. Sentinel owns the explicit role routing policy through `DecisionRouter`; this is not trained Jes inference. The lab starts in `opusplan`, with Haiku Explore and Opus Plan agents.
 
 ## Everyday development workflow
 
-From `Sentinel/`, run `make` to see the lab commands. Requirements are Go 1.27.1, Python 3, Git, and an existing MLX-Flash installation for owned inference. Go may fetch the declared toolchain and modules on the first build; the lab does not install clients or download model weights.
+From `Sentinel/`, run `make` to see the lab commands. Requirements are Go 1.27.1, Git, and an existing external MLX-Flash installation for owned inference. Go may fetch the declared toolchain and modules on the first build; the lab does not install clients or download model weights.
 
 ```sh
 cd /Users/slawomirskowron/projects/model_training/Sentinel
@@ -52,7 +52,9 @@ Startup returns your terminal prompt; run the following commands in the same ter
 
 An exclusive lock prevents two supervisors; occupied ports cause startup to fail without stopping existing services. `ATTACH_RUNTIME=1` temporarily uses your existing runtime on 19091 and leaves it running on shutdown. Gateway health alone does not mean a model is loaded: inspect runtime health/logs and verify a real prompt. First generation may wait for loading and the runtime's internal buffering.
 
-`make lab-test` runs focused gateway race/vet and Python isolation/process-ownership tests without model weights. Both client launchers remain guarded by advertised protocol/tool capabilities. Responses is now implemented; gateway health still does not prove model readiness or answer quality.
+Owned profile writes reject symlinked directories and files. Existing user preferences and edited command files are preserved. Shutdown allows up to 30 seconds for the three owned child groups to terminate and be reaped; a startup timeout gives the supervisor 25 seconds to complete that cleanup before escalation. Log and lock files use mode `0600`.
+
+`make lab-test` runs focused Go gateway/lab race and vet tests without model weights. Both client launchers remain guarded by advertised protocol/tool capabilities. Responses is now implemented; gateway health still does not prove model readiness or answer quality.
 
 ## Build and verify
 
@@ -94,8 +96,12 @@ The launcher and doctor use only `.sentinel-lab/clients/node_modules/.bin/{codex
 
 Lab state lives in ignored `.sentinel-lab/codex`, `.sentinel-lab/claude`, `.sentinel-lab/tmp` and `.sentinel-lab/workspace`. Codex uses its own `CODEX_HOME`; Claude uses its own `CLAUDE_CONFIG_DIR`. Child environments exclude inherited provider credentials and proxy variables. Claude updates/nonessential traffic and Codex analytics are disabled by configuration. No production settings, authentication, shell profiles, CLI installations or running processes are changed. Changed lab configs are preserved instead of overwritten.
 
-`doctor` invokes only installed clients' version commands in those environments. Launch commands (`python3 scripts/sentinel_lab.py codex` / `claude`) refuse to start until the gateway advertises the required protocol and tools. The Claude local-model path is experimental and officially unsupported by Anthropic. Machine-managed policy can still override application settings; separate config directories are not an OS sandbox or proof of no external network traffic. Do not claim full offline operation until it is observed.
+`doctor` invokes only installed clients' version commands in those environments. Launch commands (`./bin/sentinel-tools lab codex` / `claude`) refuse to start until the gateway advertises the required protocol and tools. The Claude local-model path is experimental and officially unsupported by Anthropic. Machine-managed policy can still override application settings; separate config directories are not an OS sandbox or proof of no external network traffic. Do not claim full offline operation until it is observed.
 
 Next work: establish the complete read/edit/check/recovery workflow, improve streaming/cancellation, evaluate an OSS decision adapter and then connect Jes. See the repository-local [migration design](jes-decision-design.md). The adapter follows the [Claude gateway endpoint guide](https://code.claude.com/docs/en/llm-gateway-protocol) and [Messages event format](https://platform.claude.com/docs/en/build-with-claude/streaming). Routing non-Claude models remains experimental and unsupported by Anthropic.
 
 See [interactive Claude validation](claude-lab-validation.md) and [earlier transport evidence](local-gateway-validation.md) for what actually ran on this Mac.
+
+## Go lab lifecycle and migration
+
+Sentinel profiles, launcher and supervisor are implemented in Go (`sentinel-tools lab` and `sentinel-tools runner`). The external `mlx-flash` executable owns MLX/Python inference; Sentinel does not import or invoke Python scripts. Native role launches require MLX-Flash support for request-scoped `enable_thinking`. A missing capability produces an actionable update/rebuild error instead of installing a compatibility shim. Updating source or building Go tools does not replace an already running supervisor or MLX runtime. Migrate at a convenient time with an explicit `make lab-stop`, then `make lab-run`; close/reopen the isolated CLI as needed. No automated migration interrupts an active lab. Existing profiles/preferences are preserved, with only Sentinel-generated legacy command references migrated to the Go executable.

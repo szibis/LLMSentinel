@@ -5,6 +5,13 @@ direct-provider learning capture, or explicitly authorized hybrid routing.
 The guide includes startup examples, slash controls, billing boundaries and
 what is implemented versus planned.
 
+Sentinel is pure Go, including capture hooks, CLI controls, status lines,
+lab management and release/smoke helpers. `make build` produces `llm-sentinel`,
+`sentinel-gateway` and `sentinel-tools`; all three ship as native release binaries.
+MLX-Flash is an external inference service with its own dependencies. Sentinel
+communicates over HTTP and launches only its executable. Future OSS/Jes decision
+services use the same boundary, without Python adapters inside Sentinel.
+
 | New gateway capability | Documentation |
 | --- | --- |
 | Client protocols and two-model Qwen lab | [Local setup](docs/local-gateway.md), [model roles](docs/claude-qwen-roles.md) |

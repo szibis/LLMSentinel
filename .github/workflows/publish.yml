@@ -34,6 +34,11 @@ jobs:
         with:
           ref: main
           persist-credentials: false
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Build Go release helper
+        run: go build -o "$RUNNER_TEMP/sentinel-tools" ./cmd/sentinel-tools
       - name: Select tested commit and create immutable version tag
         id: select
         env:
@@ -41,7 +46,7 @@ jobs:
           REPOSITORY: ${{ github.repository }}
           VERSION: ${{ inputs.version }}
           RELEASE_REF: ${{ inputs.ref }}
-        run: python3 scripts/manual_release.py --repository "$REPOSITORY" --version "$VERSION" --ref "$RELEASE_REF"
+        run: '"$RUNNER_TEMP/sentinel-tools" release --repository "$REPOSITORY" --version "$VERSION" --ref "$RELEASE_REF"'
   publish:
     needs: select
     uses: ./.github/workflows/release.yml

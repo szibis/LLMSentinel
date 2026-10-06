@@ -26,10 +26,10 @@ jobs:
         with:
           ref: ${{ github.workflow_sha }}
           persist-credentials: false
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-go@v5
         with:
-          python-version: '3.12'
-      - run: python -m unittest discover -s scripts -p test_qwen_metal_smoke.py -v
+          go-version-file: go.mod
+      - run: go test -race ./internal/qwensmoke ./internal/release
 
   hardware-status:
     name: Hardware availability
@@ -64,7 +64,7 @@ jobs:
         uses: actions/checkout@v5
         with:
           repository: szibis/MLX-Flash
-          ref: a45ae99464aa2ddd82158042043f91b6966bdec3
+          ref: 6b9c102c2ad07a585b5d414a50f36a1e5bd64103
           path: .qwen-mlx-source
           persist-credentials: false
       - name: Check out current smoke controls for historical release retries
@@ -84,10 +84,13 @@ jobs:
           } >> "$GITHUB_ENV"
       - uses: actions/setup-go@v5
         with:
-          go-version-file: go.mod
+          go-version-file: .qwen-ci-controls/go.mod
           cache: false
       - name: Build this checkout's gateway
         run: go build -o "$RUNNER_TEMP/qwen-sentinel-gateway" ./cmd/sentinel-gateway
+      - name: Build trusted Go smoke controls
+        working-directory: .qwen-ci-controls
+        run: go build -o "$RUNNER_TEMP/qwen-sentinel-tools" ./cmd/sentinel-tools
       - name: Install pinned MLX dependency in isolated runtime
         shell: bash
         run: |
@@ -103,7 +106,7 @@ jobs:
           echo "QWEN_MLX_FLASH_BIN=$VENV/bin/mlx-flash" >> "$GITHUB_ENV"
       - name: Run real offline Messages and validated tool smoke
         shell: bash
-        run: '"$QWEN_CI_PYTHON" .qwen-ci-controls/scripts/qwen_metal_smoke.py --gateway "$RUNNER_TEMP/qwen-sentinel-gateway"'
+        run: '"$RUNNER_TEMP/qwen-sentinel-tools" smoke --gateway "$RUNNER_TEMP/qwen-sentinel-gateway"'
       - name: Upload sanitized health, results, and server logs
         if: always()
         uses: actions/upload-artifact@v5
