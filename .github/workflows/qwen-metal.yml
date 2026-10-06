@@ -73,10 +73,19 @@ jobs:
           ref: ${{ github.workflow_sha }}
           path: .qwen-ci-controls
           persist-credentials: false
+      - name: Select isolated Go cache paths
+        shell: bash
+        run: |
+          CACHE_ROOT="$RUNNER_TEMP/qwen-go-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          {
+            echo "QWEN_JOB_GO_ROOT=$CACHE_ROOT"
+            echo "GOCACHE=$CACHE_ROOT/build"
+            echo "GOMODCACHE=$CACHE_ROOT/mod"
+          } >> "$GITHUB_ENV"
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
-          cache: true
+          cache: false
       - name: Build this checkout's gateway
         run: go build -o "$RUNNER_TEMP/qwen-sentinel-gateway" ./cmd/sentinel-gateway
       - name: Install pinned MLX dependency in isolated runtime
@@ -108,3 +117,4 @@ jobs:
         shell: bash
         run: |
           if [ -n "${QWEN_JOB_VENV:-}" ]; then rm -rf -- "$QWEN_JOB_VENV"; fi
+          if [ -n "${QWEN_JOB_GO_ROOT:-}" ]; then rm -rf -- "$QWEN_JOB_GO_ROOT"; fi
