@@ -327,10 +327,13 @@ func (g *Gateway) inferClaude(ctx context.Context, req claudeRequest, messages [
 	if trainingRequestID(ctx) == "" {
 		ctx = withTrainingRequestID(ctx, newID("req_"))
 	}
+	g.activityState.queue(1)
 	select {
 	case g.inference <- struct{}{}:
+		g.activityState.queue(-1)
 		defer func() { <-g.inference }()
 	case <-ctx.Done():
+		g.activityState.queue(-1)
 		return claudeResponse{}, ctx.Err()
 	}
 	route, err := g.cfg.Router.Select(ctx, RouteTask{Model: req.Model, HasTools: len(req.Tools) > 0, Messages: len(req.Messages), Client: trainingClient(ctx), MaxTokens: req.MaxTokens})
@@ -378,9 +381,12 @@ func (g *Gateway) inferClaudeOnce(ctx context.Context, req claudeRequest, messag
 		p["chat_template_kwargs"] = map[string]bool{"enable_thinking": route.Thinking}
 	}
 	payload := mustJSON(p)
-	started := time.Now()
+	started := time.Now().UTC()
 	event := trainingEvent{Model: req.Model, Role: route.Role, Reason: route.Reason, Thinking: route.Thinking, MaxTokens: budget, Input: p, AttemptID: newID("attempt_"), Quality: map[string]any{"status": "unscored", "protocol_valid": false, "input_tokens_available": false, "billing_class": "local"}}
+	attempt := activityAttempt{RequestID: trainingRequestID(ctx), AttemptID: event.AttemptID, Client: trainingClient(ctx), Role: route.Role, Model: req.Model, Upstream: selected.String(), Thinking: route.Thinking, MaxTokens: budget, StartedAt: started}
+	g.activityState.start(attempt)
 	defer func() {
+		g.activityState.finish(attempt, resultErr == nil, event.Usage)
 		event.LatencyMS = time.Since(started).Milliseconds()
 		event.Accepted = resultErr == nil
 		event.Quality["protocol_valid"] = event.Accepted

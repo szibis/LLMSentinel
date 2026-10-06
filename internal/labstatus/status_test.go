@@ -284,3 +284,84 @@ func TestStatusRejectsSymlinkAncestorBeforeAnyMutation(t *testing.T) {
 		t.Fatalf("symlink-root cache created: %v", err)
 	}
 }
+
+func TestNativeMetadataPreservedAndLabeled(t *testing.T) {
+	s := snapshotFromJSON(t, `{"sample_time":100,"runtimes":{"large":{"model_loaded":true,"stats":{"requests":1,"tokens_generated":10,"last_generation":{"generation_tps":20,"time_s":2,"timestamp":95,"native_generation_metadata":true}}}}}`)
+	if s.Runtimes["large"].LastGeneration["generation_tps"] != float64(20) {
+		t.Fatal("native metadata lost")
+	}
+	raw, _ := json.Marshal(s)
+	restored := snapshotFromJSON(t, string(raw))
+	if restored.Runtimes["large"].LastGeneration["time_s"] != float64(2) {
+		t.Fatal("cache lost metadata")
+	}
+	text := render(nil, restored)
+	for _, want := range []string{"20.0 decode tok/s", "2.0s generation"} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("missing %s: %s", want, text)
+		}
+	}
+}
+func TestRetainFailuresExpireAndReset(t *testing.T) {
+	old := snapshotFromJSON(t, `{"sample_time":100,"run_id":"r","gateway":true,"runtimes":{"large":{"model_loaded":true,"stats":{"uptime_s":50}}}}`)
+	now := snapshotFromJSON(t, `{"sample_time":105,"run_id":"r","runtimes":{"large":null}}`)
+	retainRecent(&now, old)
+	if now.Runtimes["large"] == nil || !now.Runtimes["large"].Stale || now.Gateway || !now.GatewayStale {
+		t.Fatalf("not honest stale: %+v", now)
+	}
+	expired := snapshotFromJSON(t, `{"sample_time":116,"run_id":"r","runtimes":{"large":null}}`)
+	retainRecent(&expired, now)
+	if expired.Runtimes["large"] != nil || expired.GatewayStale {
+		t.Fatal("stale retained past lifetime")
+	}
+	now = snapshotFromJSON(t, `{"sample_time":105,"run_id":"new","runtimes":{"large":null}}`)
+	retainRecent(&now, old)
+	if now.Runtimes["large"] != nil {
+		t.Fatal("retained across run restart")
+	}
+	now = snapshotFromJSON(t, `{"sample_time":105,"run_id":"r","runtimes":{"large":{"stats":{"uptime_s":1}}}}`)
+	retainRecent(&now, old)
+	if now.Runtimes["large"].Stale || now.Runtimes["large"].Stats["uptime_s"] != 1 {
+		t.Fatal("restart replaced with old state")
+	}
+}
+func TestActualActivityAndColors(t *testing.T) {
+	s := snapshotFromJSON(t, `{"gateway":true,"activity":{"active":[{"role":"haiku","upstream":"http://127.0.0.1:19092/v1"}]},"runtimes":{"small":{"endpoint":"http://127.0.0.1:19092/status","model_loaded":true,"memory":{"pressure":"critical"}}}}`)
+	text := render(map[string]any{"model": map[string]any{"id": "sentinel-opus"}}, s)
+	if !strings.Contains(text, "selected Opus") || !strings.Contains(text, "active haiku→small") {
+		t.Fatalf("wrong activity %s", text)
+	}
+	t.Setenv("NO_COLOR", "")
+	if !strings.Contains(colorize(text), "\x1b[") {
+		t.Fatal("colors absent")
+	}
+	t.Setenv("NO_COLOR", "1")
+	if strings.Contains(colorize(text), "\x1b[") {
+		t.Fatal("NO_COLOR ignored")
+	}
+}
+
+func TestStaleActivityAndEndpointsRemainHonest(t *testing.T) {
+	old := snapshotFromJSON(t, `{"sample_time":100,"run_id":"r","activity":{"active":[{"role":"opus","upstream":"http://127.0.0.1:19091/v1"}]},"runtimes":{"large":{"endpoint":"http://127.0.0.1:19091/status","model_loaded":true,"stats":{"uptime_s":50,"requests":2,"tokens_generated":10}}}}`)
+	current := snapshotFromJSON(t, `{"sample_time":105,"run_id":"r","runtime_endpoints":{"large":"http://127.0.0.1:19091/status"},"runtimes":{"large":null}}`)
+	retainRecent(&current, old)
+	addRates(&current, old)
+	text := render(nil, current)
+	if !strings.Contains(text, "last observed active opus→large (stale 5s)") || !strings.Contains(text, "large stale 5s") || len(current.Rates) != 0 {
+		t.Fatalf("dishonest stale: %s %v", text, current.Rates)
+	}
+	current = snapshotFromJSON(t, `{"sample_time":105,"run_id":"r","runtime_endpoints":{"large":"http://127.0.0.1:20000/status"},"runtimes":{"large":null}}`)
+	retainRecent(&current, old)
+	if current.Runtimes["large"] != nil {
+		t.Fatal("retained old endpoint")
+	}
+	current = snapshotFromJSON(t, `{"sample_time":116,"run_id":"r","runtimes":{"large":null}}`)
+	retainRecent(&current, old)
+	if current.Activity != nil {
+		t.Fatal("activity retained beyond deadline")
+	}
+	t.Setenv("NO_COLOR", "")
+	if !strings.Contains(colorize("pressure warning"), "\x1b[33mpressure warning") || !strings.Contains(colorize("pressure critical"), "\x1b[31mpressure critical") {
+		t.Fatal("memory warning colors absent")
+	}
+}
