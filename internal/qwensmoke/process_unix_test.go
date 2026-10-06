@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"syscall"
@@ -122,7 +123,9 @@ func TestSharedLockContentionAndRelease(t *testing.T) {
 }
 
 func TestOwnedProcessCleanupAndReadinessFailure(t *testing.T) {
-	process, err := startOwned([]string{"sh", "-c", "sleep 60"}, filepath.Join(t.TempDir(), "server.log"), os.Environ())
+	// This test checks the leader. Descendants have a separate lifecycle test;
+	// a shell without exec can leave stopped zombies in its group on Linux.
+	process, err := startOwned([]string{"sh", "-c", "exec sleep 60"}, filepath.Join(t.TempDir(), "server.log"), os.Environ())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -132,7 +135,9 @@ func TestOwnedProcessCleanupAndReadinessFailure(t *testing.T) {
 		t.Fatal("readiness was unbounded", err)
 	}
 	pid := process.command.Process.Pid
-	process.close()
+	if err = process.close(); err != nil {
+		t.Fatal(err)
+	}
 	if err = syscall.Kill(-pid, syscall.SIGTERM); err == nil {
 		t.Fatal("owned group survived cleanup")
 	}
@@ -145,4 +150,56 @@ func TestOwnedProcessCleanupAndReadinessFailure(t *testing.T) {
 	if _, err = waitReady(context.Background(), dead, "http://127.0.0.1:1/health", time.Second); err == nil {
 		t.Fatal("server death not reported")
 	}
+}
+
+func TestLinuxShellCleanupAllowsOnlyStoppedZombies(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("Linux proc exposes stopped zombie state")
+	}
+	process, err := startOwned([]string{"sh", "-c", "sleep 60"}, filepath.Join(t.TempDir(), "server.log"), os.Environ())
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, _ = waitReady(context.Background(), process, "http://127.0.0.1:1/health", 50*time.Millisecond)
+	group := strconv.Itoa(process.command.Process.Pid)
+	if err = process.close(); err != nil {
+		t.Fatal(err)
+	}
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		entries, e := os.ReadDir("/proc")
+		if e != nil {
+			t.Fatal(e)
+		}
+		alive := false
+		zombies := 0
+		for _, entry := range entries {
+			if _, e = strconv.Atoi(entry.Name()); e != nil {
+				continue
+			}
+			data, e := os.ReadFile(filepath.Join("/proc", entry.Name(), "stat"))
+			if e != nil {
+				continue
+			}
+			_, tail, ok := strings.Cut(string(data), ") ")
+			if !ok {
+				continue
+			}
+			fields := strings.Fields(tail)
+			if len(fields) < 3 || fields[2] != group {
+				continue
+			}
+			if fields[0] == "Z" {
+				zombies++
+			} else {
+				alive = true
+			}
+		}
+		if !alive {
+			t.Logf("owned shell group stopped; %d zombies await OS reaping", zombies)
+			return
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	t.Fatal("executing descendant survived owned group cleanup")
 }
