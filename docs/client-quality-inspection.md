@@ -9,8 +9,10 @@ built-in tools, arbitrary custom grammars and stored Responses histories are
 rejected explicitly. Local streams are buffered until validation succeeds;
 this is not native token streaming.
 
-The Qwen bridge accepts trained function/parameter tool blocks and the previous
-JSON envelope. It validates complete output, available tool names, input
+The shared model bridge accepts Qwen function/parameter blocks, Gemma 4 native
+calls, tagged JSON, OpenAI function calls, Anthropic content blocks and the
+canonical JSON envelope. See [translation and CLI feature reuse](model-client-translation.md).
+It validates complete output, available tool names, input
 schemas, tool choice and completed Opus thinking. A formatting correction stays
 on the originally selected model and budget. Tool results remain untrusted
 evidence. This gate does not check that a path exists or an answer is accurate.

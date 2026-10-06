@@ -446,8 +446,10 @@ func (e *environment) launch(client string) error {
 	}
 	arguments := []string{}
 	if client == "claude" {
-		agents := `{"Explore":{"description":"Fast read-only discovery.","prompt":"Use Read, Glob and Grep; report evidence. Do not edit or execute commands.","tools":["Read","Glob","Grep"],"model":"haiku"},"Plan":{"description":"Read-only planning.","prompt":"Research and plan from evidence. Do not edit or execute commands.","tools":["Read","Glob","Grep"],"model":"opus"}}`
-		arguments = []string{"--bare", "--plugin-dir", filepath.Join(e.root, "control-plugin"), "--model", "opusplan", "--setting-sources", "user", "--strict-mcp-config", "--mcp-config", `{"mcpServers":{}}`, "--tools", "Read,Write,Edit,Bash,Glob,Grep,Agent", "--agents", agents, "--permission-mode", "default"}
+		arguments, err = claudeArguments(e.root, os.Getenv("LAB_CLAUDE_FEATURES"))
+		if err != nil {
+			return err
+		}
 	}
 	workspace := os.Getenv("LAB_WORKSPACE")
 	if workspace == "" {
@@ -463,6 +465,18 @@ func (e *environment) launch(client string) error {
 	}
 	fmt.Fprintf(e.out, "Opening real %s in %s\nBackend: Sentinel → MLX-Flash → selected local model.\n", client, workspace)
 	return replaceProcess(binary, arguments, workspace, e.clientEnvironment(client), e.in, e.out, e.stderr)
+}
+
+func claudeArguments(root, mode string) ([]string, error) {
+	if mode != "" && mode != "full" && mode != "minimal" {
+		return nil, errors.New("LAB_CLAUDE_FEATURES must be full or minimal")
+	}
+	agents := `{"Explore":{"description":"Fast read-only discovery.","prompt":"Use Read, Glob and Grep; report evidence. Do not edit or execute commands.","tools":["Read","Glob","Grep"],"model":"haiku"},"Plan":{"description":"Read-only planning.","prompt":"Research and plan from evidence. Do not edit or execute commands.","tools":["Read","Glob","Grep"],"model":"opus"}}`
+	arguments := []string{"--plugin-dir", filepath.Join(root, "control-plugin"), "--model", "opusplan", "--setting-sources", "user", "--strict-mcp-config", "--mcp-config", `{"mcpServers":{}}`, "--agents", agents, "--permission-mode", "default"}
+	if mode == "minimal" {
+		arguments = append([]string{"--bare", "--tools", "Read,Write,Edit,Bash,Glob,Grep,Agent"}, arguments...)
+	}
+	return arguments, nil
 }
 
 func validateNativeProfiles(health map[string]any) error {

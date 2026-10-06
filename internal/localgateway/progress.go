@@ -8,7 +8,10 @@ import (
 
 const agentProgressInstruction = "Complete the user's requested deliverable, not just a statement of what you will do next. General research and comparison questions concern the named subject, not automatically the local repository. Search project files only when relevant to the request. Use only actually available tools; do not invent web access, sources or findings. If the evidence or tools are insufficient, explain the limitation or ask a focused clarification. Do not repeat the same lookup against unchanged evidence; change approach or report the limitation."
 
-var unfinishedPromise = regexp.MustCompile(`(?i)^(let me|i will|i'll) (look|search|inspect|explore)\b`)
+var unfinishedPromise = regexp.MustCompile(`(?i)^(let me|i will|i'll) (look|search|inspect|explore|read|research|review|compare)\b`)
+var deliverableRequest = regexp.MustCompile(`(?i)\b(read|inspect|search|research|review|compare|implement|fix|update|create|build)\b`)
+var planningRequest = regexp.MustCompile(`(?i)\b(plan|outline)\b|\b(what|how) (will|would)\b`)
+var multipleSentences = regexp.MustCompile(`[.!]\s+\S`)
 var substantiveClaim = regexp.MustCompile(`(?i)\b(as|because|shows?|found|recommend|conclude|indicates?|suggests?)\b`)
 var repeatedLookupRequest = regexp.MustCompile(`(?i)\b(poll|wait|watch|monitor|repeat|rerun|retry)\b|\b(three|four|five|[3-9]) times\b`)
 
@@ -55,6 +58,7 @@ func progressIssue(req claudeRequest, blocks []claudeBlock) string {
 	var history []lookup
 	toolResults := 0
 	allowRepeated := false
+	userTask := ""
 	for _, message := range req.Messages {
 		var parts []struct {
 			Type      string          `json:"type"`
@@ -72,6 +76,7 @@ func progressIssue(req claudeRequest, blocks []claudeBlock) string {
 				toolResults = 0
 				var text string
 				_ = json.Unmarshal(message.Content, &text)
+				userTask = text
 				allowRepeated = repeatedLookupRequest.MatchString(text)
 			}
 			continue
@@ -81,6 +86,7 @@ func progressIssue(req claudeRequest, blocks []claudeBlock) string {
 				history = nil
 				toolResults = 0
 				allowRepeated = repeatedLookupRequest.MatchString(part.Text)
+				userTask = part.Text
 			}
 			if part.Type == "tool_use" {
 				if !readOnlyLookup(part.Name, part.Input) {
@@ -119,7 +125,9 @@ func progressIssue(req claudeRequest, blocks []claudeBlock) string {
 		}
 	}
 	text := strings.TrimSpace(answer.String())
-	if !hasCalls && toolResults > 0 && len(text) <= 320 && strings.Count(text, ".") <= 1 && !strings.ContainsAny(text, "\n?:;") && unfinishedPromise.MatchString(text) && !substantiveClaim.MatchString(text) {
+	needsDeliverable := toolResults > 0 || deliverableRequest.MatchString(userTask)
+	requestedPromise := planningRequest.MatchString(userTask) || (text != "" && strings.Contains(userTask, text))
+	if !hasCalls && needsDeliverable && !requestedPromise && len(text) <= 320 && !multipleSentences.MatchString(text) && !strings.ContainsAny(text, "\n?:;") && unfinishedPromise.MatchString(text) && !substantiveClaim.MatchString(text) {
 		return "unfinished_final_answer"
 	}
 	return ""

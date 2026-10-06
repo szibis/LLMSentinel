@@ -62,6 +62,25 @@ func TestProgressGateAllowsChangedEvidenceAndMutations(t *testing.T) {
 	}
 }
 
+func TestProgressGateRejectsFirstTurnResearchPromises(t *testing.T) {
+	req := claudeRequest{Messages: []claudeMessage{{Role: "user", Content: json.RawMessage(`"Review all Loki-compatible logging solutions"`)}}}
+	for _, text := range []string{
+		"I will research and compare various observability logging solutions to provide you with a comprehensive review.",
+		"I will read the fixture file and then create the requested table.",
+		"I will read the `loki-options.md` file to extract the solutions and then create a summary table of their Loki logging API compatibility.",
+	} {
+		if progressIssue(req, []claudeBlock{{Type: "text", Text: text}}) != "unfinished_final_answer" {
+			t.Fatalf("initial promise accepted: %s", text)
+		}
+	}
+	for _, prompt := range []string{`"Give me a plan for what you will read next"`, `"Return exactly: I will read the fixture file and then create the requested table."`} {
+		req.Messages[0].Content = json.RawMessage(prompt)
+		if issue := progressIssue(req, []claudeBlock{{Type: "text", Text: "I will read the fixture file and then create the requested table."}}); issue != "" {
+			t.Fatalf("requested planning or literal sentence rejected: %s", issue)
+		}
+	}
+}
+
 func TestProgressRecoveryKeepsOneBoundedAttemptAndReturnsAnswer(t *testing.T) {
 	var attempts atomic.Int32
 	s := claudeServer(t, func(w http.ResponseWriter, r *http.Request) {

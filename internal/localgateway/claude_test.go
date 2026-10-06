@@ -218,7 +218,7 @@ func TestClaudeToolRoundTripAndStream(t *testing.T) {
 }
 
 func TestClaudeRejectsInvalidModelToolOutput(t *testing.T) {
-	for _, output := range []string{`not JSON`, `{"tool_calls":[{"name":"DeleteEverything","input":{}}]}`, `{"tool_calls":[{"name":"Read","input":{"file_path":42}}]}`} {
+	for _, output := range []string{`{not JSON`, `{"tool_calls":[{"name":"DeleteEverything","input":{}}]}`, `{"tool_calls":[{"name":"Read","input":{"file_path":42}}]}`} {
 		t.Run(output, func(t *testing.T) {
 			s := claudeServer(t, func(w http.ResponseWriter, r *http.Request) {
 				json.NewEncoder(w).Encode(map[string]any{"choices": []any{map[string]any{"message": map[string]any{"content": output}, "finish_reason": "stop"}}})

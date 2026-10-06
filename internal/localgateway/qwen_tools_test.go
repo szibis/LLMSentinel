@@ -72,6 +72,7 @@ func TestQwenPlainJSONAnswersAndTypedParameters(t *testing.T) {
 	}
 	for _, bad := range []string{
 		`<tool_call><function=Query><parameter=count>oops</parameter></function></tool_call>`,
+		`<tool_call><function=Query><parameter=options>{"path":"a","path":"b"}</parameter></function></tool_call>`,
 		`<tool_call><function=Query><parameter=count>1</parameter><parameter=count>2</parameter></function></tool_call>`,
 		`{"tool_calls":null}`, `{"tool_calls":"oops"}`,
 	} {

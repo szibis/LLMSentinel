@@ -194,6 +194,17 @@ func prepareClaude(req claudeRequest) ([]map[string]string, error) {
 	if err != nil {
 		return nil, err
 	}
+	// Some Claude Code versions append environment context as a system
+	// message. Merge text-only client context before the model output contract.
+	for _, message := range req.Messages {
+		if message.Role == "system" {
+			context, err := textContent(message.Content)
+			if err != nil {
+				return nil, errors.New("client system messages require text-only content")
+			}
+			system += "\n\n" + context
+		}
+	}
 	instruction := "You are the model behind an interactive coding agent. Never claim files were changed or commands ran without tool-result evidence."
 	if len(req.Tools) > 0 {
 		defs, _ := json.Marshal(req.Tools)
@@ -209,6 +220,9 @@ func prepareClaude(req claudeRequest) ([]map[string]string, error) {
 	known := map[string]bool{}
 	resolved := map[string]bool{}
 	for _, m := range req.Messages {
+		if m.Role == "system" {
+			continue
+		}
 		if m.Role != "user" && m.Role != "assistant" {
 			return nil, errors.New("message roles must be user or assistant")
 		}
@@ -280,6 +294,9 @@ func prepareClaude(req claudeRequest) ([]map[string]string, error) {
 		messages = append(messages, map[string]string{"role": m.Role, "content": strings.Join(parts, "\n")})
 	}
 	// Repeat the output contract after a large tool transcript for small models.
+	if len(messages) == 1 {
+		return nil, errors.New("a user or assistant conversation message is required")
+	}
 	if len(req.Tools) > 0 {
 		if !qwenRole(req.Model) || req.JSONTools {
 			messages[len(messages)-1]["content"] += "\nReturn one JSON object with text and tool_calls as specified in the system instruction."
@@ -535,6 +552,7 @@ func (g *Gateway) inferClaudeOnce(ctx context.Context, req claudeRequest, messag
 		}
 		envelope, decodeErr := decodeToolOutput(req, text)
 		if decodeErr != nil {
+			event.Quality["output_format_error"] = decodeErr.Error()
 			return claudeResponse{}, &modelOutputError{message: "local model returned invalid tool-call format; no tools were executed", raw: choice.Message.Content, input: completion.Usage.Input, output: completion.Usage.Output}
 		}
 		if len(envelope.Calls) > 8 {

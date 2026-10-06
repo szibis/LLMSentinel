@@ -53,7 +53,7 @@ func TestCacheScopePartitionsSessionsAndKeepsCorrectionTogether(t *testing.T) {
 		scopes = append(scopes, scope)
 		answer := `{"text":"done","tool_calls":[]}`
 		if len(scopes) == 1 {
-			answer = "bad tool format"
+			answer = "<tool_call>incomplete"
 		}
 		json.NewEncoder(w).Encode(map[string]any{"choices": []any{map[string]any{"message": map[string]string{"content": answer}, "finish_reason": "stop"}}})
 	}}
