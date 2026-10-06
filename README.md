@@ -12,6 +12,45 @@ MLX-Flash is an external inference service with its own dependencies. Sentinel
 communicates over HTTP and launches only its executable. Future OSS/Jes decision
 services use the same boundary, without Python adapters inside Sentinel.
 
+### Release preparation and changelog maintenance
+
+After a successful `Build` push on current `main`, Auto Release inspects the PR
+merged at that exact commit. `feat!:` (including scopes) prepares a major release,
+`feat:` a minor release, and `fix:`, `perf:` or `refactor:` a patch release.
+The labels `release:major`, `release:minor` and `release:patch` override the title;
+unknown or multiple bump labels fail. Other titles, including documentation and
+maintenance changes, skip release preparation unless given a bump label.
+
+Preparation opens a `release/vX.Y.Z` branch and a PR titled
+`chore: release vX.Y.Z`, labeled `release`. It writes a v-prefixed `VERSION` and
+a dated `CHANGELOG.md` section with commit subjects since the highest stable
+Git tag. Existing history stays intact and Unreleased notes move into the new
+section. Review and edit these draft notes, then **merge the preparation PR
+manually**. Only its successful main push Build permits automatic publication;
+the label, title, VERSION and matching changelog section must agree. The existing
+release workflow still builds all three binaries with release version metadata.
+Tags are immutable: retries reuse a tag only when it points at the same tested
+commit. An existing preparation branch/PR is reused without force pushes;
+closed preparations require maintainer attention.
+
+Bot-created PRs do not start normal PR CI with `GITHUB_TOKEN`, so Auto Release
+explicitly dispatches Build on the preparation branch with checkout pinned to
+its commit SHA. Dispatch validation does not authorize publication. The workflow
+uses repository `GITHUB_TOKEN` permissions for contents, pull requests and
+Actions; repository settings must permit Actions to create PRs. No personal
+access token is needed. Existing optional publishing credentials remain scoped
+to the release workflow.
+
+The deterministic Go helper can also prepare files locally:
+
+```sh
+git log --reverse --format=%s v3.5.0..HEAD > /tmp/sentinel-release-notes.txt
+go run ./cmd/sentinel-tools release prepare --root . --latest v3.5.0 \
+  --bump minor --date 2026-10-06 --notes /tmp/sentinel-release-notes.txt
+```
+
+Use the actual highest stable tag, intended bump, and review date for your release.
+
 | New gateway capability | Documentation |
 | --- | --- |
 | Client protocols and local model roles | [Local setup](docs/local-gateway.md), [model roles](docs/claude-qwen-roles.md) |
@@ -24,18 +63,35 @@ The current decision policy is deterministic; Jes and the proposed Kev/Jeff
 decision adapters are not connected. Selected local models generate answers.
 Protocol compatibility does not establish equivalent Claude/OpenAI quality or
 measured cost savings. The older optimization-module documentation below is
-separate from this gateway's measured results.
+separate from this gateway's measured results. See the [advertised-feature audit](docs/feature-status-audit.md)
+for source evidence and the distinction between connected features, standalone
+libraries and planned work.
+
+| Feature status | Current implementation |
+| --- | --- |
+| Connected | Local Messages/Responses/Chat Completions, effort roles, validated client tools, opt-in capture/hybrid routing, controls, lab dashboard and MLX prefix-cache integration |
+| Standalone or partial | Legacy semantic/exact answer cache, compression, graph/indexing, Batch API and optimization pipeline; these are not applied to live gateway requests |
+| Planned | Jes decisions, semantic quality scoring, shadow comparison, automatic dataset admission and model training |
+
+Older percentage-savings, coverage and feature-complete statements are historical
+claims, not current product guarantees. Native cache counters measure prefill
+reuse; they do not establish provider-billed monetary savings. The legacy
+`llm-sentinel` dashboard has known metrics initialization defects; use
+`sentinel-tools dashboard` for the current lab UI.
 
 [![Go](https://img.shields.io/badge/Go-1.27.1-blue)](https://golang.org)
 [![License](https://img.shields.io/badge/license-Apache%202.0-green)](LICENSE)
 [![Build](https://github.com/szibis/LLMSentinel/actions/workflows/build.yml/badge.svg)](https://github.com/szibis/LLMSentinel/actions/workflows/build.yml)
-[![Coverage](https://img.shields.io/badge/coverage-85%25-blue)]()
 
 ---
 
-## 🎯 What Is Claude Escalate?
+## Legacy optimization modules (experimental)
 
-LLMSentinel v1.0.0 is a gateway-layer token optimization engine for Claude API. It runs locally between your application and Claude, automatically reducing token usage by **60-75%** through:
+These modules and historical design examples predate the current local gateway.
+They do not form a connected automatic optimization path. Their illustrative
+savings figures below have not been validated for the current product. Module
+tests and storage/client implementations exist, but several model integrations
+are stubs and runtime wiring is incomplete:
 
 - **⚡ Batch API** (50% savings) — Anthropic Batch API integration for non-interactive workloads
 - **🔍 Knowledge Graph Queries** (99% savings) — Answer relationship questions from indexed code
@@ -46,7 +102,7 @@ LLMSentinel v1.0.0 is a gateway-layer token optimization engine for Claude API. 
 - **📊 Transparent Cost Tracking** — Show user when optimization applied vs fresh response
 - **🔐 Security-First** — Input validation, injection detection, configurable thresholds
 
-**The Result**: Lower API costs with full transparency on when optimization is applied.
+For supported startup and measured behavior, use the current client guide above.
 
 ---
 
@@ -424,7 +480,8 @@ curl -X POST http://localhost:8080/api/config/budgets \
 ```
 
 ### 5. Start Using
-Your Claude API requests are now being optimized automatically!
+This legacy setup does not connect the standalone optimization modules to Claude
+requests. Use [the current client guide](docs/client-modes.md) for live serving.
 
 ---
 
@@ -656,13 +713,9 @@ MIT License — See [LICENSE](LICENSE) file for details.
 
 ---
 
-**Status**: ✅ Feature Complete (v0.5.0)  
-**Version**: 0.5.0  
-**Release**: 2026-04-27  
-**Binary Size**: 12-15 MB  
-**Test Coverage**: 530 tests passing  
-**Security**: OWASP Top 10 coverage (50+ injection patterns)  
-**Performance**: <10ms graph queries, <200ms fresh requests  
+**Status**: Active development. The local gateway/lab is connected; older
+optimization modules remain partial. Current test, security and performance
+evidence must come from the relevant CI run or documented live probe.
 
 **[Get Started Now →](docs/GETTING_STARTED.md)**
 

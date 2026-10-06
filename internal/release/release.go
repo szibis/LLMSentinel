@@ -151,6 +151,9 @@ func metadata(api apiCall, repository, version, ref string) (string, error) {
 
 // Run implements sentinel-tools release; publication remains an explicit workflow action.
 func Run(args []string, _ io.Reader, out, stderr io.Writer) int {
+	if len(args) > 0 && args[0] == "prepare" {
+		return runPrepare(args[1:], out, stderr)
+	}
 	flags := flag.NewFlagSet("release", flag.ContinueOnError)
 	flags.SetOutput(stderr)
 	repository := flags.String("repository", "", "owner/repository")

@@ -9,7 +9,8 @@ on:
 permissions:
   contents: write
   packages: write
-  pull-requests: read
+  pull-requests: write
+  actions: write
 
 concurrency:
   group: sentinel-auto-release
@@ -17,17 +18,25 @@ concurrency:
 
 jobs:
   version:
-    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push'
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
     runs-on: ubuntu-latest
     outputs:
-      release: ${{ steps.version.outputs.release }}
-      version: ${{ steps.version.outputs.version }}
-      ref: ${{ github.event.workflow_run.head_sha }}
+      release: ${{ steps.publish.outputs.release }}
+      version: ${{ steps.publish.outputs.version }}
+      ref: ${{ steps.publish.outputs.ref }}
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.workflow_run.head_sha }}
           fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
       - name: Check current main
         id: current
         env:
@@ -41,52 +50,92 @@ jobs:
           else
             echo "current=false" >> "$GITHUB_OUTPUT"
           fi
-      - name: Select release-worthy merged PR
-        id: pr
+      - name: Select merged PR action
+        id: plan
         if: steps.current.outputs.current == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           REPOSITORY: ${{ github.repository }}
           COMMIT_SHA: ${{ github.event.workflow_run.head_sha }}
         run: |
-          TITLE=$(gh api "repos/${REPOSITORY}/commits/${COMMIT_SHA}/pulls" \
-            --jq '[.[] | select(.merged_at != null and .base.ref == "main")] | first | .title // ""')
-          case "${TITLE,,}" in
-            feat!:*|*breaking*) BUMP='major' ;;
-            feat:*) BUMP='minor' ;;
-            fix:*|perf:*|refactor:*) BUMP='patch' ;;
-            *) BUMP='none' ;;
-          esac
-          echo "bump=$BUMP" >> "$GITHUB_OUTPUT"
-      - name: Calculate and create version tag
-        id: version
-        if: contains(fromJSON('["major", "minor", "patch"]'), steps.pr.outputs.bump)
+          go build -o "$RUNNER_TEMP/sentinel-release-tools" ./cmd/sentinel-tools
+          gh api --paginate --slurp "repos/${REPOSITORY}/commits/${COMMIT_SHA}/pulls?per_page=100" \
+            --jq 'add' > "$RUNNER_TEMP/release-prs.json"
+          "$RUNNER_TEMP/sentinel-release-tools" release prepare --plan \
+            --prs "$RUNNER_TEMP/release-prs.json" --sha "$COMMIT_SHA" > "$RUNNER_TEMP/release-plan.json"
+          jq -r '"mode=\(.mode)", "bump=\(.bump // "")", "version=\(.version // "")"' \
+            "$RUNNER_TEMP/release-plan.json" >> "$GITHUB_OUTPUT"
+      - name: Prepare reviewable release PR
+        if: steps.plan.outputs.mode == 'prepare'
         env:
-          BUMP: ${{ steps.pr.outputs.bump }}
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          COMMIT_SHA: ${{ github.event.workflow_run.head_sha }}
+          BUMP: ${{ steps.plan.outputs.bump }}
         run: |
-          EXISTING=$(git tag --points-at HEAD | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -1 || true)
-          if [ -n "$EXISTING" ]; then
-            {
-              echo "version=$EXISTING"
-              echo "release=true"
-            } >> "$GITHUB_OUTPUT"
-            exit 0
+          set -euo pipefail
+          # Include stable tags even if their GitHub release is not yet published.
+          LATEST=$(gh api "repos/${REPOSITORY}/git/matching-refs/tags/v" --jq \
+            '[.[] | .ref | sub("^refs/tags/"; "") | select(test("^v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"))] | sort_by(ltrimstr("v") | split(".") | map(tonumber)) | last // "v0.0.0"')
+          if [ "$LATEST" = 'v0.0.0' ] && ! git rev-parse --verify "refs/tags/$LATEST" >/dev/null 2>&1; then
+            git log --reverse --format=%s "$COMMIT_SHA" > "$RUNNER_TEMP/release-notes.txt"
+          else
+            git merge-base --is-ancestor "$LATEST" "$COMMIT_SHA"
+            git log --reverse --format=%s "${LATEST}..${COMMIT_SHA}" > "$RUNNER_TEMP/release-notes.txt"
           fi
-          CURRENT=$(git tag --list 'v*' --sort=-version:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -1 || true)
-          CURRENT=${CURRENT:-v0.0.0}
-          IFS='.' read -r MAJOR MINOR PATCH <<< "${CURRENT#v}"
-          case "$BUMP" in
-            major) MAJOR=$((MAJOR+1)); MINOR=0; PATCH=0 ;;
-            minor) MINOR=$((MINOR+1)); PATCH=0 ;;
-            patch) PATCH=$((PATCH+1)) ;;
-          esac
-          VERSION="v${MAJOR}.${MINOR}.${PATCH}"
-          git tag "$VERSION"
-          git push origin "$VERSION"
-          {
-            echo "version=$VERSION"
-            echo "release=true"
-          } >> "$GITHUB_OUTPUT"
+          VERSION=$("$RUNNER_TEMP/sentinel-release-tools" release prepare --root . \
+            --latest "$LATEST" --bump "$BUMP" --date "$(date -u +%F)" --notes "$RUNNER_TEMP/release-notes.txt")
+          BRANCH="release/$VERSION"
+          # Never overwrite a preparation branch or reviewer edits on a rerun.
+          REMOTE=$(git ls-remote --heads origin "refs/heads/$BRANCH")
+          if [ -z "$REMOTE" ]; then
+            git switch -c "$BRANCH"
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git add VERSION CHANGELOG.md
+            git commit -m "chore: release $VERSION"
+            [ "$(gh api "repos/${REPOSITORY}/branches/main" --jq '.commit.sha')" = "$COMMIT_SHA" ] || { echo 'Main advanced; skip stale preparation'; exit 1; }
+            git push origin "HEAD:refs/heads/$BRANCH"
+          fi
+          gh label create release --repo "$REPOSITORY" --description 'Reviewed release preparation' --color 0E8A16 --force
+          PR=$(gh pr list --repo "$REPOSITORY" --state all --head "$BRANCH" --base main --json number,state \
+            --jq 'if length > 1 then error("ambiguous release PRs") else .[0] // {} end')
+          NUMBER=$(jq -r '.number // empty' <<< "$PR")
+          STATE=$(jq -r '.state // empty' <<< "$PR")
+          if [ -z "$NUMBER" ]; then
+            cat > "$RUNNER_TEMP/release-pr-body.md" <<BODY
+          Prepare $VERSION from successful main Build $COMMIT_SHA.
+
+          Review VERSION and CHANGELOG.md, then merge this PR manually. A successful main Build after merge creates the immutable tag and publishes the release. Commit subjects are draft notes; edit them before merging as needed.
+          BODY
+            gh pr create --repo "$REPOSITORY" --head "$BRANCH" --base main \
+              --title "chore: release $VERSION" --label release --body-file "$RUNNER_TEMP/release-pr-body.md"
+          elif [ "$STATE" != 'OPEN' ]; then
+            echo "Preparation PR already $STATE; refusing to recreate or overwrite it."
+            exit 1
+          fi
+          # GITHUB_TOKEN-created PRs do not emit CI events. Dispatch Build explicitly
+          # on the existing branch, with checkout pinned to its immutable current SHA.
+          PREP_SHA=$(gh api "repos/${REPOSITORY}/git/ref/heads/$BRANCH" --jq '.object.sha')
+          gh workflow run build.yml --repo "$REPOSITORY" --ref "$BRANCH" -f source_sha="$PREP_SHA"
+      - name: Publish reviewed release metadata
+        id: publish
+        if: steps.plan.outputs.mode == 'publish'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          COMMIT_SHA: ${{ github.event.workflow_run.head_sha }}
+          VERSION: ${{ steps.plan.outputs.version }}
+        run: |
+          set -euo pipefail
+          [ "$(cat VERSION)" = "$VERSION" ] || { echo 'Release title and VERSION differ'; exit 1; }
+          awk -v version="${VERSION#v}" '
+            /^## \[/ { if (index($0, "## [" version "] - ") == 1) count++ }
+            END { exit count != 1 }
+          ' CHANGELOG.md || { echo 'Expected exactly one matching dated changelog section'; exit 1; }
+          [ "$(gh api "repos/${REPOSITORY}/branches/main" --jq '.commit.sha')" = "$COMMIT_SHA" ] || { echo 'Main advanced; skip stale publication'; exit 1; }
+          "$RUNNER_TEMP/sentinel-release-tools" release --repository "$REPOSITORY" --version "$VERSION" --ref "$COMMIT_SHA"
+          echo 'release=true' >> "$GITHUB_OUTPUT"
   release:
     needs: version
     if: needs.version.outputs.release == 'true'
