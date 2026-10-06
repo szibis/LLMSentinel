@@ -1,6 +1,7 @@
 package release
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -70,29 +71,11 @@ func shellDecision(t *testing.T, file, name string, settings map[string]string) 
 }
 
 func TestWorkflowReleaseDecisions(t *testing.T) {
-	for _, tc := range []struct{ title, bump string }{{"", "none"}, {"docs: improve setup", "none"}, {"deps: update", "none"}, {"fix: release", "patch"}, {"feat: roles", "minor"}, {"feat!: API", "major"}, {`fix: $(exit 77) "quotes"`, "patch"}} {
-		t.Run(tc.title, func(t *testing.T) {
-			output, _ := shellDecision(t, "auto-release.yml", "Select release-worthy merged PR", map[string]string{"MOCK_TITLE": tc.title})
-			if output != "bump="+tc.bump+"\n" {
-				t.Fatal(output)
-			}
-		})
-	}
 	for _, tc := range []struct{ sha, current string }{{"abc", "true"}, {"newer", "false"}} {
 		output, _ := shellDecision(t, "auto-release.yml", "Check current main", map[string]string{"MOCK_MAIN": tc.sha})
 		if output != "current="+tc.current+"\n" {
 			t.Fatal(output)
 		}
-	}
-	for _, tc := range []struct{ bump, current, next string }{{"patch", "v4.2.9", "v4.2.10"}, {"minor", "v4.2.9", "v4.3.0"}, {"major", "v4.2.9", "v5.0.0"}, {"patch", "", "v0.0.1"}} {
-		output, calls := shellDecision(t, "auto-release.yml", "Calculate and create version tag", map[string]string{"BUMP": tc.bump, "MOCK_EXISTING": "", "MOCK_LATEST": tc.current})
-		if !strings.Contains(output, "version="+tc.next+"\n") || !strings.Contains(calls, "push origin "+tc.next) {
-			t.Fatal(output, calls)
-		}
-	}
-	output, calls := shellDecision(t, "auto-release.yml", "Calculate and create version tag", map[string]string{"BUMP": "patch", "MOCK_EXISTING": "v4.2.9", "MOCK_LATEST": "v4.2.9"})
-	if output != "version=v4.2.9\nrelease=true\n" || calls != "" {
-		t.Fatal(output, calls)
 	}
 	for _, version := range []string{"v4.2.9", "v4.3.0"} {
 		for _, name := range []string{"Promote newest semantic version to latest", "Publish release binaries"} {
@@ -140,5 +123,57 @@ func TestJobCacheCleanupPreservesHostCache(t *testing.T) {
 	}
 	if body, err := os.ReadFile(keep); err != nil || string(body) != "host cache" {
 		t.Fatal("host cache changed", err)
+	}
+}
+
+func TestPreparationWorkflowReusesBranchAndDispatchesPinnedBuild(t *testing.T) {
+	for _, existing := range []bool{false, true} {
+		t.Run(map[bool]string{false: "first run", true: "rerun"}[existing], func(t *testing.T) {
+			root := t.TempDir()
+			calls := filepath.Join(root, "calls")
+			tools := map[string]string{
+				"gh": `#!/bin/bash
+set -eu
+printf 'gh %s\n' "$*" >> "$MOCK_CALLS"
+case "$*" in
+ *matching-refs/tags/v*) echo v3.5.0 ;;
+ *branches/main*) echo "$COMMIT_SHA" ;;
+ 'pr list '*) if [ "$EXISTING" = true ]; then echo '{"number":47,"state":"OPEN"}'; else echo '{}'; fi ;;
+ *git/ref/heads/release/v3.6.0*) echo bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb ;;
+esac
+`,
+				"git": `#!/bin/bash
+set -eu
+printf 'git %s\n' "$*" >> "$MOCK_CALLS"
+case "$*" in
+ 'log '*) echo 'feat: roles' ;;
+ 'ls-remote '*) if [ "$EXISTING" = true ]; then echo 'bbbb refs/heads/release/v3.6.0'; fi ;;
+esac
+`,
+				"sentinel-release-tools": "#!/bin/sh\necho v3.6.0\n",
+			}
+			for name, body := range tools {
+				if err := os.WriteFile(filepath.Join(root, name), []byte(body), 0700); err != nil { // #nosec G306 -- Private executable workflow test doubles.
+					t.Fatal(err)
+				}
+			}
+			cmd := exec.Command("bash", "-e", "-o", "pipefail", "-c", workflowScript(t, "auto-release.yml", "Prepare reviewable release PR")) // #nosec G204 -- Checked-in shell runs against private command doubles.
+			cmd.Dir = root
+			cmd.Env = append(os.Environ(), "PATH="+root+string(os.PathListSeparator)+os.Getenv("PATH"), "RUNNER_TEMP="+root, "MOCK_CALLS="+calls, "REPOSITORY=example/Sentinel", "COMMIT_SHA="+strings.Repeat("a", 40), "BUMP=minor", fmt.Sprintf("EXISTING=%t", existing))
+			if result, err := cmd.CombinedOutput(); err != nil {
+				t.Fatalf("workflow failed: %v %s", err, result)
+			}
+			data, err := os.ReadFile(calls)
+			if err != nil {
+				t.Fatal(err)
+			}
+			operations := string(data)
+			if strings.Contains(operations, "git push") == existing || strings.Contains(operations, "gh pr create") == existing || strings.Contains(operations, "--force") && strings.Contains(operations, "git push --force") {
+				t.Fatal(operations)
+			}
+			if !strings.Contains(operations, "gh workflow run build.yml --repo example/Sentinel --ref release/v3.6.0 -f source_sha="+strings.Repeat("b", 40)) {
+				t.Fatal("dispatch did not pin the preparation commit", operations)
+			}
+		})
 	}
 }

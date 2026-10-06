@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [Unreleased]
+
+### Recent work recovered from merged commit subjects
+
+The entries below summarize changes recorded after the last maintained section;
+they do not reconstruct release dates or claim new benchmark results.
+
+- Added Go client adapters, hybrid routing, learning controls, and local lab tools.
+- Converted Sentinel client and lab tooling to Go and isolated CI caches on the Metal runner.
+- Added real Qwen Metal checks to CI and release workflows.
+- Added live backend dashboard telemetry, history, and refresh improvements.
+- Preserved runtime counters alongside native generation metadata and added measured cache statistics.
+- Added recovery for repeated lookups and unfinished agent answers.
+- Added Gemma and LFM role adapters.
+- Prepare reviewed release PRs with VERSION and changelog notes before publishing from successful main CI.
+
 ## [0.7.0] - 2026-04-27
 
 ### 🚀 Batch API + Production-Grade Hardening
