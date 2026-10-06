@@ -1,6 +1,7 @@
 package localgateway
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -28,7 +29,7 @@ func (g *Gateway) roleBudget(role string, fallback int) int {
 func (g *Gateway) controlStatus() map[string]any {
 	budgets := map[string]int{}
 	for _, role := range []string{"haiku", "sonnet", "opus"} {
-		route, _ := (RoleRouter{}).Select(nil, RouteTask{Model: role})
+		route, _ := (RoleRouter{}).Select(context.Background(), RouteTask{Model: role})
 		budgets[role] = g.roleBudget(role, route.MaxTokens)
 	}
 	policy := "local-only"

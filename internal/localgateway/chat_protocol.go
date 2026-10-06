@@ -52,7 +52,7 @@ func prepareChatProtocol(req chatProtocolRequest, roles bool, budget int) (claud
 		text := ""
 		if len(m.Content) > 0 && string(m.Content) != "null" {
 			if json.Unmarshal(m.Content, &text) != nil {
-				return claudeRequest{}, nil, errors.New("Chat Completions supports text content only")
+				return claudeRequest{}, nil, errors.New("chat completions supports text content only")
 			}
 		}
 		switch m.Role {

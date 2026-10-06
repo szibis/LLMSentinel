@@ -1,6 +1,6 @@
 # Capture normal Claude Code and Codex sessions
 
-Learning mode keeps the original CLI connected directly to Anthropic or OpenAI. An optional local hook copies conversation evidence to a private JSONL spool, then optionally to Sentinel's learning collector. It never changes authentication, model/provider selection, subscription routing, or provider base URLs, and it never makes another commercial model request. Serving mode is a separate future CLI → Sentinel → local model route.
+Learning mode keeps the original CLI connected directly to Anthropic or OpenAI. An optional local hook copies conversation evidence to a private JSONL spool, then optionally to Sentinel's learning collector. It never changes authentication, model/provider selection, subscription routing, or provider base URLs, and it never makes another commercial model request. Serving is the separate CLI → Sentinel → local model route. Start with the [mode guide](client-modes.md) to choose the path.
 
 Nothing is enabled or installed automatically. No global CLI configuration or running lab session is modified. `scripts/sentinel_capture.py` uses Python's standard library; it does not require credentials.
 

@@ -174,7 +174,7 @@ func validatePatchSyntax(patch string) error {
 			}
 			if i < len(lines)-1 && lines[i] == "*** End of File" {
 				if !changed {
-					return errors.New("End of File requires a change")
+					return errors.New("end of file requires a change")
 				}
 				i++
 			}

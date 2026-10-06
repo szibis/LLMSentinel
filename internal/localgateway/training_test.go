@@ -112,7 +112,7 @@ func TestTrainingRejectsSymlinksAndPublicFiles(t *testing.T) {
 						t.Fatal(err)
 					}
 				} else {
-					if err := os.WriteFile(filepath.Join(dir, "training.jsonl"), nil, 0644); err != nil {
+					if err := os.WriteFile(filepath.Join(dir, "training.jsonl"), nil, 0644); err != nil { // #nosec G306 -- Intentionally public fixture must be rejected by the private recorder.
 						t.Fatal(err)
 					}
 				}
