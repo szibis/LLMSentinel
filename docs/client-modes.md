@@ -86,7 +86,7 @@ decode tokens. Existing model metadata warnings can still appear in Codex.
 Build and start a separate collector; it needs no model runtime or provider key:
 
 ```sh
-rtk make gateway-build
+rtk make gateway-build tools-build
 rtk ./bin/sentinel-gateway --listen 127.0.0.1:19094 \
   --mode learning --training-dir /private/tmp/sentinel-reference-data
 ```

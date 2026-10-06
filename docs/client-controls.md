@@ -5,6 +5,7 @@
 From the repository root:
 
 ```sh
+rtk make tools-build
 rtk bin/sentinel-tools control status
 rtk bin/sentinel-tools control training off
 rtk bin/sentinel-tools control training on
