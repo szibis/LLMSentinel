@@ -2,6 +2,7 @@
 package labstatus
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -23,12 +24,34 @@ import (
 
 const maxBytes = 65536
 
+// RuntimeStats keeps numeric counters while tolerating native metadata extensions.
+type RuntimeStats map[string]float64
+
+func (s *RuntimeStats) UnmarshalJSON(raw []byte) error {
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &fields); err != nil {
+		return err
+	}
+	counters := RuntimeStats{}
+	for name, value := range fields {
+		if bytes.Equal(bytes.TrimSpace(value), []byte("null")) {
+			continue
+		}
+		var number float64
+		if json.Unmarshal(value, &number) == nil && !math.IsNaN(number) && !math.IsInf(number, 0) {
+			counters[name] = number
+		}
+	}
+	*s = counters
+	return nil
+}
+
 type Runtime struct {
-	ModelLoaded bool               `json:"model_loaded"`
-	Model       string             `json:"model"`
-	Stats       map[string]float64 `json:"stats"`
-	Memory      map[string]any     `json:"memory,omitempty"`
-	Endpoint    string             `json:"endpoint,omitempty"`
+	ModelLoaded bool           `json:"model_loaded"`
+	Model       string         `json:"model"`
+	Stats       RuntimeStats   `json:"stats"`
+	Memory      map[string]any `json:"memory,omitempty"`
+	Endpoint    string         `json:"endpoint,omitempty"`
 }
 type Snapshot struct {
 	SampleTime        float64             `json:"sample_time"`
