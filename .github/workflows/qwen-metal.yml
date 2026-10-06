@@ -117,4 +117,7 @@ jobs:
         shell: bash
         run: |
           if [ -n "${QWEN_JOB_VENV:-}" ]; then rm -rf -- "$QWEN_JOB_VENV"; fi
-          if [ -n "${QWEN_JOB_GO_ROOT:-}" ]; then rm -rf -- "$QWEN_JOB_GO_ROOT"; fi
+          if [ -n "${QWEN_JOB_GO_ROOT:-}" ] && [ -d "$QWEN_JOB_GO_ROOT" ]; then
+            chmod -R u+w "$QWEN_JOB_GO_ROOT"
+            rm -rf -- "$QWEN_JOB_GO_ROOT"
+          fi
