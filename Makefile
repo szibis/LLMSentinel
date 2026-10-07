@@ -32,6 +32,10 @@ lab-quality: tools-build
 lab-cli-quality: tools-build
 	$(TOOLS) cli-quality --root $(abspath .sentinel-lab)
 
+.PHONY: lab-cli-quality-all
+lab-cli-quality-all: tools-build
+	$(TOOLS) cli-quality --root $(abspath .sentinel-lab) --role all --timeout 6m
+
 lab-run: lab-start
 
 lab-start: gateway-build tools-build

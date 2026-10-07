@@ -4,12 +4,13 @@ Run against an already serving local lab with its isolated clients installed:
 
 ```sh
 rtk make lab-cli-quality
+rtk make lab-cli-quality-all
 rtk ./bin/sentinel-tools cli-quality --root "$PWD/.sentinel-lab" --client claude --role sonnet
 rtk ./bin/sentinel-tools cli-quality --root "$PWD/.sentinel-lab" --client codex --role haiku --task exact-read
 ```
 
 Defaults: both clients, Sonnet, four tasks, three minutes per task. Options include
-`--client claude|codex|both`, `--role haiku|sonnet|opus`, `--task exact-read|coding-fix|loki-evidence|planning|all`
+`--client claude|codex|both`, `--role haiku|sonnet|opus|all`, `--task exact-read|coding-fix|loki-evidence|planning|all`
 and `--timeout 90s` (maximum ten minutes). Exit 0 means all selected tasks passed;
 1 means task or operational failure; 2 means invalid options. Runs are sequential,
 consume local inference capacity and share the lab with interactive work.
@@ -21,6 +22,10 @@ Inherited credentials, proxies and client configuration are excluded. The gatewa
 must report local-only serving with paid API opt-in disabled. No commercial API
 request is part of this benchmark.
 
+`lab-cli-quality-all` runs 24 cases: four tasks for each role in each client,
+with six minutes allowed per task. It writes one combined report, preserving
+the same strict assertions used by single-role runs.
+
 Claude uses headless stream JSON, fixed tools and scoped permissions. Successful
 tool results are correlated with their calls; a tool proposal alone does not prove
 execution. See [Claude headless operation](https://code.claude.com/docs/en/headless)
@@ -28,6 +33,59 @@ and [permission modes](https://code.claude.com/docs/en/permissions).
 Codex uses ephemeral `exec --json`, workspace-write and approval policy `never`;
 the harness requires completed command results and a completed turn. See
 [Codex noninteractive operation](https://developers.openai.com/codex/noninteractive/).
+
+Fresh Codex profiles include a local model catalog for the Sentinel aliases.
+It declares native `unified_exec` and freeform `apply_patch`, text-only input,
+and a conservative 32K client context. This exposes the client's actual edit
+tool instead of unknown-model fallback metadata. It does not assert commercial
+model identity, runtime context capacity, web access or reasoning-summary support.
+The catalog schema and edit grammar are checked against
+[Codex 0.160.1 model metadata](https://github.com/openai/codex/blob/rust-v0.160.1/codex-rs/protocol/src/openai_models.rs)
+and its [patch grammar](https://github.com/openai/codex/blob/rust-v0.160.1/codex-rs/core/assets/tools/apply_patch.lark).
+Interactive lab preparation adds the catalog setting when absent and preserves
+an explicit custom catalog, approval policy and sandbox setting.
+Generated Codex profiles also supply a session header, using a fresh identity
+for every lab launch or probe workspace. Explicit custom HTTP headers remain
+user-owned. This enables session-scoped local routing and prompt reuse without
+sharing identities between fresh launches.
+
+For the LFM small-model lab, `--haiku-tool-role sonnet` admits Haiku requests
+with tool definitions to Gemma while preserving the Haiku alias and 1,024-token
+cap. This includes plain-answer tasks when the client advertises tools. Requests
+without tool definitions still use LFM. Set `haiku_tool_role` in saved
+`runtime.json` to `haiku` to disable this admission, or explicitly choose
+`sonnet` or `opus`. Standalone gateways default to no override; the lab's
+automatic override applies only to `lfm2_moe`, leaving Qwen unchanged.
+The control API reports `haiku_tool_role`; activity shows actual backend routes.
+This policy does not establish standalone LFM native-agent quality.
+
+The two-model lab enables `--local-role-recovery`. After a pinned correction
+fails, one extra local generation may use Sonnet for Haiku, or Opus for Sonnet;
+Opus can make one fresh bounded retry. Truncated private candidates never enter
+fallback history. The original alias and token cap remain in effect. A successful
+recovery retains the stronger route for that identified session for 20 minutes;
+new sessions begin with their configured role admission. This in-memory routing table holds
+at most 256 entries and clears on restart. Requests without a session identity
+do not retain routing. The dashboard records actual routes and the control API
+reports `local_escalation_attempts`. Standalone gateways leave recovery disabled
+unless explicitly enabled. This recovery does not call commercial providers.
+
+Tool evidence separates file contents from error status. Read-tool line numbers
+are described as display metadata, and native unchanged-file notices stop
+repeated reads. Failed combined file reads preserve partial output but explicitly
+require successful individual reads before editing. Native command headers are
+separate execution metadata, so stdout cannot masquerade as exit status.
+An explicit request to return file contents exactly also checks the final text
+against a completed, unambiguous native single-file `cat` result (ignoring outer
+whitespace). A mismatch requests correction from existing evidence; Sentinel
+does not substitute an answer. Explicit directory paths must match, and failed,
+ongoing or multi-file commands do not establish evidence for this check.
+Gemma's cached native declarations/call/response syntax is used
+instead of prompting its parser with a generic JSON tool envelope; LFM keeps the
+JSON envelope and Qwen keeps its existing native format. Format checks require explicit JSON finals;
+test-completion checks distinguish native ongoing sessions from completed test
+commands and their `write_stdin` results. These are narrow observable checks,
+not a semantic guarantee that a model's answer or code is correct.
 
 | Task | Required evidence |
 | --- | --- |
@@ -97,3 +155,27 @@ generation and final-answer failures. These are one-run observations under
 shared local load, not stable success rates. The earlier API-only Sonnet 8/8
 result does not establish native CLI success. Recovery fixes are separate work;
 this benchmark preserves failures and does not silently retry on commercial models.
+
+## Native role policy verification — October 8, 2026
+
+A combined run completed at `2026-10-07T22:22:01Z` (October 8 locally), using
+Claude Code 2.1.291 and Codex 0.160.1 with the same four task assertions:
+
+| Alias | Claude Code | Codex | Total |
+| --- | --- | --- | --- |
+| Haiku | 4/4 | 4/4 | 8/8 |
+| Sonnet | 4/4 | 4/4 | 8/8 |
+| Opus | 4/4 | 4/4 | 8/8 |
+
+All 24 bounded native tasks passed, following another 24/24 run completed at
+`2026-10-07T22:14:39Z`. Tool-bearing Haiku requests used the explicit
+Sonnet/Gemma admission policy with the Haiku cap. Sonnet used Gemma without
+thinking, and Opus used Gemma with thinking. These are observed task outcomes,
+not stable success-rate estimates or standalone LFM agent-quality certification.
+Earlier failed runs remain archived locally. CLI usage remains unreconciled;
+no commercial token savings or cost is inferred from these outcomes.
+
+A separate offline `smoke --integration-proofs` run using the rebuilt gateway
+passed 36 API, required-tool, continuation, telemetry and native cache checks
+against the cached LFM and Gemma models. Those basic API contracts are separate
+from native agent task quality; they do not certify LFM for the native task set.

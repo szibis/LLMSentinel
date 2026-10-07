@@ -135,6 +135,16 @@ eof_line: "*** End of File" LF
 %import common.LF
 `
 
+func patchGrammarRules(grammar string) string {
+	var rules []string
+	for _, line := range strings.Split(grammar, "\n") {
+		if rule := strings.TrimSpace(line); rule != "" {
+			rules = append(rules, rule)
+		}
+	}
+	return strings.Join(rules, "\n")
+}
+
 // validatePatchSyntax recognizes the advertised grammar without touching files.
 // Applying hunks to existing text remains Codex's responsibility.
 func validatePatchSyntax(patch string) error {
@@ -179,7 +189,7 @@ func validatePatchSyntax(patch string) error {
 				i++
 			}
 		default:
-			return errors.New("invalid apply_patch hunk syntax")
+			return errors.New("invalid apply_patch hunk syntax: use *** Update File: path followed by @@ and -old/+new lines; do not use unified diff ---/+++ file headers")
 		}
 	}
 	if hunks == 0 {
@@ -256,10 +266,10 @@ func prepareResponses(req responsesRequest, roleEndpoints bool, defaultBudget in
 	}
 	for _, tool := range flatTools {
 		if tool.Type == "custom" {
-			if tool.Name != "apply_patch" || tool.Format == nil || tool.Format.Type != "grammar" || tool.Format.Syntax != "lark" || strings.TrimSpace(tool.Format.Definition) != strings.TrimSpace(canonicalPatchGrammar) {
+			if tool.Name != "apply_patch" || tool.Format == nil || tool.Format.Type != "grammar" || tool.Format.Syntax != "lark" || patchGrammarRules(tool.Format.Definition) != patchGrammarRules(canonicalPatchGrammar) {
 				return converted, nil, errors.New("only the canonical single-environment Codex apply_patch custom grammar is supported")
 			}
-			converted.Tools = append(converted.Tools, claudeTool{Name: tool.qualifiedName(), Description: tool.Description + " Supply raw patch text in the required input string argument. It must start with *** Begin Patch, then Add File/Delete File/Update File hunks, and end with *** End Patch, each on its own line. Added file content lines start with +. Update content lines start with +, -, or a space; optional context lines start with @@.", Schema: map[string]any{"type": "object", "properties": map[string]any{"input": map[string]any{"type": "string"}}, "required": []any{"input"}, "additionalProperties": false}})
+			converted.Tools = append(converted.Tools, claudeTool{Name: tool.qualifiedName(), Description: tool.Description + " Supply raw patch text in the required input string argument. It must start with *** Begin Patch, then Add File/Delete File/Update File hunks, and end with *** End Patch, each on its own line. Added file content lines start with +. Update content lines start with +, -, or a space; optional context lines start with @@. This is NOT unified diff: never use ---/+++ file headers. Example structure: *** Begin Patch\n*** Update File: path\n@@\n-old text\n+new text\n*** End Patch\n. Supply actual newlines in the decoded input string.", Schema: map[string]any{"type": "object", "properties": map[string]any{"input": map[string]any{"type": "string"}}, "required": []any{"input"}, "additionalProperties": false}})
 			continue
 		}
 		if tool.Type != "function" {
@@ -393,6 +403,12 @@ func prepareResponses(req responsesRequest, roleEndpoints bool, defaultBudget in
 			}
 			calls++
 			for _, tool := range flatTools {
+				properties, _ := tool.Parameters["properties"].(map[string]any)
+				if tool.qualifiedName() == block.Name && tool.Name == "exec_command" && properties["justification"] != nil && properties["sandbox_permissions"] != nil {
+					if _, present := block.Input["justification"]; present && block.Input["sandbox_permissions"] != "require_escalated" {
+						return invalidOutput("exec_command justification requires sandbox_permissions=require_escalated; omit justification for ordinary workspace reads, edits and tests")
+					}
+				}
 				if tool.qualifiedName() != block.Name || tool.Type != "custom" {
 					continue
 				}

@@ -9,6 +9,29 @@ import (
 	"testing"
 )
 
+func TestModelJSONFailurePreservesParserDiagnosis(t *testing.T) {
+	_, err := normalizeModelOutput(claudeRequest{}, `{"text":"","tool_calls":[{"name":"Read","input":{"file_path":"a.txt"}}}]}`)
+	if err == nil || !strings.Contains(err.Error(), "after array element") {
+		t.Fatalf("correction lost syntax diagnosis: %v", err)
+	}
+}
+
+func TestActionPreambleCanPrecedeCompleteToolEnvelope(t *testing.T) {
+	envelope := `{"text":"","tool_calls":[{"name":"Read","input":{"file_path":"a.txt"}}]}`
+	for _, raw := range []string{"I'll read the file.\n" + envelope, "I'll start by reading the file.\n\n```json\n" + envelope + "\n```"} {
+		out, err := normalizeModelOutput(claudeRequest{JSONTools: true}, raw)
+		if err != nil || len(out.Calls) != 1 || out.Calls[0].Input["file_path"] != "a.txt" {
+			t.Fatalf("complete prefaced call lost: %+v %v", out, err)
+		}
+	}
+	for _, raw := range []string{"Here is an example:\n" + envelope, "I'll show an example:\n" + envelope, "I'll read the file.\n" + envelope + " extra text"} {
+		out, err := normalizeModelOutput(claudeRequest{JSONTools: true}, raw)
+		if err == nil && len(out.Calls) > 0 {
+			t.Fatal("example or trailing prose executed")
+		}
+	}
+}
+
 func TestModelOutputTranslationDoesNotDependOnClientModelAlias(t *testing.T) {
 	for _, model := range []string{"sentinel-sonnet", "local", "another-model"} {
 		req := claudeRequest{Model: model, JSONTools: true, Tools: []claudeTool{{Name: "Read", Schema: map[string]any{"type": "object"}}}}

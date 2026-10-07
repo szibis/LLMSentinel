@@ -64,8 +64,19 @@ func finalRoleText(text string, thinking bool, format ...string) (string, error)
 	}
 	before, after, complete := strings.Cut(text, marker)
 	if complete {
-		if marker == "<channel|>" && strings.Contains(before, "<|channel>") && !strings.HasPrefix(strings.TrimSpace(before), "<|channel>thought\n") {
+		if marker == "<channel|>" && strings.Contains(before, "<|channel>") && !strings.HasPrefix(strings.TrimLeft(before, " \t\r\n"), "<|channel>thought\n") {
 			return "", invalidOutput("unsupported local reasoning channel")
+		}
+		// Some native continuations repeat the empty thought delimiter. Strip
+		// only complete, empty leading sections; never discard a second thought.
+		if marker == "<channel|>" {
+			for i := 0; i < 8; i++ {
+				candidate := strings.TrimSpace(after)
+				if !strings.HasPrefix(candidate, "<|channel>thought\n<channel|>") {
+					break
+				}
+				after = strings.TrimPrefix(candidate, "<|channel>thought\n<channel|>")
+			}
 		}
 		if strings.Contains(after, "<think") || strings.Contains(after, "</think") || strings.Contains(after, "<|channel") || strings.Contains(after, "<channel|") || strings.TrimSpace(after) == "" {
 			return "", invalidOutput("local reasoning did not complete; no partial answer or tool input accepted")

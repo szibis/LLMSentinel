@@ -342,7 +342,14 @@ func prepareCLI(run, workspace, client, endpoint string, f Fixture) error {
 			return err
 		}
 	} else {
+		catalogPath := filepath.Join(run, "codex", "model-catalog.json")
+		if err := os.WriteFile(catalogPath, clientcontrol.CodexModelCatalog(), 0600); err != nil {
+			return err
+		}
 		config := "model_provider = \"sentinel\"\napproval_policy = \"never\"\nsandbox_mode = \"workspace-write\"\nweb_search = \"disabled\"\ncli_auth_credentials_store = \"file\"\n\n[analytics]\nenabled = false\n\n[model_providers.sentinel]\nname = \"Sentinel CLI probe\"\nbase_url = " + strconv.Quote(endpoint+"/v1") + "\nenv_key = \"SENTINEL_LAB_TOKEN\"\nwire_api = \"responses\"\nrequires_openai_auth = false\nrequest_max_retries = 0\nstream_max_retries = 0\nstream_idle_timeout_ms = 120000\n"
+		config = "model_catalog_json = " + strconv.Quote(catalogPath) + "\n" + config
+		config += "\n" // The header belongs to the provider table, before its fields.
+		config = strings.Replace(config, "[model_providers.sentinel]\n", "[model_providers.sentinel]\nhttp_headers = { \"X-Session-ID\" = "+strconv.Quote(filepath.Base(run))+" }\n", 1)
 		if err := os.WriteFile(filepath.Join(run, "codex", "config.toml"), []byte(config), 0600); err != nil {
 			return err
 		}
@@ -590,16 +597,26 @@ func TestHeldOutAdd(t *testing.T) { for a:=-31;a<=31;a++ {for b:=-17;b<=17;b++ {
 }
 
 // RunCLI benchmarks real local CLIs without using the user's existing profiles.
+func cliRoles(role string) []string {
+	if role == "all" {
+		return []string{"haiku", "sonnet", "opus"}
+	}
+	if role == "haiku" || role == "sonnet" || role == "opus" {
+		return []string{role}
+	}
+	return nil
+}
+
 func RunCLI(args []string, _ io.Reader, out, stderr io.Writer) int {
 	flags := flag.NewFlagSet("cli-quality", flag.ContinueOnError)
 	flags.SetOutput(stderr)
 	root := flags.String("root", ".sentinel-lab", "existing isolated lab root")
 	base := flags.String("endpoint", "http://127.0.0.1:19090", "literal loopback gateway")
-	role := flags.String("role", "sonnet", "haiku, sonnet or opus")
+	role := flags.String("role", "sonnet", "haiku, sonnet, opus or all")
 	clientName := flags.String("client", "both", "claude, codex or both")
 	task := flags.String("task", "all", "all, exact-read, coding-fix, loki-evidence or planning")
 	timeout := flags.Duration("timeout", 3*time.Minute, "whole-task deadline")
-	if flags.Parse(args) != nil || flags.NArg() != 0 || !validEndpoint(*base) || (*role != "haiku" && *role != "sonnet" && *role != "opus") || (*clientName != "claude" && *clientName != "codex" && *clientName != "both") || *timeout <= 0 || *timeout > 10*time.Minute {
+	if flags.Parse(args) != nil || flags.NArg() != 0 || !validEndpoint(*base) || len(cliRoles(*role)) == 0 || (*clientName != "claude" && *clientName != "codex" && *clientName != "both") || *timeout <= 0 || *timeout > 10*time.Minute {
 		fmt.Fprintln(stderr, "invalid CLI probe options")
 		return 2
 	}
@@ -660,15 +677,17 @@ func RunCLI(args []string, _ io.Reader, out, stderr io.Writer) int {
 	defer stop()
 	passed := true
 outer:
-	for _, client := range clients {
-		for _, f := range selected {
-			fmt.Fprintf(out, "Checking real %s / %s / %s\n", client, *role, f.ID)
-			result := executeCLI(ctx, absolute, *base, *role, client, f, *timeout)
-			report.Results = append(report.Results, result)
-			passed = passed && result.Passed
-			fmt.Fprintf(out, "  pass=%t tools=%d latency=%dms %s\n", result.Passed, result.ToolCalls, result.LatencyMS, result.Failure)
-			if ctx.Err() != nil {
-				break outer
+	for _, selectedRole := range cliRoles(*role) {
+		for _, client := range clients {
+			for _, f := range selected {
+				fmt.Fprintf(out, "Checking real %s / %s / %s\n", client, selectedRole, f.ID)
+				result := executeCLI(ctx, absolute, *base, selectedRole, client, f, *timeout)
+				report.Results = append(report.Results, result)
+				passed = passed && result.Passed
+				fmt.Fprintf(out, "  pass=%t tools=%d latency=%dms %s\n", result.Passed, result.ToolCalls, result.LatencyMS, result.Failure)
+				if ctx.Err() != nil {
+					break outer
+				}
 			}
 		}
 	}

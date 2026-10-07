@@ -34,7 +34,8 @@ func TestQwenNativeCallsUseExistingArgumentAndToolChoiceValidation(t *testing.T)
 		status               int
 	}{
 		{"native", "Reading.\n<tool_call>\n<function=Read>\n<parameter=file_path>\n/tmp/test.txt\n</parameter>\n</function>\n</tool_call>", "auto", 200},
-		{"answer", "The requested inspection is complete.", "auto", 200},
+		{"answer", "I cannot inspect the file with the available evidence.", "auto", 200},
+		{"unsupported_inspection_claim", "The requested inspection is complete.", "auto", 422},
 		{"unknown", "<tool_call><function=Delete><parameter=file_path>/tmp/test.txt</parameter></function></tool_call>", "auto", 422},
 		{"missing", "<tool_call><function=Read></function></tool_call>", "auto", 422},
 		{"partial", "<tool_call><function=Read><parameter=file_path>/tmp/test.txt", "auto", 422},

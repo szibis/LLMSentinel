@@ -143,6 +143,15 @@ func TestNativePromptsNeverReferenceAPIFixtureTool(t *testing.T) {
 	}
 }
 
+func TestCLIRolesIncludesAllThreeProfiles(t *testing.T) {
+	if got := strings.Join(cliRoles("all"), ","); got != "haiku,sonnet,opus" {
+		t.Fatal(got)
+	}
+	if got := cliRoles("unknown"); len(got) != 0 {
+		t.Fatal(got)
+	}
+}
+
 func TestCommandReadRejectsShellTextThatOnlyMentionsFixture(t *testing.T) {
 	f := fixtures("fresh-marker")[0]
 	for _, command := range []string{

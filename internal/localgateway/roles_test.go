@@ -24,6 +24,10 @@ func TestReasoningNeverLeaksFromAnyRole(t *testing.T) {
 		{"<think>unfinished", "", false, true},
 		{"<|channel>thought\nprivate\n<channel|>answer", "answer", true, false},
 		{"<|channel>thought\nprivate\n<channel|>answer", "answer", false, false},
+		{"<|channel>thought\n<channel|>answer", "answer", true, false},
+		{"<|channel>thought\n<channel|>answer", "answer", false, false},
+		{"<|channel>thought\n<channel|><|channel>thought\n<channel|>answer", "answer", true, false},
+		{"<|channel>thought\n<channel|><|channel>thought\nprivate<channel|>answer", "", true, true},
 		{"<|channel>thought\nunfinished", "", false, true},
 		{"<|channel>thought\nprivate<channel|><|channel>analysis", "", true, true},
 	} {
@@ -208,7 +212,7 @@ func TestModelFamiliesUseAdvertisedThinkingAndJSONTools(t *testing.T) {
 				}
 				answer := `<think>private</think>{"text":"","tool_calls":[{"name":"Read","input":{"file_path":"hello.txt"}}]}`
 				if family == "gemma4" {
-					answer = "<|channel>thought\nprivate\n<channel|>" + `{"text":"","tool_calls":[{"name":"Read","input":{"file_path":"hello.txt"}}]}`
+					answer = "<|channel>thought\nprivate\n<channel|>" + `<|tool_call>call:Read{file_path:<|"|>hello.txt<|"|>}<tool_call|>`
 				}
 				json.NewEncoder(w).Encode(map[string]any{"choices": []any{map[string]any{"message": map[string]string{"content": answer}, "finish_reason": "stop"}}})
 			})
