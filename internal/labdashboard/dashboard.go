@@ -56,6 +56,10 @@ func newHandler(client *http.Client, snapshot func() (json.RawMessage, error)) h
 }
 
 func newHandlerWithQuality(client *http.Client, snapshot func() (json.RawMessage, error), quality func() json.RawMessage) http.Handler {
+	return newHandlerWithQualities(client, snapshot, quality, func() json.RawMessage { return nil })
+}
+
+func newHandlerWithQualities(client *http.Client, snapshot func() (json.RawMessage, error), quality, cliQuality func() json.RawMessage) http.Handler {
 	var snapshotMu sync.Mutex
 	var cachedTelemetry json.RawMessage
 	var cachedAt time.Time
@@ -96,7 +100,7 @@ func newHandlerWithQuality(client *http.Client, snapshot func() (json.RawMessage
 			history.record(telemetry, activity, now)
 			points, attempts := history.snapshot(now)
 			w.Header().Set("Content-Type", "application/json")
-			_ = json.NewEncoder(w).Encode(map[string]any{"sample_time": now.Format(time.RFC3339), "telemetry": telemetry, "gateway": gateway, "activity": activity, "history": points, "attempts": attempts, "history_window_seconds": int(historyWindow.Seconds()), "task_quality": quality()})
+			_ = json.NewEncoder(w).Encode(map[string]any{"sample_time": now.Format(time.RFC3339), "telemetry": telemetry, "gateway": gateway, "activity": activity, "history": points, "attempts": attempts, "history_window_seconds": int(historyWindow.Seconds()), "task_quality": quality(), "cli_task_quality": cliQuality()})
 		default:
 			http.NotFound(w, r)
 		}
@@ -133,7 +137,7 @@ func Run(args []string, _ io.Reader, out, stderr io.Writer) int {
 		}
 		return json.RawMessage(data.Bytes()), nil
 	}
-	server := &http.Server{Addr: *listen, Handler: newHandlerWithQuality(client, snapshot, func() json.RawMessage {
+	server := &http.Server{Addr: *listen, Handler: newHandlerWithQualities(client, snapshot, func() json.RawMessage {
 		report := taskquality.Load(absolute)
 		if report == nil {
 			return nil
@@ -141,6 +145,19 @@ func Run(args []string, _ io.Reader, out, stderr io.Writer) int {
 		for i := range report.Results {
 			report.Results[i].Exchanges = nil
 			report.Results[i].Final = ""
+		}
+		raw, _ := json.Marshal(report)
+		return raw
+	}, func() json.RawMessage {
+		report := taskquality.LoadCLI(absolute)
+		if report == nil {
+			return nil
+		}
+		for i := range report.Results {
+			report.Results[i].Exchanges = nil
+			report.Results[i].Final = ""
+			report.Results[i].CLIEvents = nil
+			report.Results[i].CLIStderr = ""
 		}
 		raw, _ := json.Marshal(report)
 		return raw

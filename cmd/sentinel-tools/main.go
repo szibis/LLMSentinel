@@ -18,7 +18,7 @@ import (
 
 func run(args []string, in io.Reader, out, stderr io.Writer) int {
 	if len(args) == 0 || args[0] == "--help" || args[0] == "help" {
-		fmt.Fprintln(out, "Usage: sentinel-tools <capture|control|statusline|dashboard|lab|runner|ci-lab|role-check|smoke|quality|release> [options]")
+		fmt.Fprintln(out, "Usage: sentinel-tools <capture|control|statusline|dashboard|lab|runner|ci-lab|role-check|smoke|quality|cli-quality|release> [options]")
 		return 0
 	}
 	var entry func([]string, io.Reader, io.Writer, io.Writer) int
@@ -45,6 +45,8 @@ func run(args []string, in io.Reader, out, stderr io.Writer) int {
 		entry = release.Run
 	case "quality":
 		entry = taskquality.Run
+	case "cli-quality":
+		entry = taskquality.RunCLI
 	default:
 		fmt.Fprintln(stderr, "unknown sentinel-tools command:", args[0])
 		return 2
