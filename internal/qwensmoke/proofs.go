@@ -148,8 +148,15 @@ func validateProofJSON(protocol string, d document, tool bool) (document, error)
 		return nil, err
 	}
 	if tool {
-		if stop != "tool_use" || len(calls) != 1 || text(calls[0]["id"]) == "" || calls[0]["name"] != "record_marker" || len(mapping(calls[0]["input"])) != 1 || mapping(calls[0]["input"])["marker"] != marker || strings.TrimSpace(answer.String()) != "" {
-			return nil, errors.New("required tool arguments or stop semantics mismatch")
+		call := document{}
+		if len(calls) == 1 {
+			call = calls[0]
+		}
+		args := mapping(call["input"])
+		stopOK, idOK, nameOK := stop == "tool_use", text(call["id"]) != "", call["name"] == "record_marker"
+		argsOK, textOK := len(args) == 1 && args["marker"] == marker, strings.TrimSpace(answer.String()) == ""
+		if !stopOK || len(calls) != 1 || !idOK || !nameOK || !argsOK || !textOK {
+			return nil, fmt.Errorf("required tool contract mismatch: stop_ok=%t calls=%d id_ok=%t name_ok=%t arguments_ok=%t text_empty=%t", stopOK, len(calls), idOK, nameOK, argsOK, textOK)
 		}
 	} else if stop != "end_turn" || len(calls) != 0 || strings.TrimSpace(answer.String()) != marker {
 		return nil, errors.New("final marker mismatch or reasoning leak")
