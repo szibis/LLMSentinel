@@ -91,6 +91,36 @@ func TestWorkflowReleaseDecisions(t *testing.T) {
 	}
 }
 
+func TestWorkflowMergedPRPaginationUsesSupportedCLIAndFlattensPages(t *testing.T) {
+	root := t.TempDir()
+	tools := map[string]string{
+		"gh": `#!/bin/sh
+case "$*" in *--slurp*--jq*|*--jq*--slurp*) echo unsupported >&2; exit 1 ;; esac
+printf '%s\n' '[[{"number":49,"merged":true}],[]]'
+`,
+		"go": "#!/bin/sh\ncp \"$MOCK_RELEASE_TOOL\" \"$3\"\n",
+		"release-tool": `#!/bin/sh
+jq -e 'length == 1 and .[0].number == 49' "$RUNNER_TEMP/release-prs.json" >/dev/null || exit 1
+printf '%s\n' '{"mode":"prepare","bump":"patch"}'
+`,
+	}
+	for name, body := range tools {
+		if err := os.WriteFile(filepath.Join(root, name), []byte(body), 0700); err != nil { // #nosec G306 -- Private executable fixture.
+			t.Fatal(err)
+		}
+	}
+	output := filepath.Join(root, "outputs")
+	cmd := exec.Command("bash", "-e", "-o", "pipefail", "-c", workflowScript(t, "auto-release.yml", "Select merged PR action")) // #nosec G204 -- Checked-in workflow with private command doubles.
+	cmd.Env = append(os.Environ(), "PATH="+root+string(os.PathListSeparator)+os.Getenv("PATH"), "RUNNER_TEMP="+root, "GITHUB_OUTPUT="+output, "REPOSITORY=example/Sentinel", "COMMIT_SHA=abc", "MOCK_RELEASE_TOOL="+filepath.Join(root, "release-tool"))
+	if result, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("workflow failed: %v %s", err, result)
+	}
+	values, err := os.ReadFile(output)
+	if err != nil || !strings.Contains(string(values), "mode=prepare\nbump=patch\n") {
+		t.Fatalf("incorrect release decision: %s %v", values, err)
+	}
+}
+
 func TestJobCacheCleanupPreservesHostCache(t *testing.T) {
 	root := t.TempDir()
 	cache := filepath.Join(root, "job-go-cache")
