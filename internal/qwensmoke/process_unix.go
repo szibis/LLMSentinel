@@ -14,7 +14,7 @@ import (
 )
 
 func machineLock(ctx context.Context, path string, timeout time.Duration) (func(), error) {
-	fd, err := unix.Open(path, unix.O_CREAT|unix.O_RDWR|unix.O_NOFOLLOW|unix.O_NONBLOCK, 0600)
+	fd, err := unix.Open(path, unix.O_CREAT|unix.O_RDWR|unix.O_NOFOLLOW|unix.O_NONBLOCK|unix.O_CLOEXEC, 0600)
 	if err != nil {
 		return nil, errors.New("cannot open shared Qwen CI lock")
 	}

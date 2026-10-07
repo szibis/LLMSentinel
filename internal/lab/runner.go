@@ -90,6 +90,14 @@ func preflightPorts(ports []int, timeout time.Duration) error {
 	}
 }
 func (e *environment) stop(wait bool) error {
+	return e.stopFor(wait, false)
+}
+func (e *environment) stopFor(wait, forCI bool) error {
+	if !forCI {
+		if err := e.cancelCIResume(); err != nil {
+			return err
+		}
+	}
 	if !running(e.root) {
 		fmt.Fprintln(e.out, "No owned lab is running.")
 		return nil
@@ -139,6 +147,14 @@ func (e *environment) start() error {
 		return err
 	}
 	defer control.Close()
+	if err := e.checkCIPause(); err != nil {
+		return err
+	}
+	return e.startLocked()
+}
+
+// startLocked serializes restoration and explicit user stops under control.
+func (e *environment) startLocked() error {
 	if running(e.root) {
 		fmt.Fprintln(e.out, "Lab already running; inspect make lab-status or explicitly rebuild.")
 		return nil
@@ -181,6 +197,9 @@ func (e *environment) start() error {
 	return errors.New("lab startup timed out; inspect make lab-logs")
 }
 func (e *environment) supervise() (result error) {
+	if err := e.checkCIPause(); err != nil {
+		return err
+	}
 	if err := e.prepare(); err != nil {
 		return err
 	}
@@ -189,6 +208,9 @@ func (e *environment) supervise() (result error) {
 		return err
 	}
 	defer lock.Close()
+	if err := e.checkCIPause(); err != nil {
+		return err
+	}
 	var settings runtimeSettings
 	path := filepath.Join(e.root, "runtime.json")
 	if err = readJSON(path, &settings); err != nil && !os.IsNotExist(err) {

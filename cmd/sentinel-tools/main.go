@@ -17,7 +17,7 @@ import (
 
 func run(args []string, in io.Reader, out, stderr io.Writer) int {
 	if len(args) == 0 || args[0] == "--help" || args[0] == "help" {
-		fmt.Fprintln(out, "Usage: sentinel-tools <capture|control|statusline|dashboard|lab|runner|role-check|smoke|release> [options]")
+		fmt.Fprintln(out, "Usage: sentinel-tools <capture|control|statusline|dashboard|lab|runner|ci-lab|role-check|smoke|release> [options]")
 		return 0
 	}
 	var entry func([]string, io.Reader, io.Writer, io.Writer) int
@@ -34,6 +34,8 @@ func run(args []string, in io.Reader, out, stderr io.Writer) int {
 		entry = lab.Run
 	case "runner":
 		entry = lab.RunRunner
+	case "ci-lab":
+		entry = lab.RunCI
 	case "role-check":
 		entry = qwensmoke.RunRoles
 	case "smoke":

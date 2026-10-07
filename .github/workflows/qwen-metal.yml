@@ -55,6 +55,8 @@ jobs:
     env:
       HF_HUB_OFFLINE: '1'
       TRANSFORMERS_OFFLINE: '1'
+      SENTINEL_CI_PROJECT_ROOT: ${{ vars.SENTINEL_CI_PROJECT_ROOT }}
+      SENTINEL_CI_LAB_ROOT: ${{ vars.SENTINEL_CI_LAB_ROOT }}
     steps:
       - uses: actions/checkout@v5
         with:
