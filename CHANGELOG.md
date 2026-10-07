@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.5.1] - 2026-10-07
+
 ### Recent work recovered from merged commit subjects
 
 The entries below summarize changes recorded after the last maintained section;
@@ -22,6 +24,14 @@ they do not reconstruct release dates or claim new benchmark results.
 - Added recovery for repeated lookups and unfinished agent answers.
 - Added Gemma and LFM role adapters.
 - Prepare reviewed release PRs with VERSION and changelog notes before publishing from successful main CI.
+
+### Commit subjects since v3.5.0
+
+- feat: add Gemma/LFM role adapters and measured cache dashboard stats (#46)
+- fix: prepare tracked release changelogs and audit advertised features (#47)
+- fix: pin compatible MLX and gate client integration contracts (#48)
+- fix: normalize model tools and preserve CLI features (#49)
+- fix: use supported API pagination in automatic releases (#50)
 
 ## [0.7.0] - 2026-04-27
 
