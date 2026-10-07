@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.5.2] - 2026-10-07
+
+### Commit subjects since v3.5.1
+
+- chore(deps-dev): bump vite (#51)
+- fix: build Vite 8 and publish tested release commits after newer merges (#53)
+
 ## [3.5.1] - 2026-10-07
 
 ### Recent work recovered from merged commit subjects
