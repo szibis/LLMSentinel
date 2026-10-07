@@ -14,6 +14,16 @@ func messageFixture() document {
 	return document{"type": "message", "role": "assistant", "id": "msg_test", "content": []any{document{"type": "text", "text": marker}}, "stop_reason": "end_turn", "usage": document{"input_tokens": float64(12), "output_tokens": float64(4)}}
 }
 
+func TestRequiredToolFailureDiagnosticsDoNotPersistBackendText(t *testing.T) {
+	d := messageFixture()
+	d["stop_reason"] = "tool_use"
+	d["content"] = []any{document{"type": "text", "text": "PRIVATE_BACKEND_TEXT"}, document{"type": "tool_use", "id": "call_test", "name": "PRIVATE_TOOL_NAME", "input": document{"marker": "PRIVATE_ARGUMENT"}}}
+	_, err := validateProofJSON("messages", d, true)
+	if err == nil || !strings.Contains(err.Error(), "name_ok=false") || !strings.Contains(err.Error(), "arguments_ok=false") || !strings.Contains(err.Error(), "text_empty=false") || strings.Contains(err.Error(), "PRIVATE_") {
+		t.Fatalf("missing or unsafe failure diagnostics: %v", err)
+	}
+}
+
 func TestProofJSONRejectsBrokenContracts(t *testing.T) {
 	for _, tc := range []struct {
 		name   string

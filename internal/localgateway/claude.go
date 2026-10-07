@@ -121,6 +121,8 @@ func claudeError(w http.ResponseWriter, status int, message string) {
 }
 
 type modelOutputError struct {
+	recoverable   bool
+	usageKnown    bool
 	message, raw  string
 	quality       string
 	input, output int
@@ -414,7 +416,7 @@ func (g *Gateway) inferClaude(ctx context.Context, req claudeRequest, messages [
 	response, err := g.inferClaudeOnce(ctx, req, messages, route)
 	// The same operator budget and route remain pinned across a correction.
 	var output *modelOutputError
-	if !errors.As(err, &output) || output.raw == "" || ctx.Err() != nil {
+	if !errors.As(err, &output) || (!output.recoverable && output.raw == "") || ctx.Err() != nil {
 		return response, err
 	}
 	// Correct formatting once; never guess arguments or execute malformed tools.
@@ -428,6 +430,9 @@ func (g *Gateway) inferClaude(ctx context.Context, req claudeRequest, messages [
 		correction = "Your previous tool-call format was invalid. Use complete <tool_call><function=NAME><parameter=ARG>VALUE</parameter></function></tool_call> blocks with only defined names and valid required arguments. No text after calls. If no tool is needed, answer normally in plain text. Do not invent tool results."
 	}
 	corrected := append([]map[string]string(nil), messages...)
+	if output.quality == "" {
+		correction += " Validation failure: " + output.message + ". Follow the original tool-choice policy; when a tool is required, return that tool rather than a text-only answer."
+	}
 	if output.quality != "" {
 		g.qualityRecoveries.Add(1)
 		correction = "Your previous response failed the progress check (" + output.quality + "): it repeated unchanged evidence or gave an unfinished final answer. " + agentProgressInstruction + " Produce a usable answer now, or a specific honest limitation/clarification. Do not repeat the rejected lookup."
@@ -437,6 +442,7 @@ func (g *Gateway) inferClaude(ctx context.Context, req claudeRequest, messages [
 		map[string]string{"role": "user", "content": correction})
 	response, err = g.inferClaudeOnce(ctx, req, corrected, route)
 	if err == nil {
+		response.UsageKnown = response.UsageKnown && output.usageKnown
 		response.Usage["input_tokens"] += output.input
 		response.Usage["output_tokens"] += output.output
 	}
@@ -543,6 +549,10 @@ func (g *Gateway) inferClaudeOnce(ctx context.Context, req claudeRequest, messag
 	if err != nil {
 		return claudeResponse{}, err
 	}
+	toolFailure := func(message string) error {
+		event.Quality["output_validation_error"] = message
+		return &modelOutputError{recoverable: true, usageKnown: inputKnown && outputReported, message: message, raw: choice.Message.Content, input: completion.Usage.Input, output: completion.Usage.Output}
+	}
 	if len(req.Tools) == 0 {
 		blocks = append(blocks, claudeBlock{Type: "text", Text: choice.Message.Content})
 	} else {
@@ -553,10 +563,10 @@ func (g *Gateway) inferClaudeOnce(ctx context.Context, req claudeRequest, messag
 		envelope, decodeErr := decodeToolOutput(req, text)
 		if decodeErr != nil {
 			event.Quality["output_format_error"] = decodeErr.Error()
-			return claudeResponse{}, &modelOutputError{message: "local model returned invalid tool-call format; no tools were executed", raw: choice.Message.Content, input: completion.Usage.Input, output: completion.Usage.Output}
+			return claudeResponse{}, &modelOutputError{recoverable: true, usageKnown: inputKnown && outputReported, message: "local model returned invalid tool-call format; no tools were executed: " + decodeErr.Error(), raw: choice.Message.Content, input: completion.Usage.Input, output: completion.Usage.Output}
 		}
 		if len(envelope.Calls) > 8 {
-			return claudeResponse{}, invalidOutput("too many tool calls in one turn")
+			return claudeResponse{}, toolFailure("too many tool calls in one turn")
 		}
 		if envelope.Text != "" {
 			blocks = append(blocks, claudeBlock{Type: "text", Text: envelope.Text})
@@ -568,27 +578,30 @@ func (g *Gateway) inferClaudeOnce(ctx context.Context, req claudeRequest, messag
 		for _, call := range envelope.Calls {
 			tool, ok := tools[call.Name]
 			if !ok || call.Input == nil {
-				return claudeResponse{}, invalidOutput("model requested an unknown tool or non-object arguments")
+				return claudeResponse{}, toolFailure("model requested an unknown tool or non-object arguments")
 			}
 			if req.ToolChoice.Type == "none" || (req.ToolChoice.Type == "tool" && req.ToolChoice.Name != call.Name) {
-				return claudeResponse{}, invalidOutput("model violated tool_choice")
+				return claudeResponse{}, toolFailure("model violated tool_choice")
 			}
 			if err := validateInput(tool.Schema, call.Input); err != nil {
-				return claudeResponse{}, invalidOutput(fmt.Sprintf("invalid %s arguments: %s", call.Name, err))
+				return claudeResponse{}, toolFailure(fmt.Sprintf("invalid %s arguments: %s", call.Name, err))
 			}
 			blocks = append(blocks, claudeBlock{Type: "tool_use", ID: newID("toolu_"), Name: call.Name, Input: call.Input})
 			reason = "tool_use"
 		}
 		if (req.ToolChoice.Type == "any" || req.ToolChoice.Type == "tool") && len(envelope.Calls) == 0 {
-			return claudeResponse{}, invalidOutput("required tool call absent")
+			return claudeResponse{}, toolFailure("required tool call absent")
 		}
 		if len(blocks) == 0 {
-			return claudeResponse{}, invalidOutput("local model returned an empty turn")
+			return claudeResponse{}, toolFailure("local model returned an empty turn")
 		}
 	}
 	result = claudeResponse{UsageKnown: inputKnown && outputReported, ID: newID("msg_"), Type: "message", Role: "assistant", Model: req.Model, Content: blocks, StopReason: &reason, Usage: map[string]int{"input_tokens": completion.Usage.Input, "output_tokens": completion.Usage.Output}}
 	if req.ValidateResult != nil {
 		if err := req.ValidateResult(result); err != nil {
+			if len(req.Tools) > 0 {
+				return claudeResponse{}, toolFailure(err.Error())
+			}
 			return claudeResponse{}, err
 		}
 	}
@@ -596,7 +609,7 @@ func (g *Gateway) inferClaudeOnce(ctx context.Context, req claudeRequest, messag
 		g.qualityRejections.Add(1)
 		event.Quality["progress_check"] = issue
 		log.Printf("Agent progress quality rejection: %s", issue)
-		return claudeResponse{}, &modelOutputError{message: "local model failed agent progress check: " + issue, quality: issue, raw: choice.Message.Content, input: completion.Usage.Input, output: completion.Usage.Output}
+		return claudeResponse{}, &modelOutputError{recoverable: true, usageKnown: inputKnown && outputReported, message: "local model failed agent progress check: " + issue, quality: issue, raw: choice.Message.Content, input: completion.Usage.Input, output: completion.Usage.Output}
 	}
 	return result, nil
 }

@@ -311,12 +311,15 @@ func TestResponsesRejectedAdapterResultNeverCapturesAcceptance(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		var event map[string]any
-		if json.Unmarshal(data, &event) != nil {
-			t.Fatalf("expected one failed attempt: %s", data)
+		lines := strings.Split(strings.TrimSpace(string(data)), "\n")
+		if len(lines) != 2 {
+			t.Fatalf("expected exactly two rejected attempts: %s", data)
 		}
-		if event["accepted"] != false || event["quality"].(map[string]any)["protocol_valid"] != false {
-			t.Fatalf("rejected adapter output capturedaccepted: %s", data)
+		for _, line := range lines {
+			var event map[string]any
+			if json.Unmarshal([]byte(line), &event) != nil || event["accepted"] != false || event["quality"].(map[string]any)["protocol_valid"] != false {
+				t.Fatalf("rejected adapter output captured as accepted: %s", line)
+			}
 		}
 	}
 }
