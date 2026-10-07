@@ -26,6 +26,8 @@ Thumbs.db
 
 # Build
 dist/
+/web/node_modules/
+/internal/service/static/
 
 # Claude Code
 .claude/

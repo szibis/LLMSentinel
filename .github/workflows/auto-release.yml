@@ -47,12 +47,19 @@ jobs:
           MAIN_SHA=$(gh api "repos/${REPOSITORY}/branches/main" --jq '.commit.sha')
           if [ "$MAIN_SHA" = "$COMMIT_SHA" ]; then
             echo "current=true" >> "$GITHUB_OUTPUT"
+            echo "ancestor=true" >> "$GITHUB_OUTPUT"
           else
             echo "current=false" >> "$GITHUB_OUTPUT"
+            STATUS=$(gh api "repos/${REPOSITORY}/compare/${COMMIT_SHA}...${MAIN_SHA}" --jq '.status')
+            if [ "$STATUS" = 'ahead' ]; then
+              echo "ancestor=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "ancestor=false" >> "$GITHUB_OUTPUT"
+            fi
           fi
       - name: Select merged PR action
         id: plan
-        if: steps.current.outputs.current == 'true'
+        if: steps.current.outputs.ancestor == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           REPOSITORY: ${{ github.repository }}
@@ -66,7 +73,7 @@ jobs:
           jq -r '"mode=\(.mode)", "bump=\(.bump // "")", "version=\(.version // "")"' \
             "$RUNNER_TEMP/release-plan.json" >> "$GITHUB_OUTPUT"
       - name: Prepare reviewable release PR
-        if: steps.plan.outputs.mode == 'prepare'
+        if: steps.plan.outputs.mode == 'prepare' && steps.current.outputs.current == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           REPOSITORY: ${{ github.repository }}
@@ -133,7 +140,11 @@ jobs:
             /^## \[/ { if (index($0, "## [" version "] - ") == 1) count++ }
             END { exit count != 1 }
           ' CHANGELOG.md || { echo 'Expected exactly one matching dated changelog section'; exit 1; }
-          [ "$(gh api "repos/${REPOSITORY}/branches/main" --jq '.commit.sha')" = "$COMMIT_SHA" ] || { echo 'Main advanced; skip stale publication'; exit 1; }
+          STATUS=$(gh api "repos/${REPOSITORY}/compare/${COMMIT_SHA}...main" --jq '.status')
+          case "$STATUS" in
+            identical|ahead) ;;
+            *) echo 'Tested release commit is no longer on main; refusing publication'; exit 1 ;;
+          esac
           "$RUNNER_TEMP/sentinel-release-tools" release --repository "$REPOSITORY" --version "$VERSION" --ref "$COMMIT_SHA"
           echo 'release=true' >> "$GITHUB_OUTPUT"
   release:
