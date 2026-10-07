@@ -14,6 +14,7 @@ import (
 	"net/http/httputil"
 	"net/url"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 )
@@ -46,6 +47,8 @@ type Gateway struct {
 	hybrid            *hybridRouter
 	roleBudgets       map[string]*atomic.Int64
 	activityState     activityState
+	admission         sync.RWMutex
+	ciReservation     string
 }
 
 func New(cfg Config) (*Gateway, error) {
@@ -136,6 +139,18 @@ func apiError(w http.ResponseWriter, status int, code, message string) {
 }
 
 func (g *Gateway) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Path == "/sentinel/ci-reservation" {
+		g.reserveForCI(w, r)
+		return
+	}
+	if strings.HasPrefix(r.URL.Path, "/v1/") && r.Method == http.MethodPost {
+		g.admission.RLock()
+		defer g.admission.RUnlock()
+		if g.ciReservation != "" {
+			apiError(w, 503, "hardware_ci_reserved", "Lab is reserved for hardware CI; retry after restoration")
+			return
+		}
+	}
 	r = r.WithContext(withCacheSession(r.Context(), r))
 	ctx := withTrainingRequestID(r.Context(), newID("req_"))
 	client := map[string]string{"/v1/messages": "anthropic_messages", "/v1/responses": "openai_responses", "/v1/chat/completions": "openai_chat_completions"}[r.URL.Path]

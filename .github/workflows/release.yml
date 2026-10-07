@@ -3,6 +3,16 @@ name: Release
 on:
   push:
     tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Existing reviewed release tag to recover
+        required: true
+        type: string
+      ref:
+        description: Immutable 40-character tested commit belonging to the tag
+        required: true
+        type: string
   workflow_call:
     inputs:
       version:
@@ -13,6 +23,7 @@ on:
         type: string
 
 permissions:
+  actions: read
   contents: write
   packages: write
 
@@ -22,6 +33,7 @@ concurrency:
 
 jobs:
   qwen-metal:
+    needs: metadata
     uses: ./.github/workflows/qwen-metal.yml
     with:
       source_ref: ${{ inputs.ref || github.sha }}
@@ -31,6 +43,37 @@ jobs:
       version: ${{ steps.meta.outputs.version }}
       image: ${{ steps.meta.outputs.image }}
     steps:
+      - uses: actions/checkout@v5
+        if: github.event_name == 'workflow_dispatch'
+        with:
+          ref: ${{ github.workflow_sha }}
+          persist-credentials: false
+      - uses: actions/setup-go@v5
+        if: github.event_name == 'workflow_dispatch'
+        with:
+          go-version-file: go.mod
+      - name: Build reviewed release retry helper
+        if: github.event_name == 'workflow_dispatch'
+        run: go build -o "$RUNNER_TEMP/sentinel-release-tools" ./cmd/sentinel-tools
+      - name: Validate reviewed release retry
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ inputs.version }}
+          SOURCE_REF: ${{ inputs.ref }}
+          REQUEST_REF: ${{ github.ref }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          [ "$REQUEST_REF" = refs/heads/main ] || { echo 'Release recovery must run from main'; exit 1; }
+          [[ "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || exit 1
+          [[ "$SOURCE_REF" =~ ^[0-9a-f]{40}$ ]] || { echo 'Immutable source SHA required'; exit 1; }
+          gh api "repos/${REPOSITORY}/git/ref/tags/${VERSION}" >/dev/null
+          FILE_VERSION=$(gh api "repos/${REPOSITORY}/contents/VERSION?ref=${SOURCE_REF}" --jq '.content' | base64 --decode)
+          [ "$FILE_VERSION" = "$VERSION" ] || { echo 'Reviewed source VERSION differs'; exit 1; }
+          STATUS=$(gh api "repos/${REPOSITORY}/compare/${SOURCE_REF}...main" --jq '.status')
+          case "$STATUS" in identical|ahead) ;; *) echo 'Source is no longer on main'; exit 1 ;; esac
+          "$RUNNER_TEMP/sentinel-release-tools" release --repository "$REPOSITORY" --version "$VERSION" --ref "$SOURCE_REF"
       - name: Validate release version
         id: meta
         env:

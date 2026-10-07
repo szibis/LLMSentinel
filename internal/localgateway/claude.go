@@ -568,7 +568,10 @@ func (g *Gateway) inferClaudeOnce(ctx context.Context, req claudeRequest, messag
 		if len(envelope.Calls) > 8 {
 			return claudeResponse{}, toolFailure("too many tool calls in one turn")
 		}
-		if envelope.Text != "" {
+		// Forced tool choice mirrors Anthropic's prefilled tool turn: only
+		// validated tool blocks are emitted. Auto choice preserves explanations.
+		// Native usage still includes every generated token, including preamble.
+		if envelope.Text != "" && req.ToolChoice.Type != "any" && req.ToolChoice.Type != "tool" {
 			blocks = append(blocks, claudeBlock{Type: "text", Text: envelope.Text})
 		}
 		tools := map[string]claudeTool{}

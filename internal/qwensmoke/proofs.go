@@ -657,6 +657,14 @@ func runProtocolProof(ctx context.Context, base, size, role, protocol string, st
 	}
 	check := document{"name": name, "endpoint": endpoint, "role": role, "model_size": size, "passed": false, "synthetic_request": payload, "assertions": []string{"provider lifecycle and stop semantics", "exact marker or exact tool arguments", "positive native input/output usage", "no raw reasoning"}}
 	result["checks"] = append(result["checks"].([]any), check)
+	var before document
+	if len(nativeBase) > 0 {
+		var e error
+		before, e = request(ctx, nativeBase[0]+"/status", nil, 5*time.Second)
+		if e != nil {
+			return fmt.Errorf("%s native before snapshot: %w", name, e)
+		}
+	}
 	status, contentType, body, err := proofExchange(ctx, base+endpoint, payload, "sentinel-integration-"+size+"-"+role)
 	check["http_status"] = status
 	if err == nil && status != http.StatusOK {
@@ -701,11 +709,11 @@ func runProtocolProof(ctx context.Context, base, size, role, protocol string, st
 		if protocol == "chat" {
 			u = document{"input_tokens": u["prompt_tokens"], "output_tokens": u["completion_tokens"]}
 		}
-		if e = validateNativeAccounting(last, u); e != nil {
+		if e = validateNativeAccountingWindow(before, native, u); e != nil {
 			check["error"] = e.Error()
 			return fmt.Errorf("%s: %w", name, e)
 		}
-		check["native_accounting"] = document{"native_generation_metadata": true, "finish_reason": "stop", "prompt_tokens": last["prompt_tokens"], "generation_tokens": last["generation_tokens"]}
+		check["native_accounting"] = document{"native_generation_metadata": true, "finish_reason": "stop", "prompt_tokens": u["input_tokens"], "generation_tokens": u["output_tokens"], "attempts": mapping(native["stats"])["requests"].(float64) - mapping(before["stats"])["requests"].(float64), "last_prompt_tokens": last["prompt_tokens"], "last_generation_tokens": last["generation_tokens"]}
 	}
 	check["passed"] = true
 	return nil
@@ -851,6 +859,54 @@ func validateCacheAccounting(samples []document) error {
 func validateNativeAccounting(native, provider document) error {
 	if native["native_generation_metadata"] != true || native["finish_reason"] != "stop" || native["prompt_tokens"] != provider["input_tokens"] || native["generation_tokens"] != provider["output_tokens"] {
 		return errors.New("native EOS or token accounting disagrees with provider usage")
+	}
+	return positiveUsage(provider, "input_tokens", "output_tokens", false)
+}
+
+func validateNativeAccountingWindow(before, after, provider document) error {
+	read := func(d document) (float64, float64, float64, error) {
+		stats, cache := mapping(d["stats"]), mapping(d["prompt_cache"])
+		values := []any{stats["requests"], stats["tokens_generated"], cache["processed_tokens"], cache["reused_tokens"]}
+		counts := make([]float64, len(values))
+		for i, v := range values {
+			n, ok := v.(float64)
+			if !ok || math.IsNaN(n) || math.IsInf(n, 0) || n < 0 || n > float64(1<<53-1) || math.Trunc(n) != n {
+				return 0, 0, 0, errors.New("invalid native cumulative counters")
+			}
+			counts[i] = n
+		}
+		if counts[2]+counts[3] > float64(1<<53-1) {
+			return 0, 0, 0, errors.New("native prompt counter sum exceeds exact integer range")
+		}
+		return counts[0], counts[2] + counts[3], counts[1], nil
+	}
+	br, bi, bo, err := read(before)
+	if err != nil {
+		return err
+	}
+	ar, ai, ao, err := read(after)
+	if err != nil {
+		return err
+	}
+	for _, key := range []string{"processed_tokens", "reused_tokens"} {
+		if mapping(after["prompt_cache"])[key].(float64) < mapping(before["prompt_cache"])[key].(float64) {
+			return errors.New("native prompt counters reset during request")
+		}
+	}
+	attempts, input, output := ar-br, ai-bi, ao-bo
+	if (attempts != 1 && attempts != 2) || input <= 0 || output <= 0 || provider["input_tokens"] != input || provider["output_tokens"] != output {
+		return errors.New("native request-window counters disagree with aggregate provider usage")
+	}
+	last := mapping(mapping(after["stats"])["last_generation"])
+	lastUsage := document{"input_tokens": last["prompt_tokens"], "output_tokens": last["generation_tokens"]}
+	if err := validateNativeAccounting(last, lastUsage); err != nil {
+		return err
+	}
+	if attempts == 1 {
+		return validateNativeAccounting(last, provider)
+	}
+	if last["prompt_tokens"].(float64) >= input || last["generation_tokens"].(float64) >= output {
+		return errors.New("recovery window lacks positive first-attempt accounting")
 	}
 	return positiveUsage(provider, "input_tokens", "output_tokens", false)
 }

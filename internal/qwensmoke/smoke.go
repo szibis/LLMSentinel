@@ -8,6 +8,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"github.com/szibis/claude-escalate/internal/lab"
 	"io"
 	"net"
 	"net/http"
@@ -550,7 +551,7 @@ func Run(args []string, _ io.Reader, out, stderr io.Writer) int {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 	result := document{"passed": false, "health": []any{}, "checks": []any{}}
-	err := func() error {
+	err := func() (runErr error) {
 		lock := os.Getenv("QWEN_CI_LOCK_PATH")
 		if lock == "" {
 			lock = "/private/tmp/qwen-metal-ci.lock"
@@ -560,6 +561,15 @@ func Run(args []string, _ io.Reader, out, stderr io.Writer) int {
 			return e
 		}
 		defer unlock()
+		resumeLab, e := lab.PauseForCI(os.Getenv("SENTINEL_CI_PROJECT_ROOT"), os.Getenv("SENTINEL_CI_LAB_ROOT"), out)
+		if e != nil {
+			return e
+		}
+		defer func() {
+			if restoreErr := resumeLab(); restoreErr != nil {
+				runErr = errors.Join(runErr, fmt.Errorf("restore owned lab: %w", restoreErr))
+			}
+		}()
 		raw, e := os.MkdirTemp("", "qwen-ci-")
 		if e != nil {
 			return errors.New("cannot create private smoke logs")

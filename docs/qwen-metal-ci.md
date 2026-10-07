@@ -26,12 +26,12 @@ Machine environment settings stay outside Git:
 | Variable | Meaning |
 | --- | --- |
 | `QWEN_CI_PYTHON` | Absolute Python executable in the cached native MLX runtime |
-| `QWEN_SMALL_MODEL_PATH` | Absolute cached Qwen3.5 4B MLX 4-bit directory |
-| `QWEN_LARGE_MODEL_PATH` | Absolute cached Qwen3.8 27B MLX 4-bit directory, including its thinking template |
+| `QWEN_SMALL_MODEL_PATH` | Absolute cached small instruction model; the current lab uses LFM2.5-8B-A1B |
+| `QWEN_LARGE_MODEL_PATH` | Absolute cached large instruction model; the current lab uses Gemma 4 26B-A4B |
 | `QWEN_CI_LOCK_PATH` | Shared lock, default `/private/tmp/qwen-metal-ci.lock` |
 
 The inference dependency is pinned to MLX-Flash main commit
-`6b9c102c2ad07a585b5d414a50f36a1e5bd64103` (merged MLX-Flash PR #19). The job checks out that exact source
+`626d702970ef46284185401a1144af1607b0fe72` (merged MLX-Flash PR #25). The job checks out that exact source
 and installs it editable into a temporary venv with MLX 0.32.3, mlx-lm 0.32.0,
 and transformers 5.18.0. It sets `QWEN_MLX_FLASH_BIN` to that job's executable.
 Build tools may be downloaded; models must already exist locally, with intact
@@ -58,10 +58,41 @@ upstream routing. Hosted gateway unit tests verify distinct upstream routing.
 
 Ports 19190/19191 isolate this job from the interactive lab's 19090/19091/19092.
 The harness refuses occupied CI ports, starts only owned process groups, and
-cleans them up on failure or SIGINT/SIGTERM. It leaves the existing lab root and
-processes alone. Cross-repository GitHub concurrency is not shared: MLX-Flash
+cleans them up on failure or SIGINT/SIGTERM. By default it leaves the lab alone.
+Cross-repository GitHub concurrency is not shared: MLX-Flash
 and Sentinel runners must use the same lock path and OS account. The file lock
 covers preflight through final process cleanup and waits at most 30 minutes.
+
+## Optional lab memory handoff
+
+Set repository variables `SENTINEL_CI_PROJECT_ROOT` and `SENTINEL_CI_LAB_ROOT`
+to absolute paths on the self-hosted Mac. Install the current Go `sentinel-tools`
+in `<project>/bin/sentinel-tools` before enabling them. While holding the shared
+Metal lock, CI checks that the lab is idle and owned by the Go supervisor, pauses
+its processes, runs its isolated models, and restores the lab before unlocking.
+The gateway atomically reserves admission only when no client request is accepted;
+new inference returns 503 while reserved. An already stopped lab gets a lease and
+stays stopped. Busy, unknown, attached or already reserved
+labs fail the job before interruption. A manual `runner stop` during CI cancels
+restoration; starting a lab during the lease is refused. Restoration failure fails
+CI even when generation passed. Both repository runners must use this handoff to
+avoid competing with an interactive lab for model memory.
+
+The private `ci-pause.json` contains only pause ownership and restoration intent.
+An incomplete shutdown also retains the lease for explicit recovery. After
+SIGKILL or host power loss, inspect that lease and the owned processes;
+automatic cleanup cannot run. Do not remove a lease while its hardware job is
+still running. The dashboard can remain running during the pause.
+
+Native accounting proofs snapshot cumulative requests, generated tokens, and
+processed/reused prompt tokens before and after each client exchange. Exact
+provider totals must match the entire window, including the bounded correction
+attempt. Missing, reset, fractional or inconsistent counters fail the proof;
+the latest generation must still carry native metadata and a normal stop.
+The shared lock is close-on-exec, so a restored supervisor cannot retain it and
+block the next hardware job. Forced tool choices omit a generated text preamble
+while preserving schema-validated calls and all native usage. Automatic tool
+choice preserves text and calls. See [Anthropic's forced tool semantics](https://platform.claude.com/docs/en/agents-and-tools/tool-use/define-tools#forcing-tool-use).
 
 Artifacts contain a sanitized health summary, passed check usage, overall
 failure/success JSON, and sanitized gateway/runtime logs. A failed check causes

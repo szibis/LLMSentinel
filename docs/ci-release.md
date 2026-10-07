@@ -1,8 +1,23 @@
 # Build and release checks
 
+To recover a failed publication of an existing reviewed release, dispatch
+`release.yml` from main with `version` and its immutable 40-character `ref`:
+
+```sh
+gh workflow run release.yml --repo szibis/LLMSentinel --ref main \
+  -f version=v3.5.2 -f ref=04ce9012da88e2e1701d62ce9a828b7cdc772e63
+```
+
+The dispatcher verifies that the tag already exists and resolves to that commit,
+the source VERSION matches, the commit remains on main, and its completed main
+Build succeeded. It uses current workflow controls for the real Metal gate while
+building release assets from the reviewed source. A branch name, a new tag, a
+different tagged commit or failed Build is refused before hardware or publishing.
+This retries that release's contents; newer fixes require a new reviewed release.
+
 Build runs on main pushes and pull requests. Its required checks retain their existing names: four cross-platform builds, test, lint, security and docker-build. `llm-sentinel`, `sentinel-gateway` and `sentinel-tools` are built. Tests include the Go race suite and model-free Go lab/capture/controls/release/lifecycle tests. Lint uses golangci-lint v2.13.2 built with the project's Go version and validates workflow YAML with actionlint v1.7.12. Security uses govulncheck v1.8.0. The project and Docker builder use Go 1.27.1.
 
-Auto Release runs after a successful Build for a main push. It checks that the tested commit is still main’s tip and finds its merged PR. Titles starting with `feat:` select a minor bump; `feat!:` or a breaking-change title select a major bump; `fix:`, `perf:` and `refactor:` select a patch bump. Other titles and commits without a merged PR skip publishing. The old competing Auto-Tag workflow is removed.
+Auto Release runs after a successful Build for a main push. Changes select a bump from merged PR titles: `feat:` selects minor, `feat!:` or a breaking-change title selects major, and `fix:`, `perf:` or `refactor:` selects patch. At the current main tip it prepares a reviewable release PR containing VERSION and changelog changes and dispatches a Build pinned to that preparation commit. Publication follows the reviewed release PR's merge and successful main Build. The reviewed commit may remain an ancestor after newer merges; publication still uses its exact tested SHA. Unsupported titles and commits without a merged PR skip release preparation. The old competing Auto-Tag workflow is removed.
 
 The publisher receives the exact tested commit and version, builds all three binaries for Linux/macOS on amd64/arm64 (12 release assets), uploads distinct matrix artifacts and publishes release assets. GHCR image names are lowercase. Docker publishing is serialized, and only the newest semantic version tag can promote its image to latest. Rerunning a partially failed release reuses its commit tag and replaces assets rather than incrementing the version. An explicit pushed semantic version tag can also invoke Release; that path is intended for operator-selected releases.
 
