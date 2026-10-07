@@ -1,6 +1,5 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+@config "../tailwind.config.js";
 
 * {
   @apply transition-colors duration-200;
@@ -37,13 +36,13 @@ button:hover {
 }
 
 /* Responsive grid */
-@screen md {
+@media (min-width: 48rem) {
   .grid-responsive {
     @apply grid-cols-2;
   }
 }
 
-@screen lg {
+@media (min-width: 64rem) {
   .grid-responsive {
     @apply grid-cols-3;
   }
@@ -52,10 +51,12 @@ button:hover {
 /* Animations */
 @keyframes slide-in {
   from {
-    @apply opacity-0 transform translate-y-4;
+    opacity: 0;
+    transform: translateY(16px);
   }
   to {
-    @apply opacity-100 transform translate-y-0;
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 

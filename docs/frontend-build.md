@@ -16,3 +16,8 @@ by `sentinel-tools dashboard`.
 
 Commit `web/package-lock.json` when changing dependencies so local and CI builds
 use the same dependency graph.
+
+Tailwind 4 runs through `@tailwindcss/postcss`. The stylesheet imports
+`tailwindcss` and explicitly loads `tailwind.config.js` to retain the project's
+theme and class-based dark mode. Responsive custom rules use standard CSS
+media queries.
