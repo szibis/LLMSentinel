@@ -22,6 +22,7 @@ import (
 
 	"github.com/szibis/claude-escalate/internal/clientcontrol"
 	"github.com/szibis/claude-escalate/internal/labstatus"
+	"github.com/szibis/claude-escalate/internal/taskquality"
 )
 
 //go:embed dashboard.html
@@ -51,6 +52,10 @@ func readEndpoint(client *http.Client, path string) json.RawMessage {
 }
 
 func newHandler(client *http.Client, snapshot func() (json.RawMessage, error)) http.Handler {
+	return newHandlerWithQuality(client, snapshot, func() json.RawMessage { return nil })
+}
+
+func newHandlerWithQuality(client *http.Client, snapshot func() (json.RawMessage, error), quality func() json.RawMessage) http.Handler {
 	var snapshotMu sync.Mutex
 	var cachedTelemetry json.RawMessage
 	var cachedAt time.Time
@@ -91,7 +96,7 @@ func newHandler(client *http.Client, snapshot func() (json.RawMessage, error)) h
 			history.record(telemetry, activity, now)
 			points, attempts := history.snapshot(now)
 			w.Header().Set("Content-Type", "application/json")
-			_ = json.NewEncoder(w).Encode(map[string]any{"sample_time": now.Format(time.RFC3339), "telemetry": telemetry, "gateway": gateway, "activity": activity, "history": points, "attempts": attempts, "history_window_seconds": int(historyWindow.Seconds())})
+			_ = json.NewEncoder(w).Encode(map[string]any{"sample_time": now.Format(time.RFC3339), "telemetry": telemetry, "gateway": gateway, "activity": activity, "history": points, "attempts": attempts, "history_window_seconds": int(historyWindow.Seconds()), "task_quality": quality()})
 		default:
 			http.NotFound(w, r)
 		}
@@ -128,7 +133,18 @@ func Run(args []string, _ io.Reader, out, stderr io.Writer) int {
 		}
 		return json.RawMessage(data.Bytes()), nil
 	}
-	server := &http.Server{Addr: *listen, Handler: newHandler(client, snapshot), ReadHeaderTimeout: 3 * time.Second, ReadTimeout: 5 * time.Second, WriteTimeout: 5 * time.Second, IdleTimeout: 30 * time.Second}
+	server := &http.Server{Addr: *listen, Handler: newHandlerWithQuality(client, snapshot, func() json.RawMessage {
+		report := taskquality.Load(absolute)
+		if report == nil {
+			return nil
+		}
+		for i := range report.Results {
+			report.Results[i].Exchanges = nil
+			report.Results[i].Final = ""
+		}
+		raw, _ := json.Marshal(report)
+		return raw
+	}), ReadHeaderTimeout: 3 * time.Second, ReadTimeout: 5 * time.Second, WriteTimeout: 5 * time.Second, IdleTimeout: 30 * time.Second}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	go func() {

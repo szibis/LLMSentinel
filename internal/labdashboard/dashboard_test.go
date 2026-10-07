@@ -97,3 +97,26 @@ func TestFastRefreshCachesHeavyTelemetryButPollsActivity(t *testing.T) {
 		t.Fatalf("heavy telemetry polled too fast or activity cached: %d snapshots, %d endpoint polls", snapshots.Load(), polls.Load())
 	}
 }
+
+func TestDashboardIncludesTaskQualityEvidence(t *testing.T) {
+	client := &http.Client{Transport: testTransport(func(*http.Request) (*http.Response, error) {
+		return &http.Response{StatusCode: 503, Body: io.NopCloser(strings.NewReader("{}"))}, nil
+	})}
+	report := json.RawMessage(`{"version":1,"scope":"bounded-api-task-probes","results":[{"task":"exact-read","passed":false,"failure":"HTTP 422","input_tokens":null}]}`)
+	handler := newHandlerWithQuality(client, func() (json.RawMessage, error) { return nil, nil }, func() json.RawMessage { return report })
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, httptest.NewRequest("GET", "/api/status", nil))
+	var data map[string]json.RawMessage
+	if json.Unmarshal(response.Body.Bytes(), &data) != nil || !strings.Contains(string(data["task_quality"]), "HTTP 422") {
+		t.Fatalf("task failure missing: %s", response.Body.String())
+	}
+	handler = newHandlerWithQuality(client, func() (json.RawMessage, error) { return nil, nil }, func() json.RawMessage { return nil })
+	response = httptest.NewRecorder()
+	handler.ServeHTTP(response, httptest.NewRequest("GET", "/api/status", nil))
+	if json.Unmarshal(response.Body.Bytes(), &data) != nil || string(data["task_quality"]) != "null" {
+		t.Fatal("invented unavailable quality evidence")
+	}
+	if !strings.Contains(string(page), "quality-rows") {
+		t.Fatal("missing quality dashboard section")
+	}
+}

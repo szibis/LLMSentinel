@@ -22,7 +22,11 @@ lab-init: tools-build
 	$(TOOLS) lab prepare
 
 lab-test: gateway-check
-	$(GO) test -race ./internal/clientcapture ./internal/clientcontrol ./internal/lab ./internal/labstatus ./internal/qwensmoke ./internal/release ./cmd/sentinel-tools
+	$(GO) test -race ./internal/clientcapture ./internal/clientcontrol ./internal/lab ./internal/labstatus ./internal/qwensmoke ./internal/release ./internal/taskquality ./internal/labdashboard ./cmd/sentinel-tools
+
+.PHONY: lab-quality
+lab-quality: tools-build
+	$(TOOLS) quality --root $(abspath .sentinel-lab)
 
 lab-run: lab-start
 
