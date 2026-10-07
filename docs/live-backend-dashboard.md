@@ -1,5 +1,10 @@
 # Live backend dashboard
 
+The Task quality view shows the latest explicit [bounded task probe run](task-quality-probes.md),
+including failed assertions, tool calls, latency and reported tokens. These
+results persist across dashboard restarts and remain dated evidence until another
+run completes; dashboard refresh never starts inference.
+
 From Sentinel's repository root:
 
 ```sh

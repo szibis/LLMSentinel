@@ -14,4 +14,4 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
-      - run: go test -race -v ./internal/qwensmoke ./internal/release
+      - run: go test -race -v ./internal/qwensmoke ./internal/release ./internal/taskquality ./internal/labdashboard

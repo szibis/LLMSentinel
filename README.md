@@ -84,6 +84,11 @@ reuse; they do not establish provider-billed monetary savings. The legacy
 `llm-sentinel` dashboard has known metrics initialization defects; use
 `sentinel-tools dashboard` for the current lab UI.
 
+Run `make lab-quality` for explicit local [task-quality probes](docs/task-quality-probes.md)
+through Claude Messages and Codex Responses. The lab dashboard shows the latest
+results; complete synthetic transcripts and failures remain in local archives.
+These bounded checks do not establish full CLI or commercial model equivalence.
+
 [![Go](https://img.shields.io/badge/Go-1.27.1-blue)](https://golang.org)
 [![License](https://img.shields.io/badge/license-Apache%202.0-green)](LICENSE)
 [![Build](https://github.com/szibis/LLMSentinel/actions/workflows/build.yml/badge.svg)](https://github.com/szibis/LLMSentinel/actions/workflows/build.yml)
