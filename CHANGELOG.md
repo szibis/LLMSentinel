@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.5.3] - 2026-10-07
+
+### Commit subjects since v3.5.2
+
+- chore(deps): bump the npm_and_yarn group across 1 directory with 2 updates (#54)
+- fix: migrate frontend build configuration to Tailwind 4 (#56)
+- fix: recover tool contract incompatibilities before returning 422 (#57)
+- fix: verify retry usage and safely coordinate lab CI and release recovery (#58)
+
 ## [3.5.2] - 2026-10-07
 
 ### Commit subjects since v3.5.1
