@@ -30,7 +30,10 @@ manually**. Only its successful main push Build permits automatic publication;
 the label, title, VERSION and matching changelog section must agree. The existing
 release workflow still builds all three binaries with release version metadata.
 Tags are immutable: retries reuse a tag only when it points at the same tested
-commit. An existing preparation branch/PR is reused without force pushes;
+commit. New release preparation requires current main. A reviewed release can
+publish its exact successful Build commit after newer merges, provided that
+commit is still an ancestor of main. Newer changes are excluded from that tag.
+An existing preparation branch/PR is reused without force pushes;
 closed preparations require maintainer attention.
 
 Bot-created PRs do not start normal PR CI with `GITHUB_TOKEN`, so Auto Release

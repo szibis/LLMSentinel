@@ -41,7 +41,7 @@ func shellDecision(t *testing.T, file, name string, settings map[string]string) 
 	path := t.TempDir()
 	doubles := map[string]string{
 		"docker": "#!/bin/sh\nprintf 'docker %s\\n' \"$*\" >> \"$MOCK_CALLS\"\n",
-		"gh":     "#!/bin/sh\ncase \"$*\" in\n *branches/main*) printf '%s\\n' \"$MOCK_MAIN\" ;;\n *matching-refs/tags/v*) printf '%s\\n' \"$MOCK_LATEST\" ;;\n release*) printf 'gh %s\\n' \"$*\" >> \"$MOCK_CALLS\" ;;\n *) printf '%s\\n' \"$MOCK_TITLE\" ;;\nesac\n",
+		"gh":     "#!/bin/sh\ncase \"$*\" in\n *branches/main*) printf '%s\\n' \"$MOCK_MAIN\" ;;\n *compare/*) printf '%s\\n' \"$MOCK_COMPARISON\" ;;\n *matching-refs/tags/v*) printf '%s\\n' \"$MOCK_LATEST\" ;;\n release*) printf 'gh %s\\n' \"$*\" >> \"$MOCK_CALLS\" ;;\n *) printf '%s\\n' \"$MOCK_TITLE\" ;;\nesac\n",
 		"git":    "#!/bin/sh\ncase \"$*\" in\n 'tag --points-at HEAD') printf '%s\\n' \"$MOCK_EXISTING\" ;;\n 'tag --list v* --sort=-version:refname') printf '%s\\n' \"$MOCK_LATEST\" ;;\n *) printf '%s\\n' \"$*\" >> \"$MOCK_CALLS\" ;;\nesac\n",
 	}
 	for name, body := range doubles {
@@ -71,9 +71,9 @@ func shellDecision(t *testing.T, file, name string, settings map[string]string) 
 }
 
 func TestWorkflowReleaseDecisions(t *testing.T) {
-	for _, tc := range []struct{ sha, current string }{{"abc", "true"}, {"newer", "false"}} {
-		output, _ := shellDecision(t, "auto-release.yml", "Check current main", map[string]string{"MOCK_MAIN": tc.sha})
-		if output != "current="+tc.current+"\n" {
+	for _, tc := range []struct{ sha, current, comparison, ancestor string }{{"abc", "true", "identical", "true"}, {"newer", "false", "ahead", "true"}, {"removed", "false", "diverged", "false"}, {"older", "false", "behind", "false"}} {
+		output, _ := shellDecision(t, "auto-release.yml", "Check current main", map[string]string{"MOCK_MAIN": tc.sha, "MOCK_COMPARISON": tc.comparison})
+		if output != "current="+tc.current+"\nancestor="+tc.ancestor+"\n" {
 			t.Fatal(output)
 		}
 	}
@@ -88,6 +88,42 @@ func TestWorkflowReleaseDecisions(t *testing.T) {
 				t.Fatal(version, name, calls)
 			}
 		}
+	}
+}
+
+func TestReviewedReleaseUsesTestedCommitAfterMainAdvances(t *testing.T) {
+	for _, comparison := range []string{"identical", "ahead", "diverged", "behind"} {
+		t.Run(comparison, func(t *testing.T) {
+			root := t.TempDir()
+			files := map[string]string{
+				"VERSION":                "v3.5.1\n",
+				"CHANGELOG.md":           "## [3.5.1] - 2026-10-07\n\nReviewed changes.\n",
+				"gh":                     "#!/bin/sh\nprintf '%s\\n' \"$MOCK_COMPARISON\"\n",
+				"sentinel-release-tools": "#!/bin/sh\nprintf '%s\\n' \"$*\" > \"$MOCK_CALLS\"\n",
+			}
+			for name, body := range files {
+				if err := os.WriteFile(filepath.Join(root, name), []byte(body), 0700); err != nil { // #nosec G306 -- Private workflow fixture including executable doubles.
+					t.Fatal(err)
+				}
+			}
+			calls := filepath.Join(root, "calls")
+			sha := strings.Repeat("a", 40)
+			cmd := exec.Command("bash", "-e", "-o", "pipefail", "-c", workflowScript(t, "auto-release.yml", "Publish reviewed release metadata")) // #nosec G204 -- Checked-in shell with private command doubles.
+			cmd.Dir = root
+			cmd.Env = append(os.Environ(), "PATH="+root+string(os.PathListSeparator)+os.Getenv("PATH"), "RUNNER_TEMP="+root, "GITHUB_OUTPUT="+filepath.Join(root, "outputs"), "MOCK_CALLS="+calls, "REPOSITORY=example/Sentinel", "COMMIT_SHA="+sha, "VERSION=v3.5.1", "MOCK_COMPARISON="+comparison)
+			result, err := cmd.CombinedOutput()
+			accepted := comparison == "ahead" || comparison == "identical"
+			if (err == nil) != accepted {
+				t.Fatalf("comparison %s: %v %s", comparison, err, result)
+			}
+			data, readErr := os.ReadFile(calls)
+			if accepted && (readErr != nil || !strings.Contains(string(data), "--ref "+sha)) {
+				t.Fatalf("release not pinned to tested commit: %s %v", data, readErr)
+			}
+			if !accepted && !os.IsNotExist(readErr) {
+				t.Fatal("removed/non-ancestor commit reached publisher")
+			}
+		})
 	}
 }
 

@@ -60,6 +60,5 @@ button:hover {
 }
 
 .animate-slide-in {
-  @apply animate-slide-in;
   animation: slide-in 0.3s ease-out;
 }
