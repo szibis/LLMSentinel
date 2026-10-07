@@ -88,6 +88,8 @@ Run `make lab-quality` for explicit local [task-quality probes](docs/task-qualit
 through Claude Messages and Codex Responses. The lab dashboard shows the latest
 results; complete synthetic transcripts and failures remain in local archives.
 These bounded checks do not establish full CLI or commercial model equivalence.
+Run `make lab-cli-quality` for separate [real Claude Code and Codex task probes](docs/native-cli-quality.md),
+including file edits and independently checked Go tests. Both suites appear in the dashboard.
 
 [![Go](https://img.shields.io/badge/Go-1.27.1-blue)](https://golang.org)
 [![License](https://img.shields.io/badge/license-Apache%202.0-green)](LICENSE)

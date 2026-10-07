@@ -46,19 +46,26 @@ type Exchange struct {
 	Status   int             `json:"http_status"`
 }
 type Result struct {
-	Task         string     `json:"task"`
-	Role         string     `json:"role"`
-	Protocol     string     `json:"protocol"`
-	Passed       bool       `json:"passed"`
-	Failure      string     `json:"failure,omitempty"`
-	Requests     int        `json:"requests"`
-	ToolCalls    int        `json:"tool_calls"`
-	LatencyMS    int64      `json:"latency_ms"`
-	InputTokens  *int64     `json:"input_tokens"`
-	OutputTokens *int64     `json:"output_tokens"`
-	UsageSource  string     `json:"usage_source"`
-	Final        string     `json:"final"`
-	Exchanges    []Exchange `json:"exchanges,omitempty"`
+	Task          string            `json:"task"`
+	Role          string            `json:"role"`
+	Protocol      string            `json:"protocol"`
+	Passed        bool              `json:"passed"`
+	Failure       string            `json:"failure,omitempty"`
+	Requests      int               `json:"requests,omitempty"`
+	ToolCalls     int               `json:"tool_calls"`
+	LatencyMS     int64             `json:"latency_ms"`
+	InputTokens   *int64            `json:"input_tokens"`
+	OutputTokens  *int64            `json:"output_tokens"`
+	UsageSource   string            `json:"usage_source"`
+	Final         string            `json:"final"`
+	Exchanges     []Exchange        `json:"exchanges,omitempty"`
+	Client        string            `json:"client,omitempty"`
+	ClientVersion string            `json:"client_version,omitempty"`
+	CLIExitCode   *int              `json:"cli_exit_code,omitempty"`
+	CLIEvents     []json.RawMessage `json:"cli_events,omitempty"`
+	CLIStderr     string            `json:"cli_stderr,omitempty"`
+	Workspace     string            `json:"workspace,omitempty"`
+	Checks        map[string]bool   `json:"checks,omitempty"`
 }
 type Report struct {
 	Version         int             `json:"version"`
@@ -300,9 +307,24 @@ func execute(ctx context.Context, client *http.Client, base, role, protocol stri
 }
 
 const reportFile = "task-quality-latest.json"
+const cliReportFile = "task-cli-quality-latest.json"
+
+func reportFilename(scope string) (string, error) {
+	switch scope {
+	case "bounded-api-task-probes":
+		return reportFile, nil
+	case "real-cli-task-probes":
+		return cliReportFile, nil
+	}
+	return "", errors.New("unknown task report scope")
+}
 
 // Save atomically publishes a private report. Only synthetic fixture traffic is retained.
 func Save(root string, report Report) error {
+	filename, err := reportFilename(report.Scope)
+	if err != nil {
+		return err
+	}
 	raw, err := json.MarshalIndent(report, "", "  ")
 	if err != nil {
 		return err
@@ -336,6 +358,8 @@ func Save(root string, report Report) error {
 	for i := range summary.Results {
 		summary.Results[i].Exchanges = nil
 		summary.Results[i].Final = ""
+		summary.Results[i].CLIEvents = nil
+		summary.Results[i].CLIStderr = ""
 	}
 	raw, err = json.MarshalIndent(summary, "", "  ")
 	if err != nil {
@@ -357,12 +381,18 @@ func Save(root string, report Report) error {
 	if err = temp.Close(); err != nil {
 		return err
 	}
-	return os.Rename(name, filepath.Join(root, reportFile))
+	return os.Rename(name, filepath.Join(root, filename))
 }
 
 // Load returns nil when no valid report exists; the dashboard never fabricates results.
 func Load(root string) *Report {
-	file, err := os.Open(filepath.Join(root, reportFile))
+	return loadReport(root, reportFile, "bounded-api-task-probes")
+}
+
+func LoadCLI(root string) *Report { return loadReport(root, cliReportFile, "real-cli-task-probes") }
+
+func loadReport(root, filename, scope string) *Report {
+	file, err := os.Open(filepath.Join(root, filename))
 	if err != nil {
 		return nil
 	}
@@ -372,7 +402,7 @@ func Load(root string) *Report {
 		return nil
 	}
 	var report Report
-	if json.Unmarshal(raw, &report) != nil || report.Version != 1 || report.Scope != "bounded-api-task-probes" || report.FinishedAt.IsZero() || len(report.Results) == 0 || len(report.Results) > 24 {
+	if json.Unmarshal(raw, &report) != nil || report.Version != 1 || report.Scope != scope || report.FinishedAt.IsZero() || len(report.Results) == 0 || len(report.Results) > 24 {
 		return nil
 	}
 	return &report

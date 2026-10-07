@@ -28,6 +28,10 @@ lab-test: gateway-check
 lab-quality: tools-build
 	$(TOOLS) quality --root $(abspath .sentinel-lab)
 
+.PHONY: lab-cli-quality
+lab-cli-quality: tools-build
+	$(TOOLS) cli-quality --root $(abspath .sentinel-lab)
+
 lab-run: lab-start
 
 lab-start: gateway-build tools-build

@@ -50,6 +50,24 @@ func TestDashboardShowsLiveDataAndPreservesUnknownEndpoints(t *testing.T) {
 	}
 }
 
+func TestDashboardKeepsCLIAndAPIEvidenceSeparate(t *testing.T) {
+	client := &http.Client{Transport: testTransport(func(*http.Request) (*http.Response, error) {
+		return &http.Response{StatusCode: 503, Body: io.NopCloser(strings.NewReader("{}"))}, nil
+	})}
+	handler := newHandlerWithQualities(client, func() (json.RawMessage, error) { return nil, nil }, func() json.RawMessage { return json.RawMessage(`{"scope":"bounded-api-task-probes"}`) }, func() json.RawMessage {
+		return json.RawMessage(`{"scope":"real-cli-task-probes","results":[{"client":"claude","passed":false,"failure":"unsupported local reasoning channel"}]}`)
+	})
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, httptest.NewRequest("GET", "/api/status", nil))
+	var data map[string]json.RawMessage
+	if json.Unmarshal(response.Body.Bytes(), &data) != nil || !strings.Contains(string(data["cli_task_quality"]), "reasoning channel") || !strings.Contains(string(data["task_quality"]), "bounded-api") {
+		t.Fatalf("mixed or missing scopes: %s", response.Body.String())
+	}
+	if !strings.Contains(string(page), "cli-quality-rows") {
+		t.Fatal("CLI table missing")
+	}
+}
+
 func TestDashboardRejectsMutationsAndUnknownRoutes(t *testing.T) {
 	handler := newHandler(&http.Client{}, func() (json.RawMessage, error) { t.Fatal("unexpected poll"); return nil, nil })
 	for _, tc := range []struct {
