@@ -88,7 +88,7 @@ func prepareChatProtocol(req chatProtocolRequest, roles bool, budget int) (claud
 		var format struct {
 			Type string `json:"type"`
 		}
-		if json.Unmarshal(req.ResponseFormat, &format) != nil || format.Type != "text" {
+		if unmarshalModelJSON(string(req.ResponseFormat), &format) != nil || format.Type != "text" {
 			return claudeRequest{}, nil, errors.New("only text response_format is supported")
 		}
 	}
@@ -99,7 +99,7 @@ func prepareChatProtocol(req chatProtocolRequest, roles bool, budget int) (claud
 			Name string `json:"name"`
 		} `json:"function"`
 	}
-	if len(choice) > 0 && json.Unmarshal(choice, &named) == nil && named.Type == "function" {
+	if len(choice) > 0 && unmarshalModelJSON(string(choice), &named) == nil && named.Type == "function" {
 		choice = mustJSON(map[string]string{"type": "function", "name": named.Function.Name})
 	}
 	payload := map[string]any{"model": req.Model, "input": input, "instructions": strings.Join(system, "\n"), "tools": tools, "store": false}
@@ -131,7 +131,7 @@ func (g *Gateway) chatCompletions(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var req chatProtocolRequest
-	if json.Unmarshal(body, &req) != nil {
+	if unmarshalModelJSON(string(body), &req) != nil {
 		responsesError(w, 400, "invalid Chat Completions request")
 		return
 	}

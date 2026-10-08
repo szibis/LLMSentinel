@@ -4,8 +4,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"reflect"
 	"regexp"
 	"strings"
+	"unicode/utf8"
 )
 
 var toolActionPreamble = regexp.MustCompile(`(?i)^(i('ll| will| am|'m)|let me)\b`)
@@ -15,6 +17,9 @@ var toolExamplePreamble = regexp.MustCompile(`(?i)\b(example|sample|quoted?|demo
 // schemas and client policy are still validated before any client tool is emitted.
 func normalizeModelOutput(req claudeRequest, raw string) (localToolEnvelope, error) {
 	out := localToolEnvelope{Calls: []localToolCall{}}
+	if !utf8.ValidString(raw) {
+		return out, errors.New("invalid model UTF-8")
+	}
 	value := strings.TrimSpace(raw)
 	if req.ToolFormat == "gemma4" && (strings.HasPrefix(value, "{") || strings.HasPrefix(value, "[")) {
 		// Native Gemma frames carry executable calls. A user's requested JSON
@@ -195,6 +200,9 @@ func normalizeToolCall(object map[string]any) (localToolCall, error) {
 }
 
 func unmarshalModelJSON(raw string, target any) error {
+	if !utf8.ValidString(raw) {
+		return errors.New("invalid UTF-8 JSON")
+	}
 	if err := json.Unmarshal([]byte(raw), target); err != nil {
 		return err
 	}
@@ -232,7 +240,67 @@ func unmarshalModelJSON(raw string, target any) error {
 		_, err = decoder.Token()
 		return err
 	}
-	return check(0)
+	if err := check(0); err != nil {
+		return err
+	}
+	// encoding/json also matches struct tags case-insensitively. Prevent a
+	// differently cased protocol key from overriding a canonical field, while
+	// preserving case-sensitive keys in arbitrary dictionaries and tool data.
+	decoder = json.NewDecoder(strings.NewReader(raw))
+	decoder.UseNumber()
+	var value any
+	if err := decoder.Decode(&value); err != nil {
+		return err
+	}
+	return canonicalProtocolKeys(value, reflect.TypeOf(target))
+}
+
+func canonicalProtocolKeys(value any, kind reflect.Type) error {
+	for kind.Kind() == reflect.Pointer {
+		kind = kind.Elem()
+	}
+	switch kind.Kind() {
+	case reflect.Struct:
+		object, ok := value.(map[string]any)
+		if !ok {
+			return nil
+		}
+		for i := 0; i < kind.NumField(); i++ {
+			field := kind.Field(i)
+			if field.PkgPath != "" {
+				continue
+			}
+			name := strings.Split(field.Tag.Get("json"), ",")[0]
+			if name == "-" {
+				continue
+			}
+			if name == "" {
+				name = field.Name
+			}
+			for key := range object {
+				if key != name && strings.EqualFold(key, name) {
+					return errors.New("noncanonical protocol JSON field")
+				}
+			}
+			if child, exists := object[name]; exists {
+				if err := canonicalProtocolKeys(child, field.Type); err != nil {
+					return err
+				}
+			}
+		}
+	case reflect.Slice, reflect.Array:
+		if kind.Elem().Kind() == reflect.Uint8 {
+			return nil
+		}
+		if items, ok := value.([]any); ok {
+			for _, child := range items {
+				if err := canonicalProtocolKeys(child, kind.Elem()); err != nil {
+					return err
+				}
+			}
+		}
+	}
+	return nil
 }
 
 func normalizeContentBlocks(blocks []any) (localToolEnvelope, error) {
@@ -251,6 +319,9 @@ func normalizeContentBlocks(blocks []any) (localToolEnvelope, error) {
 			}
 			text = append(text, value)
 		case "tool_use":
+			if len(out.Calls) >= 8 {
+				return out, errors.New("too many model tool calls")
+			}
 			call, err := normalizeToolCall(block)
 			if err != nil {
 				return out, err

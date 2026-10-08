@@ -217,7 +217,7 @@ func responseInputText(raw json.RawMessage) (string, error) {
 		Type string  `json:"type"`
 		Text *string `json:"text"`
 	}
-	if json.Unmarshal(raw, &parts) != nil || parts == nil {
+	if unmarshalModelJSON(string(raw), &parts) != nil || parts == nil {
 		return "", errors.New("content must be a string or text content array")
 	}
 	var out []string
@@ -297,7 +297,7 @@ func prepareResponses(req responsesRequest, roleEndpoints bool, defaultBudget in
 				Name      string `json:"name"`
 				Namespace string `json:"namespace"`
 			}
-			if json.Unmarshal(req.ToolChoice, &choice) != nil || (choice.Type != "function" && choice.Type != "custom") || choice.Name == "" {
+			if unmarshalModelJSON(string(req.ToolChoice), &choice) != nil || (choice.Type != "function" && choice.Type != "custom") || choice.Name == "" {
 				return converted, nil, errors.New("tool_choice must name a function tool")
 			}
 			matches := false
@@ -336,7 +336,7 @@ func prepareResponses(req responsesRequest, roleEndpoints bool, defaultBudget in
 				Input     *string         `json:"input"`
 				Namespace string          `json:"namespace"`
 			}
-			if json.Unmarshal(raw, &item) != nil {
+			if unmarshalModelJSON(string(raw), &item) != nil {
 				return converted, nil, errors.New("invalid input item")
 			}
 			switch item.Type {
@@ -358,7 +358,7 @@ func prepareResponses(req responsesRequest, roleEndpoints bool, defaultBudget in
 				}
 			case "function_call":
 				var args map[string]any
-				if item.CallID == "" || item.Name == "" || json.Unmarshal([]byte(item.Arguments), &args) != nil || args == nil {
+				if item.CallID == "" || item.Name == "" || unmarshalModelJSON(item.Arguments, &args) != nil || args == nil {
 					return converted, nil, errors.New("function_call requires call_id, name and JSON object arguments")
 				}
 				callKinds[item.CallID] = "function_call_output"
@@ -569,7 +569,7 @@ func (g *Gateway) responses(w http.ResponseWriter, r *http.Request) {
 	}
 	var req responsesRequest
 	trimmed := strings.TrimSpace(string(body))
-	if !strings.HasPrefix(trimmed, "{") || json.Unmarshal(body, &req) != nil {
+	if !strings.HasPrefix(trimmed, "{") || unmarshalModelJSON(string(body), &req) != nil {
 		responsesError(w, 400, "Expected a Responses JSON object")
 		return
 	}
