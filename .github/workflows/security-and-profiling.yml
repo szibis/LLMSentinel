@@ -77,10 +77,23 @@ jobs:
 
       - name: Fuzz Testing
         run: |
-          TARGETS=$(go test ./internal/fuzz -list '^Fuzz' | grep '^Fuzz')
-          for TARGET in $TARGETS; do
-            go test ./internal/fuzz -run '^$' -fuzz="^${TARGET}$" -parallel=2 -fuzztime=10s -timeout=60s
+          for PACKAGE in ./internal/fuzz ./internal/localgateway; do
+            TARGETS=$(go test "$PACKAGE" -list '^Fuzz' | grep '^Fuzz')
+            for TARGET in $TARGETS; do
+              go test "$PACKAGE" -run '^$' -fuzz="^${TARGET}$" -parallel=2 -fuzztime=10s -timeout=60s
+            done
           done
+
+      - name: Preserve minimized fuzz failures
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: protocol-fuzz-regressions
+          path: |
+            internal/fuzz/testdata/fuzz/**
+            internal/localgateway/testdata/fuzz/**
+          if-no-files-found: ignore
+          retention-days: 14
 
   stress-test:
     runs-on: ubuntu-latest

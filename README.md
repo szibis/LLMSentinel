@@ -90,6 +90,8 @@ results; complete synthetic transcripts and failures remain in local archives.
 These bounded checks do not establish full CLI or commercial model equivalence.
 Run `make lab-cli-quality` for separate [real Claude Code and Codex task probes](docs/native-cli-quality.md),
 including file edits and independently checked Go tests. Both suites appear in the dashboard.
+Model-free [protocol edge cases and fuzz campaigns](docs/protocol-hardening.md)
+exercise all three client APIs, validated streams and malformed runtime output in CI.
 
 [![Go](https://img.shields.io/badge/Go-1.27.1-blue)](https://golang.org)
 [![License](https://img.shields.io/badge/license-Apache%202.0-green)](LICENSE)

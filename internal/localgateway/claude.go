@@ -698,16 +698,21 @@ func (g *Gateway) inferClaudeOnce(ctx context.Context, req claudeRequest, messag
 			Exact bool `json:"native_generation_metadata"`
 		} `json:"mlx_flash_compress"`
 	}
-	if json.Unmarshal(body, &completion) != nil || len(completion.Choices) != 1 {
+	if unmarshalModelJSON(string(body), &completion) != nil || len(completion.Choices) != 1 {
 		return claudeResponse{}, errors.New("invalid backend Chat Completions response")
+	}
+	if completion.Usage.Input < 0 || completion.Usage.Output < 0 {
+		return claudeResponse{}, errors.New("invalid backend token accounting")
 	}
 	choice := completion.Choices[0]
 	var observed struct {
 		Usage map[string]json.RawMessage `json:"usage"`
 	}
 	_ = json.Unmarshal(body, &observed)
-	_, inputReported := observed.Usage["prompt_tokens"]
-	_, outputReported := observed.Usage["completion_tokens"]
+	inputRaw, inputReported := observed.Usage["prompt_tokens"]
+	outputRaw, outputReported := observed.Usage["completion_tokens"]
+	inputReported = inputReported && !bytes.Equal(bytes.TrimSpace(inputRaw), []byte("null"))
+	outputReported = outputReported && !bytes.Equal(bytes.TrimSpace(outputRaw), []byte("null"))
 	event.Output = choice.Message.Content
 	event.Usage = map[string]int{}
 	inputKnown := inputReported && (completion.Usage.Input > 0 || completion.Native.Exact)
@@ -824,7 +829,7 @@ func (g *Gateway) claude(w http.ResponseWriter, r *http.Request) {
 		claudeError(w, 413, "Request exceeds body limit")
 		return
 	}
-	if json.Unmarshal(body, &req) != nil {
+	if unmarshalModelJSON(string(body), &req) != nil {
 		claudeError(w, 400, "Expected a Messages JSON object")
 		return
 	}
