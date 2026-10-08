@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.6.0] - 2026-10-07
+
+### Commit subjects since v3.5.3
+
+- Add bounded task-quality probes and live dashboard evidence (#60)
+- feat: benchmark real Claude Code and Codex task execution (#61)
+
 ## [3.5.3] - 2026-10-07
 
 ### Commit subjects since v3.5.2
