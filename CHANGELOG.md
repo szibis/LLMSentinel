@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.6.1] - 2026-10-08
+
+### Commit subjects since v3.6.0
+
+- fix: validate native client tools and route Haiku agent requests by quality (#62)
+
 ## [3.6.0] - 2026-10-07
 
 ### Commit subjects since v3.5.3
