@@ -217,6 +217,20 @@ func TestResponsesCustomPatchProtocolAndHistory(t *testing.T) {
 	}
 }
 
+func TestResponsesNativeCodexPatchGrammarSpacing(t *testing.T) {
+	// rust-v0.160.1 adds a blank separator after add_line. Grammar rules
+	// are unchanged; formatting must not disable the native edit tool.
+	grammar := strings.Replace(testPatchGrammar, "LF -> line\n", "LF -> line\n\n", 1)
+	req := responsesRequest{Model: "local", Input: json.RawMessage(`"edit"`), Tools: []responsesTool{{Type: "custom", Name: "apply_patch", Format: &responsesToolFormat{Type: "grammar", Syntax: "lark", Definition: grammar}}}}
+	if _, _, err := prepareResponses(req, false, 1024); err != nil {
+		t.Fatalf("native Codex grammar rejected: %v", err)
+	}
+	req.Tools[0].Format.Definition = strings.Replace(grammar, "hunk+", "hunk*", 1)
+	if _, _, err := prepareResponses(req, false, 1024); err == nil {
+		t.Fatal("different grammar accepted")
+	}
+}
+
 func TestResponsesMalformedPatchNeverOpensStream(t *testing.T) {
 	for _, patch := range []string{"*** Begin Patch\n*** Add File: a\n+partial", "not a patch", "*** Begin Patch\n*** Add File: a\nhello\n*** End Patch"} {
 		s := claudeServer(t, func(w http.ResponseWriter, r *http.Request) {

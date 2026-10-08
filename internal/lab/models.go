@@ -11,6 +11,7 @@ import (
 )
 
 type runtimeSettings struct {
+	HaikuToolRole      string `json:"haiku_tool_role,omitempty"`
 	ModelPath          string `json:"model_path"`
 	SmallModelPath     string `json:"small_model_path,omitempty"`
 	Executable         string `json:"executable"`
@@ -139,7 +140,17 @@ func (e *environment) runtimePlan(settings runtimeSettings) ([]runtimeItem, erro
 func (e *environment) gatewayCommand(settings runtimeSettings) []string {
 	args := []string{filepath.Join(e.project, "bin", "sentinel-gateway")}
 	if settings.SmallModelPath != "" {
-		args = append(args, "--role-haiku-upstream", "http://127.0.0.1:19092/v1", "--role-sonnet-upstream", "http://127.0.0.1:19091/v1", "--role-opus-upstream", "http://127.0.0.1:19091/v1")
+		args = append(args, "--role-haiku-upstream", "http://127.0.0.1:19092/v1", "--role-sonnet-upstream", "http://127.0.0.1:19091/v1", "--role-opus-upstream", "http://127.0.0.1:19091/v1", "--local-role-recovery")
+		toolRole := settings.HaikuToolRole
+		var model struct {
+			ModelType string `json:"model_type"`
+		}
+		if toolRole == "" && readJSON(filepath.Join(settings.SmallModelPath, "config.json"), &model) == nil && model.ModelType == "lfm2_moe" {
+			toolRole = "sonnet"
+		}
+		if toolRole != "" {
+			args = append(args, "--haiku-tool-role", toolRole)
+		}
 	}
 	return args
 }

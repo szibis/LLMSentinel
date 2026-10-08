@@ -8,7 +8,7 @@ the external native inference runtime.
 
 | Role | Artifact | Profile |
 |---|---|---|
-| Haiku | `LiquidAI/LFM2.5-8B-A1B-MLX-4bit` | Native reasoning, 1,024 output-token limit; no unsupported thinking toggle |
+| Haiku | LFM for requests without tool definitions; Gemma for tool-bearing requests | 1,024 output-token limit, original Haiku alias retained |
 | Sonnet | `mlx-community/gemma-4-26b-a4b-it-4bit` | Thinking disabled, 4,096 output-token limit |
 | Opus | Same Gemma artifact | Thinking enabled, 8,192 output-token limit |
 
@@ -20,10 +20,28 @@ arguments reach clients. All role Chat Completions, including streams, use the
 buffered validation path. Unknown or inconsistent families fail before model
 dispatch. Existing Qwen profiles remain supported.
 
-Gemma/LFM initially use the existing validated JSON tool envelope. Tool names,
-required arguments and schemas are validated; malformed or incomplete outputs
-do not execute tools. Their different native tool languages are not advertised
-as interchangeable Qwen tool formats. LFM's recommended repetition penalty is
+The LFM lab defaults to `--haiku-tool-role sonnet`: requests advertising tools
+use Gemma even when the model ultimately answers without a tool call. LFM did
+not pass every native agent task, so this is an explicit quality routing policy,
+not evidence that LFM matches the larger model. Set `haiku_tool_role` to `haiku`
+in the saved `runtime.json` to use LFM for these requests, or select `sonnet` or
+`opus` explicitly. The automatic default applies only to the cached `lfm2_moe`
+small model; Qwen configurations retain their existing routing. The control API
+exposes this setting and activity records the actual backend route.
+
+The lab also enables bounded local role recovery. A failed validated generation
+can escalate to a stronger local role while preserving the client alias and
+original token cap; successful recovery retains that route for the identified
+session for 20 minutes. Fresh sessions start with the configured role admission. See
+[native client checks and recovery](native-cli-quality.md) for limits and evidence.
+
+Gemma uses its native tool declarations, typed call frames and tool-response
+history, rendered by Sentinel to match the cached chat template. Its final text
+or requested JSON is returned directly. Marker-bearing file evidence is escaped
+so it cannot create control frames. LFM retains the validated JSON tool envelope.
+Tool names, required arguments and schemas are validated in both paths;
+malformed or incomplete outputs do not execute tools. Their tool languages are
+not advertised as interchangeable Qwen formats. LFM's recommended repetition penalty is
 applied by the native runtime; Sentinel does not pretend its reasoning can be
 disabled. Its thinking may consume more output tokens than a nonreasoning small
 model, so route quality and total task usage need continued evaluation.

@@ -72,6 +72,77 @@ func TestPrepareSeedsExplicitClaudeControlPlugin(t *testing.T) {
 	}
 }
 
+func TestPrepareAddsCodexCatalogWithoutChangingPolicy(t *testing.T) {
+	e := fixture(t)
+	if err := privateDirectory(filepath.Join(e.root, "codex")); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(e.root, "codex", "config.toml")
+	custom := "approval_policy = \"never\"\nsandbox_mode = \"read-only\"\n[model_providers.sentinel]\nname = \"custom\"\n"
+	if err := atomicFile(path, []byte(custom)); err != nil {
+		t.Fatal(err)
+	}
+	if err := e.prepare(); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(path)
+	if err != nil || !strings.HasSuffix(string(data), custom) || !strings.HasPrefix(string(data), "model_catalog_json = ") {
+		t.Fatalf("policy altered or catalog absent: %s %v", data, err)
+	}
+	if _, err := os.Stat(filepath.Join(e.root, "codex", "sentinel-model-catalog.json")); err != nil {
+		t.Fatal(err)
+	}
+	custom = "model_catalog_json = \"/custom/catalog.json\"\n" + custom
+	if err := atomicFile(path, []byte(custom)); err != nil {
+		t.Fatal(err)
+	}
+	if err := e.prepare(); err != nil {
+		t.Fatal(err)
+	}
+	data, err = os.ReadFile(path)
+	if err != nil || string(data) != custom {
+		t.Fatal("user catalog overwritten", err)
+	}
+}
+
+func TestCodexLaunchGetsFreshSessionAndProviderHeader(t *testing.T) {
+	e := fixture(t)
+	if err := e.prepare(); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(e.root, "codex", "config.toml")
+	config, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(config), `env_http_headers = { "X-Session-ID" = "SENTINEL_LAB_SESSION" }`) {
+		t.Fatal("missing native session header")
+	}
+	a, b := strings.Join(e.clientEnvironment("codex"), "\n"), strings.Join(e.clientEnvironment("codex"), "\n")
+	if a == b || !strings.Contains(a, "SENTINEL_LAB_SESSION=") {
+		t.Fatal("Codex launches share a session identity")
+	}
+}
+
+func TestLFMLabToolAdmissionIsExplicitAndDoesNotChangeQwen(t *testing.T) {
+	e := fixture(t)
+	model := t.TempDir()
+	path := filepath.Join(model, "config.json")
+	for _, kind := range []string{"lfm2_moe", "qwen3"} {
+		if err := os.WriteFile(path, []byte(`{"model_type":"`+kind+`"}`), 0600); err != nil {
+			t.Fatal(err)
+		}
+		args := strings.Join(e.gatewayCommand(runtimeSettings{SmallModelPath: model}), " ")
+		if strings.Contains(args, "--haiku-tool-role sonnet") != (kind == "lfm2_moe") {
+			t.Fatalf("wrong tool admission for %s: %s", kind, args)
+		}
+	}
+	args := strings.Join(e.gatewayCommand(runtimeSettings{SmallModelPath: model, HaikuToolRole: "haiku"}), " ")
+	if !strings.Contains(args, "--haiku-tool-role haiku") {
+		t.Fatal("explicit small-role choice lost")
+	}
+}
+
 func TestPreparePreservesCustomLegacyStatusWrapper(t *testing.T) {
 	e := fixture(t)
 	if err := e.prepare(); err != nil {

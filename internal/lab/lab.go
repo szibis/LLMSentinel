@@ -11,9 +11,12 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/google/uuid"
 
 	"github.com/szibis/claude-escalate/internal/clientcontrol"
 )
@@ -193,6 +196,7 @@ cli_auth_credentials_store = "file"
 
 [model_providers.sentinel]
 name = "Sentinel isolated local lab"
+env_http_headers = { "X-Session-ID" = "SENTINEL_LAB_SESSION" }
 base_url = "http://127.0.0.1:19090/v1"
 env_key = "SENTINEL_LAB_TOKEN"
 wire_api = "responses"
@@ -205,6 +209,29 @@ stream_idle_timeout_ms = 300000
 enabled = false
 `
 	if err := seedFile(filepath.Join(e.root, "codex", "config.toml"), []byte(config)); err != nil {
+		return err
+	}
+	catalogPath := filepath.Join(e.root, "codex", "sentinel-model-catalog.json")
+	if err := seedFile(catalogPath, clientcontrol.CodexModelCatalog()); err != nil {
+		return err
+	}
+	configPath := filepath.Join(e.root, "codex", "config.toml")
+	if err := regularDestination(configPath); err != nil {
+		return err
+	}
+	current, err := os.ReadFile(configPath)
+	if err != nil {
+		return err
+	}
+	if !regexp.MustCompile(`(?m)^\s*model_catalog_json\s*=`).Match(current) {
+		current = append([]byte("model_catalog_json = "+strconv.Quote(catalogPath)+"\n"), current...)
+	}
+	// Only migrate the exact generated provider header. Custom providers and
+	// explicit HTTP-header settings remain user-owned.
+	if !strings.Contains(string(current), "http_headers") {
+		current = []byte(strings.Replace(string(current), "[model_providers.sentinel]\nname = \"Sentinel isolated local lab\"\n", "[model_providers.sentinel]\nname = \"Sentinel isolated local lab\"\nenv_http_headers = { \"X-Session-ID\" = \"SENTINEL_LAB_SESSION\" }\n", 1))
+	}
+	if err := atomicFile(configPath, current); err != nil {
 		return err
 	}
 	for _, client := range []string{"claude", "codex"} {
@@ -269,7 +296,7 @@ func (e *environment) clientEnvironment(client string) []string {
 	env := allowedEnvironment("HOME", "TERM", "COLORTERM", "LANG", "LC_ALL")
 	env = append(env, "PATH="+filepath.Join(e.root, "clients", "node_modules", ".bin")+string(os.PathListSeparator)+os.Getenv("PATH"), "TMPDIR="+filepath.Join(e.root, "tmp"))
 	if client == "codex" {
-		return append(env, "CODEX_HOME="+filepath.Join(e.root, "codex"), "SENTINEL_LAB_TOKEN="+token)
+		return append(env, "CODEX_HOME="+filepath.Join(e.root, "codex"), "SENTINEL_LAB_TOKEN="+token, "SENTINEL_LAB_SESSION="+uuid.NewString())
 	}
 	env = append(env, "CLAUDE_CONFIG_DIR="+filepath.Join(e.root, "claude"), "ANTHROPIC_BASE_URL="+endpoint, "ANTHROPIC_API_KEY="+token, "ANTHROPIC_MODEL=opusplan", "ANTHROPIC_DEFAULT_HAIKU_MODEL=sentinel-haiku", "ANTHROPIC_DEFAULT_SONNET_MODEL=sentinel-sonnet", "ANTHROPIC_DEFAULT_OPUS_MODEL=sentinel-opus", "ANTHROPIC_DEFAULT_HAIKU_MODEL_NAME=Haiku", "ANTHROPIC_DEFAULT_SONNET_MODEL_NAME=Sonnet", "ANTHROPIC_DEFAULT_OPUS_MODEL_NAME=Opus", "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1", "DISABLE_AUTOUPDATER=1", "DISABLE_UPDATES=1", "DISABLE_TELEMETRY=1", "DISABLE_ERROR_REPORTING=1", "MAX_THINKING_TOKENS=0", "CLAUDE_CODE_DISABLE_ADAPTIVE_THINKING=1", "CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS=1", "ENABLE_TOOL_SEARCH=false")
 	var settings runtimeSettings

@@ -26,6 +26,8 @@ func run() int {
 	claude := flag.Bool("claude-adapter", true, "Anthropic Messages, OpenAI Responses and Chat Completions with validated local tools")
 	claudeTokens := flag.Int("claude-max-tokens", 768, "Maximum output tokens per local Claude generation (1..32768)")
 	bufferedValidation := flag.Bool("claude-buffered-validation", true, "Validate buffered model output before opening the Claude stream")
+	localRecovery := flag.Bool("local-role-recovery", false, "Allow one bounded stronger local role generation after validation failure")
+	haikuToolRole := flag.String("haiku-tool-role", "", "Optional configured local role for Haiku tool requests; keeps Haiku alias and token cap")
 	mode := flag.String("mode", "serving", "serving for local inference; learning for copied hook events; hybrid for explicitly authorized vendor APIs")
 	trainingMode := flag.Bool("training-mode", false, "Opt in to private local inference capture")
 	trainingDir := flag.String("training-dir", "", "Private directory for training candidates")
@@ -45,6 +47,8 @@ func run() int {
 		return 2
 	}
 	cfg := localgateway.Config{Upstream: *upstream, Timeout: *timeout, MaxRequestBytes: 2 * 1024 * 1024, ClaudeAdapter: *claude, ClaudeMaxTokens: *claudeTokens, ClaudeBufferedValidation: *bufferedValidation}
+	cfg.LocalRoleRecovery = *localRecovery
+	cfg.HaikuToolRole = *haikuToolRole
 	if *mode != "serving" && *mode != "learning" && *mode != "hybrid" {
 		fmt.Fprintln(os.Stderr, "mode must be serving, learning or hybrid")
 		return 2

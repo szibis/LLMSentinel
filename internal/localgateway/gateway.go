@@ -26,6 +26,8 @@ type Config struct {
 	ClaudeAdapter            bool
 	ClaudeMaxTokens          int
 	ClaudeBufferedValidation bool
+	LocalRoleRecovery        bool
+	HaikuToolRole            string
 	Router                   DecisionRouter
 	RoleUpstreams            map[string]string
 	Training                 *TrainingConfig
@@ -36,6 +38,7 @@ type Config struct {
 type Gateway struct {
 	qualityRejections atomic.Uint64
 	qualityRecoveries atomic.Uint64
+	localEscalations  atomic.Uint64
 	cfg               Config
 	upstream          *url.URL
 	proxy             *httputil.ReverseProxy
@@ -46,6 +49,8 @@ type Gateway struct {
 	training          *trainingRecorder
 	hybrid            *hybridRouter
 	roleBudgets       map[string]*atomic.Int64
+	// Accessed only while holding the single inference slot.
+	recoveredSessions map[string]recoveredSession
 	activityState     activityState
 	admission         sync.RWMutex
 	ciReservation     string
@@ -77,6 +82,9 @@ func New(cfg Config) (*Gateway, error) {
 			return nil, fmt.Errorf("%s endpoint: %w", role, err)
 		}
 		roles[role] = endpoint
+	}
+	if cfg.HaikuToolRole != "" && cfg.HaikuToolRole != "haiku" && (cfg.HaikuToolRole != "sonnet" && cfg.HaikuToolRole != "opus" || roles[cfg.HaikuToolRole] == nil) {
+		return nil, errors.New("haiku tool role must be haiku or a configured sonnet/opus role")
 	}
 	if cfg.Timeout <= 0 || cfg.Timeout > 10*time.Minute || cfg.MaxRequestBytes < 1 || cfg.MaxRequestBytes > 16*1024*1024 {
 		return nil, errors.New("timeout must be positive and at most 10m; request limit must be 1..16 MiB")

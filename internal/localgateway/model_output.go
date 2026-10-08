@@ -3,14 +3,50 @@ package localgateway
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
+	"regexp"
 	"strings"
 )
+
+var toolActionPreamble = regexp.MustCompile(`(?i)^(i('ll| will| am|'m)|let me)\b`)
+var toolExamplePreamble = regexp.MustCompile(`(?i)\b(example|sample|quoted?|demonstration)\b`)
 
 // Normalize recognized model formats into one internal envelope. Tool names,
 // schemas and client policy are still validated before any client tool is emitted.
 func normalizeModelOutput(req claudeRequest, raw string) (localToolEnvelope, error) {
 	out := localToolEnvelope{Calls: []localToolCall{}}
 	value := strings.TrimSpace(raw)
+	if req.ToolFormat == "gemma4" && (strings.HasPrefix(value, "{") || strings.HasPrefix(value, "[")) {
+		// Native Gemma frames carry executable calls. A user's requested JSON
+		// answer may contain protocol-looking field names and remains data.
+		var answer any
+		if err := unmarshalModelJSON(value, &answer); err != nil {
+			return out, fmt.Errorf("invalid final JSON: %w", err)
+		}
+		out.Text = raw
+		return out, nil
+	}
+	if req.JSONTools && toolActionPreamble.MatchString(value) {
+		if start := strings.Index(value, "{"); start > 0 && strings.Contains(value[start:], `"tool_calls"`) && !toolExamplePreamble.MatchString(value[:start]) {
+			prefix := strings.TrimSpace(value[:start])
+			candidate := strings.TrimSpace(value[start:])
+			if strings.HasSuffix(prefix, "```json") && strings.HasSuffix(candidate, "```") {
+				prefix = strings.TrimSpace(strings.TrimSuffix(prefix, "```json"))
+				candidate = strings.TrimSpace(strings.TrimSuffix(candidate, "```"))
+			}
+			parsed, err := normalizeModelOutput(req, candidate)
+			if err != nil {
+				return out, err
+			}
+			if len(parsed.Calls) == 0 {
+				return out, errors.New("action preamble must precede a complete tool envelope")
+			}
+			if parsed.Text == "" {
+				parsed.Text = prefix
+			}
+			return parsed, nil
+		}
+	}
 	jsonValue := strings.HasPrefix(value, "{") || strings.HasPrefix(value, "[")
 	taggedStart := strings.Index(value, "<tool_call>")
 	gemmaStart := strings.Index(value, gemmaCallStart)
@@ -61,8 +97,8 @@ func normalizeModelOutput(req claudeRequest, raw string) (localToolEnvelope, err
 		return out, nil
 	}
 	var decoded any
-	if unmarshalModelJSON(value, &decoded) != nil {
-		return out, errors.New("invalid model JSON")
+	if err := unmarshalModelJSON(value, &decoded); err != nil {
+		return out, fmt.Errorf("invalid model JSON: %w", err)
 	}
 	if object, ok := decoded.(map[string]any); ok {
 		if calls, present := object["tool_calls"]; present {
