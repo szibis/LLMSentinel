@@ -60,7 +60,7 @@ func (s *Store) SaveRecord(record AnalyticsRecord) error {
 
 	_, err = tx.Exec(query,
 		record.ValidationID,
-		record.Timestamp,
+		record.Timestamp.UTC().Format(time.RFC3339Nano),
 		string(phase1JSON),
 		string(phase2JSON),
 		string(phase3JSON),
@@ -151,11 +151,11 @@ func (s *Store) GetSentimentTrend(hours int) (SentimentTrend, error) {
 	// Count sentiments in period
 	query := `
 		SELECT
-			sentiment_type,
+			sentiment,
 			COUNT(*) as count
 		FROM sentiment_outcomes
-		WHERE timestamp > datetime('now', '-' || ? || ' hours')
-		GROUP BY sentiment_type
+		WHERE datetime(timestamp) > datetime('now', '-' || ? || ' hours')
+		GROUP BY sentiment
 	`
 
 	rows, err := s.db.Query(query, hours)
@@ -222,7 +222,9 @@ func (s *Store) GetBudgetStatus() (BudgetStatus, error) {
 	`
 
 	var dailyUsed float64
-	s.db.QueryRow(query).Scan(&dailyUsed)
+	if err := s.db.QueryRow(query).Scan(&dailyUsed); err != nil {
+		return status, fmt.Errorf("failed to query daily budget: %w", err)
+	}
 	status.DailyBudget.Used = dailyUsed
 
 	// Query monthly spending
@@ -232,7 +234,9 @@ func (s *Store) GetBudgetStatus() (BudgetStatus, error) {
 	`
 
 	var monthlyUsed float64
-	s.db.QueryRow(query).Scan(&monthlyUsed)
+	if err := s.db.QueryRow(query).Scan(&monthlyUsed); err != nil {
+		return status, fmt.Errorf("failed to query monthly budget: %w", err)
+	}
 	status.MonthlyBudget.Used = monthlyUsed
 
 	return status, nil
@@ -296,7 +300,7 @@ func (s *Store) storeSentimentOutcome(record AnalyticsRecord) error {
 		record.Phase3.Learning.Success,
 		record.Phase3.ActualTotalTokens,
 		record.Phase3.Learning.DurationSeconds,
-		record.Timestamp,
+		record.Timestamp.UTC().Format(time.RFC3339Nano),
 	)
 
 	return err
@@ -313,7 +317,7 @@ func (s *Store) storeBudgetImpact(record AnalyticsRecord) error {
 		record.Phase1.RoutedModel,
 		record.Phase3.ActualTotalTokens,
 		record.Phase3.ActualCostUSD,
-		record.Timestamp,
+		record.Timestamp.UTC().Format(time.RFC3339Nano),
 	)
 
 	return err
@@ -334,7 +338,7 @@ func (s *Store) storeFrustrationEvent(record AnalyticsRecord) error {
 
 	_, err := s.db.Exec(query,
 		record.ValidationID,
-		record.Timestamp,
+		record.Timestamp.UTC().Format(time.RFC3339Nano),
 		record.Phase3.UserSentiment.ImplicitSentiment,
 		record.Phase1.TaskType,
 		record.Phase1.RoutedModel,
@@ -364,7 +368,7 @@ func (s *Store) storeSentimentOutcomeWithTx(tx *sql.Tx, record AnalyticsRecord) 
 		record.Phase3.Learning.Success,
 		record.Phase3.ActualTotalTokens,
 		record.Phase3.Learning.DurationSeconds,
-		record.Timestamp,
+		record.Timestamp.UTC().Format(time.RFC3339Nano),
 	)
 
 	return err
@@ -381,7 +385,7 @@ func (s *Store) storeBudgetImpactWithTx(tx *sql.Tx, record AnalyticsRecord) erro
 		record.Phase1.RoutedModel,
 		record.Phase3.ActualTotalTokens,
 		record.Phase3.ActualCostUSD,
-		record.Timestamp,
+		record.Timestamp.UTC().Format(time.RFC3339Nano),
 	)
 
 	return err
@@ -402,7 +406,7 @@ func (s *Store) storeFrustrationEventWithTx(tx *sql.Tx, record AnalyticsRecord) 
 
 	_, err := tx.Exec(query,
 		record.ValidationID,
-		record.Timestamp,
+		record.Timestamp.UTC().Format(time.RFC3339Nano),
 		record.Phase3.UserSentiment.ImplicitSentiment,
 		record.Phase1.TaskType,
 		record.Phase1.RoutedModel,
@@ -420,7 +424,7 @@ func (s *Store) getFrustrationEvents(hours int) []FrustrationEvent {
 	query := `
 		SELECT timestamp, sentiment, task_type, initial_model, escalated_to, resolved, resolution_time
 		FROM frustration_events
-		WHERE timestamp > datetime('now', '-' || ? || ' hours')
+		WHERE datetime(timestamp) > datetime('now', '-' || ? || ' hours')
 		ORDER BY timestamp DESC
 	`
 
@@ -457,11 +461,11 @@ func (s *Store) getSentimentTimeline(hours int) []SentimentTimeslot {
 	query := `
 		SELECT
 			strftime('%H', timestamp) as hour,
-			sentiment_type,
+			sentiment,
 			COUNT(*) as count
 		FROM sentiment_outcomes
-		WHERE timestamp > datetime('now', '-' || ? || ' hours')
-		GROUP BY hour, sentiment_type
+		WHERE datetime(timestamp) > datetime('now', '-' || ? || ' hours')
+		GROUP BY hour, sentiment
 		ORDER BY hour
 	`
 

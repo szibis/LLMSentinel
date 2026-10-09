@@ -69,6 +69,9 @@ type Result struct {
 }
 type Report struct {
 	Version         int             `json:"version"`
+	FixtureVersion  int             `json:"fixture_version,omitempty"`
+	Suite           string          `json:"suite,omitempty"`
+	CorpusSHA256    string          `json:"corpus_sha256,omitempty"`
 	Scope           string          `json:"scope"`
 	StartedAt       time.Time       `json:"started_at"`
 	FinishedAt      time.Time       `json:"finished_at"`
@@ -90,7 +93,7 @@ func matches(f Fixture, answer string) bool {
 	var actual, expected any
 	if f.ID == "coding-fix" {
 		var result map[string]string
-		if len(answer) > 8192 || json.Unmarshal([]byte(answer), &result) != nil || len(result) != 1 {
+		if len(answer) > 8192 || strictJSON([]byte(answer), &result) != nil || len(result) != 1 {
 			return false
 		}
 		expression, err := parser.ParseExpr(result["expression"])
@@ -100,7 +103,7 @@ func matches(f Fixture, answer string) bool {
 		a, b, ok := coefficients(expression)
 		return ok && a == 1 && b == 1
 	}
-	return json.Unmarshal([]byte(answer), &actual) == nil && json.Unmarshal([]byte(f.Expected), &expected) == nil && reflect.DeepEqual(actual, expected)
+	return strictJSON([]byte(answer), &actual) == nil && strictJSON([]byte(f.Expected), &expected) == nil && reflect.DeepEqual(actual, expected)
 }
 
 // Symbolic coefficients accept equivalent addition expressions without executing model code.
@@ -181,7 +184,7 @@ func count(v any) (int64, bool) {
 }
 
 func execute(ctx context.Context, client *http.Client, base, role, protocol string, f Fixture, timeout time.Duration) (result Result) {
-	result = Result{Task: f.ID, Role: role, Protocol: protocol, UsageSource: "unknown"}
+	result = Result{Task: f.ID, Role: role, Protocol: protocol, UsageSource: "unknown", Checks: map[string]bool{}}
 	started := time.Now()
 	defer func() { result.LatencyMS = time.Since(started).Milliseconds() }()
 	ctx, cancel := context.WithTimeout(ctx, timeout)
@@ -190,6 +193,7 @@ func execute(ctx context.Context, client *http.Client, base, role, protocol stri
 	history := []any{object{"role": "user", "content": f.Prompt}}
 	var totalIn, totalOut int64
 	known := true
+	successfulReads := 0
 	for step := 0; step < 4; step++ {
 		payload := object{"model": "sentinel-" + role, "stream": false}
 		if protocol == "messages" {
@@ -266,11 +270,14 @@ func execute(ctx context.Context, client *http.Client, base, role, protocol stri
 				result.Failure = "incomplete final answer"
 				return
 			}
-			if result.ToolCalls == 0 {
+			if successfulReads == 0 || (f.ID == "tool-recovery" && !result.Checks["failed_read_before_success"]) {
 				result.Failure = "required fixture was not read"
 				return
 			}
 			result.Passed = matches(f, result.Final)
+			result.Checks["protocol_valid"] = true
+			result.Checks["fixture_read"] = successfulReads > 0
+			result.Checks["final_assertion"] = result.Passed
 			if !result.Passed {
 				result.Failure = "final answer failed fixture assertions"
 			}
@@ -286,24 +293,41 @@ func execute(ctx context.Context, client *http.Client, base, role, protocol stri
 		}
 		call := calls[0]
 		input := obj(call["input"])
-		if call["name"] != "read_fixture" || str(call["id"]) == "" || len(input) != 1 || input["path"] != f.Path {
+		if call["name"] != "read_fixture" || str(call["id"]) == "" || len(input) != 1 {
 			result.Failure = "invalid fixture tool or path"
 			return
 		}
+		if f.ID == "tool-recovery" && input["path"] == "unavailable.txt" && result.ToolCalls == 0 {
+			result.ToolCalls++
+			result.Checks["failed_read_before_success"] = true
+			history = fixtureResult(history, protocol, blocks, call["id"], "fixture unavailable", true)
+			continue
+		}
+		if input["path"] != f.Path || (f.ID == "tool-recovery" && !result.Checks["failed_read_before_success"]) {
+			result.Failure = "invalid fixture tool or recovery order"
+			return
+		}
 		result.ToolCalls++
-		if result.ToolCalls > 1 {
+		successfulReads++
+		if successfulReads > 1 {
 			result.Failure = "repeated unchanged fixture read"
 			return
 		}
-		if protocol == "messages" {
-			history = append(history, object{"role": "assistant", "content": blocks}, object{"role": "user", "content": []any{object{"type": "tool_result", "tool_use_id": call["id"], "content": f.Content}}})
-		} else {
-			history = append(history, blocks...)
-			history = append(history, object{"type": "function_call_output", "call_id": call["id"], "output": f.Content})
-		}
+		history = fixtureResult(history, protocol, blocks, call["id"], f.Content, false)
 	}
 	result.Failure = "turn limit exceeded"
 	return
+}
+
+func fixtureResult(history []any, protocol string, blocks []any, id any, content string, failed bool) []any {
+	if protocol == "messages" {
+		return append(history, object{"role": "assistant", "content": blocks}, object{"role": "user", "content": []any{object{"type": "tool_result", "tool_use_id": id, "content": content, "is_error": failed}}})
+	}
+	history = append(history, blocks...)
+	if failed {
+		content = "[read_fixture error] " + content
+	}
+	return append(history, object{"type": "function_call_output", "call_id": id, "output": content})
 }
 
 const reportFile = "task-quality-latest.json"
@@ -392,7 +416,12 @@ func Load(root string) *Report {
 func LoadCLI(root string) *Report { return loadReport(root, cliReportFile, "real-cli-task-probes") }
 
 func loadReport(root, filename, scope string) *Report {
-	file, err := os.Open(filepath.Join(root, filename))
+	path := filepath.Join(root, filename)
+	stat, err := os.Lstat(path)
+	if err != nil || !stat.Mode().IsRegular() || stat.Size() > 1<<20 {
+		return nil
+	}
+	file, err := os.Open(path)
 	if err != nil {
 		return nil
 	}
@@ -402,7 +431,7 @@ func loadReport(root, filename, scope string) *Report {
 		return nil
 	}
 	var report Report
-	if json.Unmarshal(raw, &report) != nil || report.Version != 1 || report.Scope != scope || report.FinishedAt.IsZero() || len(report.Results) == 0 || len(report.Results) > 24 {
+	if strictJSON(raw, &report) != nil || report.Version != 1 || report.Scope != scope || report.FinishedAt.IsZero() || len(report.Results) == 0 || len(report.Results) > 96 {
 		return nil
 	}
 	return &report
@@ -417,6 +446,7 @@ func Run(args []string, _ io.Reader, out, stderr io.Writer) int {
 	role := flags.String("role", "sonnet", "haiku, sonnet or opus")
 	protocol := flags.String("protocol", "both", "messages, responses or both")
 	task := flags.String("task", "all", "all, exact-read, coding-fix, loki-evidence or planning")
+	suite := flags.String("suite", "baseline", "baseline or extended fixture corpus")
 	timeout := flags.Duration("timeout", 2*time.Minute, "whole-task timeout")
 	if flags.Parse(args) != nil || flags.NArg() != 0 || !validEndpoint(*endpoint) || (*role != "haiku" && *role != "sonnet" && *role != "opus") || (*protocol != "both" && *protocol != "messages" && *protocol != "responses") || *timeout <= 0 || *timeout > 10*time.Minute {
 		fmt.Fprintln(stderr, "invalid quality options")
@@ -428,7 +458,12 @@ func Run(args []string, _ io.Reader, out, stderr io.Writer) int {
 		return 1
 	}
 	var selected []Fixture
-	for _, f := range fixtures("QUALITY_" + hex.EncodeToString(nonce)) {
+	corpus, err := fixtureSuite("QUALITY_"+hex.EncodeToString(nonce), *suite)
+	if err != nil {
+		fmt.Fprintln(stderr, err)
+		return 2
+	}
+	for _, f := range corpus {
 		if *task == "all" || *task == f.ID {
 			selected = append(selected, f)
 		}
@@ -468,7 +503,8 @@ func Run(args []string, _ io.Reader, out, stderr io.Writer) int {
 		fmt.Fprintln(stderr, "quality requires serving mode, local-only policy and disabled paid API opt-in")
 		return 1
 	}
-	report := Report{Version: 1, Scope: "bounded-api-task-probes", Endpoint: *endpoint, StartedAt: time.Now().UTC(), GatewayHealth: health}
+	report := Report{Version: 1, FixtureVersion: fixtureVersion, Suite: *suite, Scope: "bounded-api-task-probes", Endpoint: *endpoint, StartedAt: time.Now().UTC(), GatewayHealth: health}
+	report.CorpusSHA256 = corpusDigest(corpus)
 	// Model identities are configuration/status evidence, not inferred from role aliases.
 	var snapshot, diagnostic bytes.Buffer
 	if *endpoint == "http://127.0.0.1:19090" && labstatus.Run([]string{"--root", absolute, "--json"}, nil, &snapshot, &diagnostic) == 0 && json.Valid(snapshot.Bytes()) {

@@ -150,8 +150,8 @@ func (bs *BaristaSource) Poll() (StatuslineData, error) {
 	return StatuslineData{
 		Source:              bs.Name(),
 		Timestamp:           time.Now(),
-		InputTokens:         *baristaMetrics.InputTokens,
-		OutputTokens:        *baristaMetrics.OutputTokens,
+		InputTokens:         baristaMetrics.InputTokens,
+		OutputTokens:        baristaMetrics.OutputTokens,
 		CacheHitTokens:      cacheHit,
 		CacheCreationTokens: cacheCreate,
 		ContextWindowUsage:  contextUsage,

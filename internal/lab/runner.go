@@ -36,8 +36,13 @@ type runState struct {
 var ownershipID = regexp.MustCompile(`^[A-Za-z0-9_-]+$`)
 
 func (e *environment) runRunner(args []string) error {
-	if len(args) == 0 || len(args) > 2 || (len(args) == 2 && (args[0] != "logs" || args[1] != "--follow")) {
+	if len(args) == 0 || len(args) > 2 {
 		return errors.New("expected runner start|run|restart|stop|status|logs [--follow]|ask")
+	}
+	if len(args) >= 2 {
+		if args[0] != "logs" || args[1] != "--follow" {
+			return errors.New("expected runner start|run|restart|stop|status|logs [--follow]|ask")
+		}
 	}
 	switch args[0] {
 	case "start":
@@ -45,10 +50,7 @@ func (e *environment) runRunner(args []string) error {
 	case "run":
 		return e.supervise()
 	case "restart":
-		if err := e.stop(true); err != nil {
-			return err
-		}
-		return e.start()
+		return e.restart()
 	case "stop":
 		return e.stop(true)
 	case "status":
@@ -60,6 +62,26 @@ func (e *environment) runRunner(args []string) error {
 	default:
 		return errors.New("unknown runner command")
 	}
+}
+
+// A restart is one control transaction. Unlike an explicit stop it must never
+// cancel a hardware CI owner's restoration lease, including a concurrent pause.
+func (e *environment) restart() error {
+	control, err := e.stopControlLock()
+	if err != nil {
+		return err
+	}
+	defer control.Close()
+	if err := e.checkCIPause(); err != nil {
+		return err
+	}
+	if err := e.stopFor(true, true); err != nil {
+		return err
+	}
+	if err := e.prepare(); err != nil {
+		return err
+	}
+	return e.startLocked()
 }
 func preflightPorts(ports []int, timeout time.Duration) error {
 	deadline := time.Now().Add(timeout)
@@ -239,7 +261,11 @@ func (e *environment) supervise() (result error) {
 	for _, item := range plan {
 		ports = append(ports, item.Port)
 	}
-	if err = preflightPorts(ports, 3*time.Second); err != nil {
+	check := e.portCheck
+	if check == nil {
+		check = preflightPorts
+	}
+	if err = check(ports, 3*time.Second); err != nil {
 		return err
 	}
 	if len(plan) > 0 {
@@ -322,7 +348,7 @@ func (e *environment) status() error {
 		fmt.Fprintln(e.out, string(data))
 	}
 	for _, path := range []string{"/health", "/sentinel/status"} {
-		value, err := fetchJSON(endpoint+path, 3*time.Second)
+		value, err := e.fetchJSON(endpoint+path, 3*time.Second)
 		if err != nil {
 			fmt.Fprintln(e.out, "Local health unavailable:", err)
 			if path == "/health" {
@@ -429,7 +455,9 @@ func (e *environment) ask() error {
 	}
 	request.Header.Set("Content-Type", "application/json")
 	fmt.Fprintln(e.stderr, "Sending to local model; first output may wait for model loading and buffered generation.")
-	response, err := localHTTP(300 * time.Second).Do(request)
+	client := e.localHTTP(300 * time.Second)
+	defer client.CloseIdleConnections()
+	response, err := client.Do(request)
 	if err != nil {
 		return err
 	}

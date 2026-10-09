@@ -12,6 +12,9 @@ type RateLimiter struct {
 	ipBuckets         map[string]*tokenBucket
 	mu                sync.RWMutex
 	cleanupTicker     *time.Ticker
+	done              chan struct{}
+	cleanupDone       chan struct{}
+	closeOnce         sync.Once
 }
 
 // tokenBucket represents a token bucket for rate limiting
@@ -28,6 +31,8 @@ func NewRateLimiter(requestsPerMinute int, perIP bool) *RateLimiter {
 		perIP:             perIP,
 		ipBuckets:         make(map[string]*tokenBucket),
 		cleanupTicker:     time.NewTicker(5 * time.Minute),
+		done:              make(chan struct{}),
+		cleanupDone:       make(chan struct{}),
 	}
 
 	// Start cleanup goroutine
@@ -107,7 +112,18 @@ func (rl *RateLimiter) Reset(ip string) {
 
 // cleanupExpiredBuckets periodically cleans up old buckets
 func (rl *RateLimiter) cleanupExpiredBuckets() {
-	for range rl.cleanupTicker.C {
+	if rl.cleanupDone != nil {
+		defer close(rl.cleanupDone)
+	}
+	for {
+		select {
+		case <-rl.done:
+			return
+		case _, ok := <-rl.cleanupTicker.C:
+			if !ok {
+				return
+			}
+		}
 		rl.mu.Lock()
 
 		now := time.Now()
@@ -125,7 +141,11 @@ func (rl *RateLimiter) cleanupExpiredBuckets() {
 
 // Close stops the rate limiter
 func (rl *RateLimiter) Close() {
-	rl.cleanupTicker.Stop()
+	rl.closeOnce.Do(func() {
+		rl.cleanupTicker.Stop()
+		close(rl.done)
+	})
+	<-rl.cleanupDone
 }
 
 func min(a, b float64) float64 {

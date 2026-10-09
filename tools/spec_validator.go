@@ -171,7 +171,7 @@ func (sv *SpecValidator) ValidateSpecCompliance(srcDir string) *ValidationResult
 		implementationFound := false
 		for _, file := range req.Files {
 			fullPath := filepath.Join(srcDir, file)
-			if _, err := os.Stat(fullPath); err == nil { // #nosec G703 -- Operator-selected source root and hardcoded requirement filename.
+			if info, err := os.Stat(fullPath); err == nil && !info.IsDir() { // #nosec G703 -- Operator-selected source root and hardcoded requirement filename.
 				implementationFound = true
 				results.ImplementedCount++
 				break
@@ -182,7 +182,7 @@ func (sv *SpecValidator) ValidateSpecCompliance(srcDir string) *ValidationResult
 		testsFound := false
 		for _, testFile := range req.Tests {
 			fullPath := filepath.Join(srcDir, testFile)
-			if _, err := os.Stat(fullPath); err == nil { // #nosec G703 -- Operator-selected source root and hardcoded test filename.
+			if info, err := os.Stat(fullPath); err == nil && !info.IsDir() { // #nosec G703 -- Operator-selected source root and hardcoded test filename.
 				testsFound = true
 				results.TestedCount++
 				break

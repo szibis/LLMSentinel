@@ -151,7 +151,7 @@ optimizations:
 `
 
 	// Tools/adapters
-	config += `# Tool adapters (auto-detected)\n`
+	config += "# Tool adapters (auto-detected)\n"
 
 	if detectedTools.GitPath != "" {
 		config += `tools:

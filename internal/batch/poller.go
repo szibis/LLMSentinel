@@ -9,16 +9,23 @@ import (
 	"github.com/szibis/claude-escalate/internal/client"
 )
 
+// batchAPI is the minimal offline-testable boundary for batch operations.
+type batchAPI interface {
+	GetBatchStatus(context.Context, string) (*client.BatchJob, error)
+	GetBatchResults(context.Context, string) ([]client.BatchResult, error)
+	CancelBatch(context.Context, string) (*client.BatchJob, error)
+}
+
 // BatchPoller manages polling of submitted batch jobs
 type BatchPoller struct {
 	mu                sync.RWMutex
-	anthropicClient   *client.AnthropicClient
+	anthropicClient   batchAPI
 	jobs              map[string]*BatchJobTracker
 	pollingInterval   time.Duration
 	maxRetries        int
 	retryBackoff      time.Duration
 	stopChan          chan struct{}
-	wg                sync.WaitGroup
+	doneChan          chan struct{}
 	isRunning         bool
 	totalJobsPolled   int64
 	totalJobsComplete int64
@@ -40,7 +47,7 @@ type BatchJobTracker struct {
 }
 
 // NewBatchPoller creates a new batch poller
-func NewBatchPoller(anthropicClient *client.AnthropicClient) *BatchPoller {
+func NewBatchPoller(anthropicClient batchAPI) *BatchPoller {
 	return &BatchPoller{
 		anthropicClient: anthropicClient,
 		jobs:            make(map[string]*BatchJobTracker),
@@ -55,45 +62,43 @@ func NewBatchPoller(anthropicClient *client.AnthropicClient) *BatchPoller {
 // Start begins polling for batch job completion in background
 func (bp *BatchPoller) Start(ctx context.Context) error {
 	bp.mu.Lock()
+	defer bp.mu.Unlock()
 	if bp.isRunning {
-		bp.mu.Unlock()
 		return fmt.Errorf("poller already running")
 	}
+	bp.stopChan = make(chan struct{})
+	bp.doneChan = make(chan struct{})
 	bp.isRunning = true
-	bp.mu.Unlock()
-
-	bp.wg.Add(1)
-	go bp.pollingLoop(ctx)
-
+	go bp.pollingLoop(ctx, bp.stopChan, bp.doneChan, bp.pollingInterval)
 	return nil
 }
 
-// Stop halts the polling loop
+// Stop waits for the current generation to finish; concurrent stops share its completion.
 func (bp *BatchPoller) Stop() {
 	bp.mu.Lock()
 	if !bp.isRunning {
 		bp.mu.Unlock()
 		return
 	}
-	bp.isRunning = false
+	stop, done := bp.stopChan, bp.doneChan
+	select {
+	case <-stop:
+	default:
+		close(stop)
+	}
 	bp.mu.Unlock()
-
-	close(bp.stopChan)
-	bp.wg.Wait()
+	<-done
 }
 
-// pollingLoop continuously checks batch job status
-func (bp *BatchPoller) pollingLoop(ctx context.Context) {
-	defer bp.wg.Done()
-
-	ticker := time.NewTicker(bp.pollingInterval)
+func (bp *BatchPoller) pollingLoop(ctx context.Context, stop, done chan struct{}, interval time.Duration) {
+	defer func() { bp.mu.Lock(); bp.isRunning = false; close(done); bp.mu.Unlock() }()
+	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
-
 	for {
 		select {
 		case <-ctx.Done():
 			return
-		case <-bp.stopChan:
+		case <-stop:
 			return
 		case <-ticker.C:
 			bp.pollAllJobs(ctx)
@@ -117,18 +122,24 @@ func (bp *BatchPoller) pollAllJobs(ctx context.Context) {
 
 // pollJob checks status of a single batch job
 func (bp *BatchPoller) pollJob(ctx context.Context, jobID string) {
-	bp.mu.Lock()
-	tracker, exists := bp.jobs[jobID]
+	bp.mu.RLock()
+	_, exists := bp.jobs[jobID]
+	bp.mu.RUnlock()
 	if !exists {
+		return
+	}
+
+	// Do network I/O outside the lock; publish status updates under the lock.
+	job, err := bp.anthropicClient.GetBatchStatus(ctx, jobID)
+	bp.mu.Lock()
+	tracker := bp.jobs[jobID]
+	if tracker == nil {
 		bp.mu.Unlock()
 		return
 	}
-	bp.mu.Unlock()
-
-	// Get current job status from Anthropic API
-	job, err := bp.anthropicClient.GetBatchStatus(ctx, jobID)
 	if err != nil {
 		tracker.ErrorMessage = fmt.Sprintf("polling error: %v", err)
+		bp.mu.Unlock()
 		return
 	}
 
@@ -138,6 +149,7 @@ func (bp *BatchPoller) pollJob(ctx context.Context, jobID string) {
 	tracker.ProcessingCount = job.RequestCounts.Processing
 	tracker.SuccessCount = job.RequestCounts.Succeeded
 	tracker.FailureCount = job.RequestCounts.Errored
+	bp.mu.Unlock()
 
 	// If job is done, retrieve results
 	if job.ProcessingStatus == "succeeded" || job.ProcessingStatus == "failed" {

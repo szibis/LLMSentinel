@@ -27,8 +27,21 @@ func NewDownloadManager(cachePath string) *DownloadManager {
 	}
 }
 
+func validateModelID(modelID string) error {
+	if modelID == "" || modelID == "." || modelID == ".." || filepath.Base(modelID) != modelID {
+		return fmt.Errorf("model ID must be a single cache filename")
+	}
+	return nil
+}
+
 // EnsureModel ensures a model is downloaded and cached
 func (dm *DownloadManager) EnsureModel(ctx context.Context, modelID, source string) (string, error) {
+	if err := validateModelID(modelID); err != nil {
+		return "", err
+	}
+	if err := ctx.Err(); err != nil {
+		return "", err
+	}
 	// Generate cache filename
 	cacheFile := filepath.Join(dm.cachePath, modelID+".onnx")
 
@@ -71,23 +84,34 @@ func (dm *DownloadManager) downloadFromHuggingFace(ctx context.Context, modelID,
 	// Download with timeout and retry
 	var resp *http.Response
 	for attempt := 0; attempt < 3; attempt++ {
+		if err := ctx.Err(); err != nil {
+			return "", err
+		}
 		resp, err = dm.client.Do(req)
 		if err == nil && resp.StatusCode == 200 {
 			break
 		}
+		if resp != nil && resp.Body != nil {
+			resp.Body.Close()
+		}
 		if attempt < 2 {
-			time.Sleep(time.Second * time.Duration(attempt+1))
+			timer := time.NewTimer(time.Second * time.Duration(attempt+1))
+			select {
+			case <-ctx.Done():
+				timer.Stop()
+				return "", ctx.Err()
+			case <-timer.C:
+			}
 		}
 	}
 
 	if err != nil {
 		return "", fmt.Errorf("download failed: %w", err)
 	}
-	defer resp.Body.Close()
-
 	if resp.StatusCode != 200 {
 		return "", fmt.Errorf("download failed: status %d", resp.StatusCode)
 	}
+	defer resp.Body.Close()
 
 	// Create cache directory
 	if err := os.MkdirAll(dm.cachePath, 0755); err != nil {
@@ -118,6 +142,9 @@ func (dm *DownloadManager) downloadFromHuggingFace(ctx context.Context, modelID,
 
 // findLocalModel finds a model in local system paths
 func (dm *DownloadManager) findLocalModel(modelID string) (string, error) {
+	if err := validateModelID(modelID); err != nil {
+		return "", err
+	}
 	// Check in cache path first
 	cacheFile := filepath.Join(dm.cachePath, modelID+".onnx")
 	if _, err := os.Stat(cacheFile); err == nil {

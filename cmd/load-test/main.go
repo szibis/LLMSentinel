@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"sort"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -77,7 +78,9 @@ func runLoadTest(config LoadTestConfig) *LoadTestMetrics {
 
 	// Channels for coordination
 	stopChan := make(chan struct{})
-	tickerChan := time.NewTicker(config.ReportInterval).C
+	reportTicker := time.NewTicker(config.ReportInterval)
+	defer reportTicker.Stop()
+	tickerChan := reportTicker.C
 	requestChan := make(chan struct{}, config.Workers*10)
 
 	// WaitGroup for workers
@@ -93,7 +96,7 @@ func runLoadTest(config LoadTestConfig) *LoadTestMetrics {
 
 				// Simulate request processing
 				req := batch.BatchRequest{
-					ID:              fmt.Sprintf("req_%d_%d", workerID, metrics.TotalRequests),
+					ID:              fmt.Sprintf("req_%d_%d", workerID, atomic.LoadInt64(&metrics.TotalRequests)),
 					PromptLength:    5000 + workerID*100,
 					EstimatedOutput: 2000 + workerID*50,
 					Model:           "sonnet",
@@ -131,6 +134,9 @@ func runLoadTest(config LoadTestConfig) *LoadTestMetrics {
 
 	// Main control loop
 	go func() {
+		defer close(requestChan)
+		deadline := time.NewTimer(config.Duration)
+		defer deadline.Stop()
 		startTime := time.Now()
 		sustainDuration := config.Duration - config.RampUpDuration - config.RampDownDuration
 
@@ -157,9 +163,14 @@ func runLoadTest(config LoadTestConfig) *LoadTestMetrics {
 
 			// Send requests to achieve target rate
 			ratePerWorker := float64(currentRate) / float64(config.Workers)
-			interval := time.Duration(float64(time.Second) / ratePerWorker)
+			interval := time.Millisecond
+			if ratePerWorker > 0 {
+				interval = time.Duration(float64(time.Second) / ratePerWorker)
+			}
 
 			select {
+			case <-deadline.C:
+				return
 			case <-stopChan:
 				return
 			case <-time.After(interval):
@@ -172,18 +183,26 @@ func runLoadTest(config LoadTestConfig) *LoadTestMetrics {
 				}
 			}
 		}
-		close(requestChan)
 	}()
 
 	// Report metrics periodically
+	reportDone := make(chan struct{})
 	go func() {
-		for range tickerChan {
-			printInterimReport(metrics)
+		defer close(reportDone)
+		for {
+			select {
+			case <-tickerChan:
+				printInterimReport(metrics)
+			case <-stopChan:
+				return
+			}
 		}
 	}()
 
 	// Wait for all workers to finish
 	wg.Wait()
+	close(stopChan)
+	<-reportDone
 	metrics.EndTime = time.Now()
 
 	return metrics
@@ -276,6 +295,8 @@ func calculatePercentile(values []int64, percentile float64) int64 {
 		return 0
 	}
 
+	values = append([]int64(nil), values...)
+	sort.Slice(values, func(i, j int) bool { return values[i] < values[j] })
 	if percentile <= 0 {
 		return values[0]
 	}

@@ -15,7 +15,8 @@ import (
 )
 
 // Test helpers
-func setupTestServer(_ *testing.T) *Server {
+func setupTestServer(t *testing.T) *Server {
+	t.Setenv("HOME", t.TempDir())
 	loader := config.NewLoader("")
 	collector := metrics.NewMetricsCollector()
 	publisher := metrics.NewMetricsPublisher(collector, 1*time.Minute)

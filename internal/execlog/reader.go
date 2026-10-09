@@ -80,6 +80,9 @@ func (r *Reader) SessionMetrics(sessionID string) SessionMetrics {
 
 // SlowestOperations returns the N slowest operations by average duration
 func (r *Reader) SlowestOperations(limit int) []OperationStats {
+	if limit <= 0 {
+		return nil
+	}
 	stats := r.aggregateByCommand()
 
 	var results []OperationStats
@@ -101,6 +104,9 @@ func (r *Reader) SlowestOperations(limit int) []OperationStats {
 
 // FastestOperations returns operations under 500ms
 func (r *Reader) FastestOperations(limit int) []OperationStats {
+	if limit <= 0 {
+		return nil
+	}
 	stats := r.aggregateByCommand()
 
 	var results []OperationStats

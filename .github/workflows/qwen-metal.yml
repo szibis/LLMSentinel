@@ -57,6 +57,7 @@ jobs:
       TRANSFORMERS_OFFLINE: '1'
       SENTINEL_CI_PROJECT_ROOT: ${{ vars.SENTINEL_CI_PROJECT_ROOT }}
       SENTINEL_CI_LAB_ROOT: ${{ vars.SENTINEL_CI_LAB_ROOT }}
+      SENTINEL_EXTENDED_QUALITY_REQUIRED: ${{ vars.SENTINEL_EXTENDED_QUALITY_REQUIRED || 'false' }}
     steps:
       - uses: actions/checkout@v5
         with:
@@ -127,6 +128,7 @@ jobs:
           CONTROLS_SHA: ${{ github.workflow_sha }}
         run: |
           mkdir -p qwen-metal-artifacts
+          printf 'SENTINEL_CI_SOURCE_SHA=%s\n' "$(git rev-parse HEAD)" >> "$GITHUB_ENV"
           jq -n --arg sentinel "$(git rev-parse HEAD)" \
             --arg mlx "$(git -C .qwen-mlx-source rev-parse HEAD)" \
             --arg controls "$CONTROLS_SHA" \
@@ -136,13 +138,31 @@ jobs:
             > qwen-metal-artifacts/revisions.json
       - name: Run real offline client API, tool continuation and cache proofs
         shell: bash
-        run: '"$RUNNER_TEMP/qwen-sentinel-tools" smoke --gateway "$RUNNER_TEMP/qwen-sentinel-gateway" --integration-proofs'
+        run: '"$RUNNER_TEMP/qwen-sentinel-tools" smoke --gateway "$RUNNER_TEMP/qwen-sentinel-gateway" --integration-proofs --native-quality'
+      - name: Hash and verify synthetic Metal evidence
+        if: always()
+        env:
+          CONTROLS_SHA: ${{ github.workflow_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          args=()
+          while IFS= read -r -d '' artifact; do
+            args+=(--artifact "${artifact#qwen-metal-artifacts/}")
+          done < <(find qwen-metal-artifacts -type f ! -name evidence.json ! -path '*/task-cli-runs/*' -print0)
+          "$RUNNER_TEMP/qwen-sentinel-tools" evidence create --root "$PWD/qwen-metal-artifacts" \
+            --manifest "$PWD/qwen-metal-artifacts/evidence.json" --source-revision "$(git rev-parse HEAD)" \
+            --control-revision "$CONTROLS_SHA" --runtime-revision "$(git -C .qwen-mlx-source rev-parse HEAD)" \
+            "${args[@]}"
+          "$RUNNER_TEMP/qwen-sentinel-tools" evidence verify --root "$PWD/qwen-metal-artifacts" --manifest "$PWD/qwen-metal-artifacts/evidence.json"
       - name: Upload sanitized health, results, and server logs
         if: always()
         uses: actions/upload-artifact@v5
         with:
           name: qwen-metal-${{ github.run_id }}-${{ github.run_attempt }}
-          path: qwen-metal-artifacts/
+          path: |
+            qwen-metal-artifacts/
+            !qwen-metal-artifacts/native-quality-*/task-cli-runs/**
           retention-days: 14
           if-no-files-found: warn
       - name: Remove job runtime

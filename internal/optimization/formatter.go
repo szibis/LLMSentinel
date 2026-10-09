@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
+	"sort"
 	"strings"
 )
 
@@ -102,8 +103,20 @@ func (f *InputFormatter) ShortenCommonTerms(input string) (string, error) {
 		"and also":           "&",
 	}
 
-	for verbose, short := range replacements {
-		shortened = strings.ReplaceAll(shortened, verbose, short)
+	// Overlapping phrases must be replaced in a stable order, with longer
+	// phrases first so "not including" retains its negative meaning.
+	phrases := make([]string, 0, len(replacements))
+	for phrase := range replacements {
+		phrases = append(phrases, phrase)
+	}
+	sort.Slice(phrases, func(i, j int) bool {
+		if len(phrases[i]) == len(phrases[j]) {
+			return phrases[i] < phrases[j]
+		}
+		return len(phrases[i]) > len(phrases[j])
+	})
+	for _, verbose := range phrases {
+		shortened = strings.ReplaceAll(shortened, verbose, replacements[verbose])
 	}
 
 	return shortened, nil

@@ -12,6 +12,19 @@ import (
 	"github.com/szibis/claude-escalate/internal/intent"
 )
 
+var exitCommand = os.Exit
+
+type commandFactory interface {
+	CreateFromConfig(*config.Config) error
+	GetAdapter(string) (gateway.ToolAdapter, error)
+	Close() error
+}
+
+var newCommandFactory = func() commandFactory { return gateway.NewAdapterFactory() }
+var classifyCommandIntent = func(ctx context.Context, query, userID string, queryContext *intent.QueryContext) *intent.IntentDecision {
+	return intent.NewClassifier(90).Classify(ctx, query, userID, queryContext)
+}
+
 func main() {
 	// Parse command line flags
 	configPath := flag.String("config", "", "Path to config.yaml")
@@ -24,7 +37,7 @@ func main() {
 	if flag.NArg() == 0 {
 		fmt.Fprintf(os.Stderr, "Usage: claude-escalate [flags] <tool> [args...]\n")
 		fmt.Fprintf(os.Stderr, "Example: claude-escalate --no-cache cli git status\n")
-		os.Exit(1)
+		exitCommand(1)
 	}
 
 	ctx := context.Background()
@@ -34,7 +47,7 @@ func main() {
 	cfg, err := loader.Load()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error loading configuration: %v\n", err)
-		os.Exit(1)
+		exitCommand(1)
 	}
 
 	if *verbose {
@@ -44,10 +57,10 @@ func main() {
 	}
 
 	// Create adapter factory
-	factory := gateway.NewAdapterFactory()
+	factory := newCommandFactory()
 	if err := factory.CreateFromConfig(cfg); err != nil {
 		fmt.Fprintf(os.Stderr, "Error creating adapters: %v\n", err)
-		os.Exit(1)
+		exitCommand(1)
 	}
 	defer factory.Close()
 
@@ -60,11 +73,11 @@ func main() {
 			adapter, err = factory.GetAdapter("cli")
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "Error: tool not found: %s\n", toolName)
-				os.Exit(1)
+				exitCommand(1)
 			}
 		} else {
 			fmt.Fprintf(os.Stderr, "Error: tool not found: %s\n", toolName)
-			os.Exit(1)
+			exitCommand(1)
 		}
 	}
 
@@ -97,7 +110,6 @@ func main() {
 	}
 
 	// Create intent classifier
-	classifier := intent.NewClassifier(90)
 
 	// Classify intent
 	queryContext := &intent.QueryContext{
@@ -111,7 +123,7 @@ func main() {
 		queryStr = toolName
 	}
 
-	decision := classifier.Classify(ctx, queryStr, fmt.Sprint(os.Getuid()), queryContext)
+	decision := classifyCommandIntent(ctx, queryStr, fmt.Sprint(os.Getuid()), queryContext)
 
 	if *verbose {
 		fmt.Printf("Intent: %s\n", decision.Intent)
@@ -125,7 +137,7 @@ func main() {
 	resp, err := adapter.Execute(ctx, req)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error executing tool: %v\n", err)
-		os.Exit(1)
+		exitCommand(1)
 	}
 
 	if !resp.Success {
@@ -135,7 +147,7 @@ func main() {
 				fmt.Fprintf(os.Stderr, "%s\n", stderr)
 			}
 		}
-		os.Exit(1)
+		exitCommand(1)
 	}
 
 	// Print output
@@ -170,7 +182,7 @@ func parseToolParams(args []string) map[string]interface{} {
 
 		if strings.HasPrefix(arg, "--") {
 			key := strings.TrimPrefix(arg, "--")
-			if i+1 < len(args) && !strings.HasPrefix(args[i+1], "--") {
+			if i+1 < len(args) && !strings.HasPrefix(args[i+1], "-") {
 				params[key] = args[i+1]
 				i++
 			} else {

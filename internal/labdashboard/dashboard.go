@@ -21,6 +21,8 @@ import (
 	"time"
 
 	"github.com/szibis/claude-escalate/internal/clientcontrol"
+	"github.com/szibis/claude-escalate/internal/jes"
+	"github.com/szibis/claude-escalate/internal/labbench"
 	"github.com/szibis/claude-escalate/internal/labstatus"
 	"github.com/szibis/claude-escalate/internal/taskquality"
 )
@@ -60,6 +62,14 @@ func newHandlerWithQuality(client *http.Client, snapshot func() (json.RawMessage
 }
 
 func newHandlerWithQualities(client *http.Client, snapshot func() (json.RawMessage, error), quality, cliQuality func() json.RawMessage) http.Handler {
+	return newHandlerWithEvidence(client, snapshot, quality, cliQuality, func() json.RawMessage { return nil }, func() json.RawMessage { return nil })
+}
+
+func newHandlerWithEvidence(client *http.Client, snapshot func() (json.RawMessage, error), quality, cliQuality, benchmark, judge func() json.RawMessage) http.Handler {
+	return newHandlerWithHistory(client, snapshot, quality, cliQuality, benchmark, judge, func() json.RawMessage { return nil })
+}
+
+func newHandlerWithHistory(client *http.Client, snapshot func() (json.RawMessage, error), quality, cliQuality, benchmark, judge, benchmarks func() json.RawMessage) http.Handler {
 	var snapshotMu sync.Mutex
 	var cachedTelemetry json.RawMessage
 	var cachedAt time.Time
@@ -100,7 +110,7 @@ func newHandlerWithQualities(client *http.Client, snapshot func() (json.RawMessa
 			history.record(telemetry, activity, now)
 			points, attempts := history.snapshot(now)
 			w.Header().Set("Content-Type", "application/json")
-			_ = json.NewEncoder(w).Encode(map[string]any{"sample_time": now.Format(time.RFC3339), "telemetry": telemetry, "gateway": gateway, "activity": activity, "history": points, "attempts": attempts, "history_window_seconds": int(historyWindow.Seconds()), "task_quality": quality(), "cli_task_quality": cliQuality()})
+			_ = json.NewEncoder(w).Encode(map[string]any{"sample_time": now.Format(time.RFC3339), "telemetry": telemetry, "gateway": gateway, "activity": activity, "history": points, "attempts": attempts, "route_history": routeSummary(attempts), "history_window_seconds": int(historyWindow.Seconds()), "task_quality": quality(), "cli_task_quality": cliQuality(), "benchmark": benchmark(), "benchmark_history": benchmarks(), "jes_quality": judge()})
 		default:
 			http.NotFound(w, r)
 		}
@@ -137,31 +147,7 @@ func Run(args []string, _ io.Reader, out, stderr io.Writer) int {
 		}
 		return json.RawMessage(data.Bytes()), nil
 	}
-	server := &http.Server{Addr: *listen, Handler: newHandlerWithQualities(client, snapshot, func() json.RawMessage {
-		report := taskquality.Load(absolute)
-		if report == nil {
-			return nil
-		}
-		for i := range report.Results {
-			report.Results[i].Exchanges = nil
-			report.Results[i].Final = ""
-		}
-		raw, _ := json.Marshal(report)
-		return raw
-	}, func() json.RawMessage {
-		report := taskquality.LoadCLI(absolute)
-		if report == nil {
-			return nil
-		}
-		for i := range report.Results {
-			report.Results[i].Exchanges = nil
-			report.Results[i].Final = ""
-			report.Results[i].CLIEvents = nil
-			report.Results[i].CLIStderr = ""
-		}
-		raw, _ := json.Marshal(report)
-		return raw
-	}), ReadHeaderTimeout: 3 * time.Second, ReadTimeout: 5 * time.Second, WriteTimeout: 5 * time.Second, IdleTimeout: 30 * time.Second}
+	server := &http.Server{Addr: *listen, Handler: newHandlerWithHistory(client, snapshot, func() json.RawMessage { return loadEvidence(absolute, "api") }, func() json.RawMessage { return loadEvidence(absolute, "cli") }, func() json.RawMessage { return loadEvidence(absolute, "benchmark") }, func() json.RawMessage { return loadEvidence(absolute, "judge") }, func() json.RawMessage { return loadEvidence(absolute, "benchmark-history") }), ReadHeaderTimeout: 3 * time.Second, ReadTimeout: 5 * time.Second, WriteTimeout: 5 * time.Second, IdleTimeout: 30 * time.Second}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	go func() {
@@ -176,4 +162,59 @@ func Run(args []string, _ io.Reader, out, stderr io.Writer) int {
 		return 1
 	}
 	return 0
+}
+
+// loadEvidence reads bounded saved reports and removes private task transcripts.
+func loadEvidence(root, kind string) json.RawMessage {
+	switch kind {
+	case "api":
+		report := taskquality.Load(root)
+		if report == nil {
+			return nil
+		}
+		for i := range report.Results {
+			report.Results[i].Exchanges = nil
+			report.Results[i].Final = ""
+		}
+		raw, _ := json.Marshal(report)
+		return raw
+
+	case "cli":
+		report := taskquality.LoadCLI(root)
+		if report == nil {
+			return nil
+		}
+		for i := range report.Results {
+			report.Results[i].Exchanges = nil
+			report.Results[i].Final = ""
+			report.Results[i].CLIEvents = nil
+			report.Results[i].CLIStderr = ""
+		}
+		raw, _ := json.Marshal(report)
+		return raw
+
+	case "benchmark":
+		report, err := labbench.Load(root)
+		if err != nil {
+			return nil
+		}
+		raw, _ := json.Marshal(report)
+		return raw
+
+	case "judge":
+		report := jes.Load(root)
+		if report == nil {
+			return nil
+		}
+		raw, _ := json.Marshal(report)
+		return raw
+	case "benchmark-history":
+		reports, err := labbench.LoadHistory(root)
+		if err != nil {
+			return nil
+		}
+		raw, _ := json.Marshal(reports)
+		return raw
+	}
+	return nil
 }

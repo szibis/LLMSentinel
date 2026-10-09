@@ -10,10 +10,12 @@ import (
 	"github.com/szibis/claude-escalate/internal/config"
 )
 
+var exitCommand = os.Exit
+
 func main() {
 	if len(os.Args) < 2 {
 		printUsage()
-		os.Exit(1)
+		exitCommand(1)
 	}
 
 	cmd := os.Args[1]
@@ -33,7 +35,7 @@ func main() {
 	default:
 		fmt.Printf("Unknown command: %s\n", cmd)
 		printUsage()
-		os.Exit(1)
+		exitCommand(1)
 	}
 }
 
@@ -47,7 +49,7 @@ func handleSetBudget(args []string) {
 	cfg, err := config.LoadEscalationConfig()
 	if err != nil {
 		fmt.Printf("Error loading config: %v\n", err)
-		os.Exit(1)
+		exitCommand(1)
 	}
 
 	updated := false
@@ -69,12 +71,12 @@ func handleSetBudget(args []string) {
 		fmt.Println("  escalation-manager set-budget --daily 10.00")
 		fmt.Println("  escalation-manager set-budget --monthly 100.00")
 		fmt.Println("  escalation-manager set-budget --session 10000")
-		os.Exit(1)
+		exitCommand(1)
 	}
 
 	if err := config.SaveEscalationConfig(cfg); err != nil {
 		fmt.Printf("Error saving config: %v\n", err)
-		os.Exit(1)
+		exitCommand(1)
 	}
 
 	fmt.Println("✅ Budget configuration updated:")
@@ -95,7 +97,7 @@ func handleConfig(args []string) {
 		cfg, err := config.LoadEscalationConfig()
 		if err != nil {
 			fmt.Printf("Error loading config: %v\n", err)
-			os.Exit(1)
+			exitCommand(1)
 		}
 
 		fmt.Println("╔════════════════════════════════════════════════════════════════╗")
@@ -136,7 +138,7 @@ func handleConfig(args []string) {
 		cfg, err := config.LoadEscalationConfig()
 		if err != nil {
 			fmt.Printf("Error loading config: %v\n", err)
-			os.Exit(1)
+			exitCommand(1)
 		}
 
 		// Parse and set value
@@ -144,7 +146,7 @@ func handleConfig(args []string) {
 
 		if err := config.SaveEscalationConfig(cfg); err != nil {
 			fmt.Printf("Error saving config: %v\n", err)
-			os.Exit(1)
+			exitCommand(1)
 		}
 
 		fmt.Printf("✅ Config updated: %s = %s\n", key, value)
@@ -205,19 +207,19 @@ func handleDashboard(args []string) {
 		case "--sentiment":
 			if err := dashboard.SentimentDashboard(); err != nil {
 				fmt.Printf("Error: %v\n", err)
-				os.Exit(1)
+				exitCommand(1)
 			}
 			return
 		case "--budget":
 			if err := dashboard.BudgetDashboard(); err != nil {
 				fmt.Printf("Error: %v\n", err)
-				os.Exit(1)
+				exitCommand(1)
 			}
 			return
 		case "--optimization":
 			if err := dashboard.CostOptimizationDashboard(); err != nil {
 				fmt.Printf("Error: %v\n", err)
-				os.Exit(1)
+				exitCommand(1)
 			}
 			return
 		}
@@ -226,7 +228,7 @@ func handleDashboard(args []string) {
 	// Show all views
 	if err := dashboard.FullDashboard(); err != nil {
 		fmt.Printf("Error: %v\n", err)
-		os.Exit(1)
+		exitCommand(1)
 	}
 }
 

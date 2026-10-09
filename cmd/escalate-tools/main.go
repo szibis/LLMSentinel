@@ -12,10 +12,13 @@ import (
 
 // Tools utility CLI - manage tools, validation, diagnostics
 
+var exitCommand = os.Exit
+var detectCommandTools = discovery.DetectTools
+
 func main() {
 	if len(os.Args) < 2 {
 		printHelp()
-		os.Exit(0)
+		exitCommand(0)
 	}
 
 	command := os.Args[1]
@@ -35,7 +38,7 @@ func main() {
 	default:
 		fmt.Fprintf(os.Stderr, "Unknown command: %s\n", command)
 		printHelp()
-		os.Exit(1)
+		exitCommand(1)
 	}
 }
 
@@ -69,7 +72,7 @@ func cmdDiscover(args []string) {
 	verbose := fs.Bool("v", false, "Verbose output")
 	fs.Parse(args)
 
-	tools := discovery.DetectTools()
+	tools := detectCommandTools()
 
 	fmt.Println("🔍 Tool Discovery Results")
 	fmt.Println(strings.Repeat("=", 60))
@@ -146,7 +149,7 @@ func cmdStatus(args []string) {
 	fs := flag.NewFlagSet("status", flag.ExitOnError)
 	fs.Parse(args)
 
-	tools := discovery.DetectTools()
+	tools := detectCommandTools()
 
 	fmt.Println("✓ Tool Status Check")
 	fmt.Println(strings.Repeat("=", 60))
@@ -204,7 +207,7 @@ func cmdValidate(args []string) {
 	// Check if file exists
 	if _, err := os.Stat(*configPath); os.IsNotExist(err) {
 		fmt.Printf("✗ Config file not found: %s\n", *configPath)
-		os.Exit(1)
+		exitCommand(1)
 	}
 
 	fmt.Println("✓ Config file exists")
@@ -228,22 +231,22 @@ func cmdConfig(args []string) {
 	if *addTool {
 		if *toolName == "" {
 			fmt.Fprintf(os.Stderr, "Error: --name required\n")
-			os.Exit(1)
+			exitCommand(1)
 		}
 		if *toolType == "" {
 			fmt.Fprintf(os.Stderr, "Error: --type required (cli, mcp, rest)\n")
-			os.Exit(1)
+			exitCommand(1)
 		}
 		if *toolPath == "" {
 			fmt.Fprintf(os.Stderr, "Error: --path required\n")
-			os.Exit(1)
+			exitCommand(1)
 		}
 
 		// Validate path exists
 		if *toolType == "cli" {
 			if _, err := os.Stat(*toolPath); os.IsNotExist(err) {
 				fmt.Fprintf(os.Stderr, "Error: Tool not found at %s\n", *toolPath)
-				os.Exit(1)
+				exitCommand(1)
 			}
 		}
 

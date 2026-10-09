@@ -34,7 +34,7 @@ lab-cli-quality: tools-build
 
 .PHONY: lab-cli-quality-all
 lab-cli-quality-all: tools-build
-	$(TOOLS) cli-quality --root $(abspath .sentinel-lab) --role all --timeout 6m
+	$(TOOLS) cli-quality --root $(abspath .sentinel-lab) --role all --suite extended --timeout 6m
 
 lab-run: lab-start
 
@@ -152,7 +152,7 @@ slo-test:
 ## Security Testing
 
 security-lint:
-	go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.13.2 run ./... --enable gosec --timeout 10m
+	go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.14.0 run ./... --enable gosec --timeout 10m
 
 security-test:
 	go test -v ./internal/security/...
@@ -170,7 +170,7 @@ ci-local: security-lint memory-leak-test slo-test
 ## Lint
 
 lint:
-	go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.13.2 run ./... --timeout 5m
+	go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.14.0 run ./... --timeout 5m
 
 fmt:
 	gofmt -w .

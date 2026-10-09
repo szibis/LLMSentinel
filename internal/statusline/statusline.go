@@ -29,8 +29,9 @@ type StatuslineSource interface {
 type StatuslineData struct {
 	Source                  string        // Which source provided this
 	Timestamp               time.Time     // When these metrics were captured
-	InputTokens             int           // Input tokens used so far
-	OutputTokens            int           // Output tokens used so far
+	InputTokens             *int          // Nil when input usage was not observed
+	OutputTokens            *int          // Nil when output usage was not observed
+	TotalTokens             *int          // Observed total, or sum of observed input/output
 	CacheHitTokens          int           // Tokens from cache hits
 	CacheCreationTokens     int           // Tokens for cache creation
 	ContextWindowUsage      int           // Percent of context window used

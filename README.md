@@ -63,6 +63,7 @@ Use the actual highest stable tag, intended bump, and review date for your relea
 | Small decision helpers → OSS bridge → our Jes | [Migration design](docs/jes-decision-design.md) |
 | Actual quality/accounting evidence | [Client inspection](docs/client-quality-inspection.md), [progress checks](docs/agent-progress-quality.md), [dataset admission](docs/training-mode.md) |
 | Regression and real Metal API proofs | [Integration verification](docs/mlx-integration-verification.md) |
+| Repository coverage, native quality gates and artifact provenance | [Verified quality foundation](docs/verified-quality-foundation.md) |
 
 The current decision policy is deterministic; Jes and the proposed Kev/Jeff
 decision adapters are not connected. Selected local models generate answers.
@@ -93,7 +94,7 @@ including file edits and independently checked Go tests. Both suites appear in t
 Model-free [protocol edge cases and fuzz campaigns](docs/protocol-hardening.md)
 exercise all three client APIs, validated streams and malformed runtime output in CI.
 
-[![Go](https://img.shields.io/badge/Go-1.27.1-blue)](https://golang.org)
+[![Go](https://img.shields.io/badge/Go-1.27.2-blue)](https://golang.org)
 [![License](https://img.shields.io/badge/license-Apache%202.0-green)](LICENSE)
 [![Build](https://github.com/szibis/LLMSentinel/actions/workflows/build.yml/badge.svg)](https://github.com/szibis/LLMSentinel/actions/workflows/build.yml)
 
@@ -655,7 +656,7 @@ docker-compose up   # Service + dashboard
 
 ## 📋 Requirements
 
-- **Go 1.27.1** (for building from source)
+- **Go 1.27.2** (for building from source)
 - **Node.js 18+** (for building web dashboard)
 - **Linux or macOS** (Intel/ARM)
 - **8 MB disk space** (binary + cache)

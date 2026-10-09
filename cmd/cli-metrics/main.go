@@ -13,16 +13,23 @@ import (
 	"github.com/szibis/claude-escalate/internal/metrics"
 )
 
+var exitCommand = os.Exit
+var newCommandMetrics = metrics.NewSessionMetrics
+
 func main() {
 	if len(os.Args) < 2 {
 		printUsage()
-		os.Exit(1)
+		exitCommand(1)
 	}
 
 	// Parse global flags
 	globalFlags := flag.NewFlagSet("", flag.ContinueOnError)
 	formatFlag := globalFlags.String("format", "text", "Output format: text, json, csv")
 	daysFlag := globalFlags.Int("days", 7, "Number of days to analyze")
+	if err := globalFlags.Parse(os.Args[2:]); err != nil {
+		exitCommand(2)
+		return
+	}
 
 	switch os.Args[1] {
 	case "overview":
@@ -42,12 +49,12 @@ func main() {
 	default:
 		fmt.Printf("Unknown command: %s\n", os.Args[1])
 		printUsage()
-		os.Exit(1)
+		exitCommand(1)
 	}
 }
 
 func cmdOverview() {
-	sm := metrics.NewSessionMetrics()
+	sm := newCommandMetrics()
 
 	fmt.Println("╔══════════════════════════════════════════════════════════════╗")
 	fmt.Println("║           Claude Escalate Metrics Overview                   ║")
@@ -82,7 +89,7 @@ func cmdOverview() {
 }
 
 func cmdDaily(days int, format string) {
-	sm := metrics.NewSessionMetrics()
+	sm := newCommandMetrics()
 
 	if format == "json" {
 		dailyData := make([]map[string]interface{}, 0)
@@ -139,7 +146,7 @@ func cmdDaily(days int, format string) {
 }
 
 func cmdBreakdown(format string) {
-	sm := metrics.NewSessionMetrics()
+	sm := newCommandMetrics()
 
 	breakdown := map[string]map[string]interface{}{
 		"exact_dedup": {
@@ -222,7 +229,7 @@ func cmdBreakdown(format string) {
 }
 
 func cmdProjections(format string) {
-	sm := metrics.NewSessionMetrics()
+	sm := newCommandMetrics()
 
 	proj7 := sm.ProjectMonthly(7)
 	proj30 := sm.ProjectMonthly(30)
@@ -272,7 +279,7 @@ func cmdProjections(format string) {
 }
 
 func cmdExport(format string) {
-	sm := metrics.NewSessionMetrics()
+	sm := newCommandMetrics()
 
 	if format == "json" {
 		jsonBytes, _ := json.MarshalIndent(sm.GetJSON(), "", "  ")
@@ -300,7 +307,7 @@ func cmdExport(format string) {
 }
 
 func cmdStatus() {
-	sm := metrics.NewSessionMetrics()
+	sm := newCommandMetrics()
 
 	fmt.Printf("Claude Escalate Metrics Status\n")
 	fmt.Printf("─────────────────────────────────────────\n")

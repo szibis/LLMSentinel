@@ -28,6 +28,8 @@ type environment struct {
 	project, root, executable string
 	in                        io.Reader
 	out, stderr               io.Writer
+	transport                 http.RoundTripper // Optional instance-scoped transport for isolated protocol tests.
+	portCheck                 func([]int, time.Duration) error
 }
 
 func newEnvironment(in io.Reader, out, stderr io.Writer) (*environment, error) {
@@ -55,7 +57,7 @@ func newEnvironment(in io.Reader, out, stderr io.Writer) (*environment, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &environment{project, root, executable, in, out, stderr}, nil
+	return &environment{project: project, root: root, executable: executable, in: in, out: out, stderr: stderr}, nil
 }
 func Run(args []string, in io.Reader, out, stderr io.Writer) int {
 	e, err := newEnvironment(in, out, stderr)
@@ -177,6 +179,9 @@ func (e *environment) prepare() error {
 	var existing map[string]any
 	if err := readJSON(settingsPath, &existing); err != nil {
 		return err
+	}
+	if existing == nil {
+		return errors.New("claude settings must be a JSON object")
 	}
 	if status, _ := existing["statusLine"].(map[string]any); status != nil {
 		command, _ := status["command"].(string)
@@ -336,8 +341,25 @@ func (e *environment) clientBinary(client string) (string, error) {
 func localHTTP(timeout time.Duration) *http.Client {
 	return &http.Client{Timeout: timeout, Transport: &http.Transport{Proxy: nil}, CheckRedirect: func(*http.Request, []*http.Request) error { return errors.New("local redirect refused") }}
 }
+func (e *environment) localHTTP(timeout time.Duration) *http.Client {
+	client := localHTTP(timeout)
+	if e.transport != nil {
+		client.Transport = e.transport
+	}
+	return client
+}
 func fetchJSON(url string, timeout time.Duration) (map[string]any, error) {
-	response, err := localHTTP(timeout).Get(url)
+	client := localHTTP(timeout)
+	defer client.CloseIdleConnections()
+	return fetchJSONWith(client, url)
+}
+func (e *environment) fetchJSON(url string, timeout time.Duration) (map[string]any, error) {
+	client := e.localHTTP(timeout)
+	defer client.CloseIdleConnections()
+	return fetchJSONWith(client, url)
+}
+func fetchJSONWith(client *http.Client, url string) (map[string]any, error) {
+	response, err := client.Get(url)
 	if err != nil {
 		return nil, err
 	}
@@ -351,6 +373,9 @@ func fetchJSON(url string, timeout time.Duration) (map[string]any, error) {
 	}
 	var value map[string]any
 	err = json.Unmarshal(data, &value)
+	if err == nil && value == nil {
+		return nil, errors.New("local health response must be a JSON object")
+	}
 	return value, err
 }
 func (e *environment) runClient(args []string) error {
@@ -429,7 +454,7 @@ func (e *environment) doctor() error {
 			failures = append(failures, err)
 		}
 	}
-	health, err := fetchJSON(endpoint+"/health", 2*time.Second)
+	health, err := e.fetchJSON(endpoint+"/health", 2*time.Second)
 	if err != nil {
 		failures = append(failures, err)
 	} else {
@@ -443,7 +468,7 @@ func (e *environment) launch(client string) error {
 	if err != nil {
 		return err
 	}
-	health, err := fetchJSON(endpoint+"/health", 2*time.Second)
+	health, err := e.fetchJSON(endpoint+"/health", 2*time.Second)
 	if err != nil {
 		return errors.New("gateway unavailable; run make lab-run, then inspect make lab-status")
 	}
@@ -462,7 +487,7 @@ func (e *environment) launch(client string) error {
 	}
 	if settings.SmallModelPath != "" {
 		for _, port := range []int{19091, 19092} {
-			runtimeHealth, err := fetchJSON(fmt.Sprintf("http://127.0.0.1:%d/health", port), 2*time.Second)
+			runtimeHealth, err := e.fetchJSON(fmt.Sprintf("http://127.0.0.1:%d/health", port), 2*time.Second)
 			if err != nil {
 				return fmt.Errorf("MLX runtime %d is unavailable or loading; inspect make lab-status: %w", port, err)
 			}
@@ -486,7 +511,7 @@ func (e *environment) launch(client string) error {
 	if err != nil {
 		return err
 	}
-	info, err := os.Stat(workspace)
+	info, err := os.Stat(workspace) // #nosec G703 -- LAB_WORKSPACE is the local caller's explicit working directory; launching their chosen project is intentional.
 	if err != nil || !info.IsDir() {
 		return errors.New("LAB_WORKSPACE must be an existing directory")
 	}

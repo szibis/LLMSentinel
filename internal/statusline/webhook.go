@@ -209,8 +209,8 @@ func (ws *WebhookSource) Poll() (StatuslineData, error) {
 	return StatuslineData{
 		Source:              ws.Name(),
 		Timestamp:           time.Now(),
-		InputTokens:         *webhookMetrics.InputTokens,
-		OutputTokens:        *webhookMetrics.OutputTokens,
+		InputTokens:         webhookMetrics.InputTokens,
+		OutputTokens:        webhookMetrics.OutputTokens,
 		CacheHitTokens:      cacheHit,
 		CacheCreationTokens: cacheCreate,
 		ContextWindowUsage:  contextUsage,

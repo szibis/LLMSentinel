@@ -34,6 +34,8 @@ jobs:
       - name: Build frontend
         working-directory: web
         run: npm run build
+      - name: Verify live dashboard rendering contracts
+        run: node --test scripts/test-dashboard-dom.cjs
   qwen-metal:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     uses: ./.github/workflows/qwen-metal.yml
@@ -80,9 +82,52 @@ jobs:
           cache: true
 
       - name: Test with coverage
+        id: tests
         run: |
-          go test -v -race -coverprofile=coverage.out -count=1 ./...
-          go tool cover -func=coverage.out | tail -1
+          go test -json -race -coverprofile=coverage.out -count=1 ./... > test-results.jsonl
+
+      - name: Enforce repository statement coverage
+        if: always()
+        run: |
+          if [ -f coverage.out ]; then
+            go run ./cmd/sentinel-tools coverage --profile coverage.out --min 90 > coverage-summary.json
+          else
+            printf '%s\n' '{"passed":false,"complete":false,"reason":"coverage profile unavailable"}' > coverage-summary.json
+            exit 1
+          fi
+
+      - name: Compress complete test execution log
+        id: test_logs
+        if: always()
+        run: |
+          if [ ! -f test-results.jsonl ]; then
+            echo 'Test execution log unavailable; refusing incomplete evidence.' >&2
+            exit 1
+          fi
+          gzip -n -9 -- test-results.jsonl
+
+      - name: Hash synthetic test evidence
+        if: always()
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha || github.sha }}
+          CONTROLS_SHA: ${{ github.workflow_sha }}
+          TEST_OUTCOME: ${{ steps.tests.outcome }}
+          LOG_OUTCOME: ${{ steps.test_logs.outcome }}
+        run: |
+          if [ "$LOG_OUTCOME" != success ] || [ ! -f test-results.jsonl.gz ]; then
+            echo 'Compressed test execution log unavailable; refusing incomplete evidence.' >&2
+            exit 1
+          fi
+          printf '{"test_step_outcome":"%s","test_log_compression_outcome":"%s","source_revision":"%s","control_revision":"%s"}\n' \
+            "$TEST_OUTCOME" "$LOG_OUTCOME" "$SOURCE_SHA" "$CONTROLS_SHA" > test-status.json
+          args=()
+          for artifact in coverage.out coverage-summary.json test-results.jsonl.gz test-status.json; do
+            if [ -f "$artifact" ]; then args+=(--artifact "$artifact"); fi
+          done
+          go run ./cmd/sentinel-tools evidence create --root "$PWD" --manifest test-evidence.json \
+            --source-revision "$SOURCE_SHA" --control-revision "$CONTROLS_SHA" \
+            "${args[@]}"
+          go run ./cmd/sentinel-tools evidence verify --root "$PWD" --manifest test-evidence.json
 
       - name: Enforce pure Go Sentinel tooling
         run: |
@@ -92,11 +137,17 @@ jobs:
           fi
 
       - name: Upload coverage
-        if: github.event_name == 'pull_request'
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: coverage
-          path: coverage.out
+          path: |
+            coverage.out
+            coverage-summary.json
+            test-results.jsonl.gz
+            test-status.json
+            test-evidence.json
+          retention-days: 14
 
   lint:
     runs-on: ubuntu-latest
@@ -112,7 +163,7 @@ jobs:
           cache: true
 
       - name: Run golangci-lint
-        run: go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.13.2 run ./... --timeout 5m
+        run: go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.14.0 run ./... --timeout 5m
 
       - name: Validate Actions workflows
         run: go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12 -shellcheck= -pyflakes=

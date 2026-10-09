@@ -97,3 +97,63 @@ func TestReleasePlan(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestPrepareVersionFloorAvoidsMergedUnpublishedVersion(t *testing.T) {
+	for _, tc := range []struct {
+		latest, floor, bump, want string
+		bad                       bool
+	}{
+		{"v3.6.0", "v3.6.1", "patch", "v3.6.2", false},
+		{"v3.6.2", "v3.6.1", "patch", "v3.6.3", false},
+		{"v3.6.0", "v3.6.1", "minor", "v3.7.0", false},
+		{"v3.6.0", "v3.6.1", "major", "v4.0.0", false},
+		{"v3.6.0", "v3.6.0", "patch", "v3.6.1", false},
+		{"v3.6.0", "v03.6.1", "patch", "", true},
+		{"v3.6.0", "main", "patch", "", true},
+		{"v3.6.0", "v18446744073709551615.0.0", "major", "", true},
+	} {
+		t.Run(tc.latest+"/"+tc.floor+"/"+tc.bump, func(t *testing.T) {
+			root := t.TempDir()
+			original := "# Changelog\n\n## [3.6.0] - 2026-10-07\n\nHistorical notes.\n"
+			if err := os.WriteFile(filepath.Join(root, "CHANGELOG.md"), []byte(original), 0600); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(filepath.Join(root, "VERSION"), []byte(tc.floor+"\n"), 0600); err != nil {
+				t.Fatal(err)
+			}
+			notes := filepath.Join(root, "notes")
+			if err := os.WriteFile(notes, []byte("fix: protocol edge cases\n"), 0600); err != nil {
+				t.Fatal(err)
+			}
+			args := []string{"--root", root, "--latest", tc.latest, "--version-floor", tc.floor, "--bump", tc.bump, "--date", "2026-10-08", "--notes", notes}
+			var out, diagnostic bytes.Buffer
+			code := runPrepare(args, &out, &diagnostic)
+			if tc.bad {
+				if code != 1 {
+					t.Fatalf("bad floor accepted: %d %s %s", code, out.String(), diagnostic.String())
+				}
+				after, _ := os.ReadFile(filepath.Join(root, "CHANGELOG.md"))
+				version, _ := os.ReadFile(filepath.Join(root, "VERSION"))
+				if string(after) != original || string(version) != tc.floor+"\n" {
+					t.Fatal("invalid preparation mutated metadata")
+				}
+				return
+			}
+			if code != 0 || strings.TrimSpace(out.String()) != tc.want {
+				t.Fatalf("floor not honored: %d %s %s", code, out.String(), diagnostic.String())
+			}
+			first, _ := os.ReadFile(filepath.Join(root, "CHANGELOG.md"))
+			if !strings.Contains(string(first), "### Commit subjects since "+tc.latest) || !strings.HasSuffix(string(first), "## [3.6.0] - 2026-10-07\n\nHistorical notes.\n") {
+				t.Fatal("notes lost tag provenance/history")
+			}
+			out.Reset()
+			if code := runPrepare(args, &out, &diagnostic); code != 0 {
+				t.Fatal("retry failed", diagnostic.String())
+			}
+			after, _ := os.ReadFile(filepath.Join(root, "CHANGELOG.md"))
+			if string(after) != string(first) {
+				t.Fatal("retry changed release")
+			}
+		})
+	}
+}

@@ -228,3 +228,66 @@ func TestCIPauseRejectsSymlinkLease(t *testing.T) {
 		t.Fatal("symlink CI lease accepted")
 	}
 }
+
+func TestCIPausedRestartPreservesRestoration(t *testing.T) {
+	project, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	e := &environment{project: project, root: filepath.Join(project, ".sentinel-lab"), out: io.Discard, stderr: io.Discard}
+	state := runState{RunID: "owned-run", Phase: "ci-paused"}
+	if err := writeJSON(filepath.Join(e.root, "state.json"), state); err != nil {
+		t.Fatal(err)
+	}
+	lease := ciLease{Token: "owned-token", RunID: state.RunID, Resume: true}
+	if err := writeJSON(e.ciLeasePath(), lease); err != nil {
+		t.Fatal(err)
+	}
+	if err := e.runRunner([]string{"restart"}); err == nil {
+		t.Fatal("restart during CI was accepted")
+	}
+	after, err := e.readCILease()
+	if err != nil || after != lease {
+		t.Fatalf("restart changed CI restoration: %#v %v", after, err)
+	}
+	if _, err := os.Stat(filepath.Join(e.root, "stop-"+state.RunID)); !os.IsNotExist(err) {
+		t.Fatal("restart sent stop during CI")
+	}
+}
+
+func TestRestartWaitsForCIPauseControlThenPreservesLease(t *testing.T) {
+	project, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	e := &environment{project: project, root: filepath.Join(project, ".sentinel-lab"), out: io.Discard, stderr: io.Discard}
+	control, err := acquireLock(filepath.Join(e.root, "control"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer control.Close()
+	finished := make(chan error, 1)
+	go func() { finished <- e.runRunner([]string{"restart"}) }()
+	select {
+	case err := <-finished:
+		t.Fatalf("restart bypassed CI control: %v", err)
+	case <-time.After(50 * time.Millisecond):
+	}
+	lease := ciLease{Token: "owned-token", RunID: "owned-run", Resume: true}
+	if err := writeJSON(e.ciLeasePath(), lease); err != nil {
+		t.Fatal(err)
+	}
+	control.Close()
+	select {
+	case err := <-finished:
+		if err == nil {
+			t.Fatal("restart accepted pending CI lease")
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatal("restart did not finish")
+	}
+	after, err := e.readCILease()
+	if err != nil || after != lease {
+		t.Fatalf("restart canceled concurrent CI restoration: %#v %v", after, err)
+	}
+}

@@ -201,7 +201,8 @@ func (sm *SessionMetrics) GetDailySummary(date time.Time) *DailyMetrics {
 
 	day := date.Truncate(24 * time.Hour)
 	if daily, exists := sm.DailyMetrics[day]; exists {
-		return daily
+		snapshot := *daily
+		return &snapshot
 	}
 	return nil
 }
@@ -210,7 +211,11 @@ func (sm *SessionMetrics) GetDailySummary(date time.Time) *DailyMetrics {
 func (sm *SessionMetrics) CalculateSavingsPercent() float64 {
 	sm.mu.RLock()
 	defer sm.mu.RUnlock()
+	return sm.calculateSavingsPercentLocked()
+}
 
+// calculateSavingsPercentLocked requires the caller to hold sm.mu.
+func (sm *SessionMetrics) calculateSavingsPercentLocked() float64 {
 	if sm.TotalBurned.TotalTokens == 0 {
 		return 0
 	}
@@ -258,7 +263,7 @@ func (sm *SessionMetrics) GetJSON() map[string]interface{} {
 	sm.mu.RLock()
 	defer sm.mu.RUnlock()
 
-	savingsPercent := sm.CalculateSavingsPercent()
+	savingsPercent := sm.calculateSavingsPercentLocked()
 
 	return map[string]interface{}{
 		"period": map[string]interface{}{

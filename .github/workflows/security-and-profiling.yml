@@ -22,7 +22,7 @@ jobs:
           go-version-file: go.mod
 
       - name: golangci-lint with gosec
-        run: go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.13.2 run ./... --enable gosec --timeout 10m
+        run: go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.14.0 run ./... --enable gosec --timeout 10m
 
       - name: Build
         run: make build
@@ -76,22 +76,51 @@ jobs:
           go-version-file: go.mod
 
       - name: Fuzz Testing
+        shell: bash
         run: |
-          for PACKAGE in ./internal/fuzz ./internal/localgateway; do
-            TARGETS=$(go test "$PACKAGE" -list '^Fuzz' | grep '^Fuzz')
+          set -euo pipefail
+          mkdir -p fuzz-logs
+          {
+            git rev-parse HEAD
+            go version
+            printf 'parallel=2 fuzztime=10s target_timeout=60s\n'
+          } > fuzz-logs/campaign.txt
+          printf 'package\ttarget\texit_code\n' > fuzz-logs/results.tsv
+          go list ./internal/... > fuzz-logs/packages.txt 2> fuzz-logs/package-discovery.stderr
+          FAILED=0
+          while IFS= read -r PACKAGE; do
+            SLUG="${PACKAGE//\//_}"
+            go test "$PACKAGE" -list '^Fuzz' > "fuzz-logs/${SLUG}-targets.log" 2>&1
+            TARGETS=$(awk '/^Fuzz/ {print $1}' "fuzz-logs/${SLUG}-targets.log")
             for TARGET in $TARGETS; do
-              go test "$PACKAGE" -run '^$' -fuzz="^${TARGET}$" -parallel=2 -fuzztime=10s -timeout=60s
+              if go test "$PACKAGE" -run '^$' -fuzz="^${TARGET}$" -parallel=2 -fuzztime=10s -timeout=60s \
+                2>&1 | tee "fuzz-logs/${SLUG}-${TARGET}.log"; then
+                STATUS=0
+              else
+                STATUS=$?
+                FAILED=1
+              fi
+              printf '%s\t%s\t%s\n' "$PACKAGE" "$TARGET" "$STATUS" >> fuzz-logs/results.tsv
             done
-          done
+          done < fuzz-logs/packages.txt
+          printf 'campaign_exit_code=%s\n' "$FAILED" >> fuzz-logs/campaign.txt
+          exit "$FAILED"
+
+      - name: Preserve fuzz campaign execution logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fuzz-campaign-logs
+          path: fuzz-logs/
+          if-no-files-found: warn
+          retention-days: 14
 
       - name: Preserve minimized fuzz failures
-        if: failure()
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: protocol-fuzz-regressions
-          path: |
-            internal/fuzz/testdata/fuzz/**
-            internal/localgateway/testdata/fuzz/**
+          path: internal/**/testdata/fuzz/**
           if-no-files-found: ignore
           retention-days: 14
 

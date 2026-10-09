@@ -123,7 +123,31 @@ func nextVersion(latest, bump string) (string, error) {
 }
 
 func prepare(root, latest, bump, date, notes string) (string, error) {
-	version, err := nextVersion(latest, bump)
+	return prepareWithFloor(root, latest, "", bump, date, notes)
+}
+
+func prepareWithFloor(root, latest, floor, bump, date, notes string) (string, error) {
+	base := latest
+	if floor != "" {
+		published, err := versionKey(latest)
+		if err != nil {
+			return "", err
+		}
+		reviewed, err := versionKey(floor)
+		if err != nil {
+			return "", err
+		}
+		for i := range reviewed {
+			if reviewed[i] > published[i] {
+				base = floor
+				break
+			}
+			if reviewed[i] < published[i] {
+				break
+			}
+		}
+	}
+	version, err := nextVersion(base, bump)
 	if err != nil {
 		return "", err
 	}
@@ -209,6 +233,7 @@ func runPrepare(args []string, out, stderr io.Writer) int {
 	flags.SetOutput(stderr)
 	root := flags.String("root", ".", "repository root")
 	latest := flags.String("latest", "", "latest stable tag")
+	floor := flags.String("version-floor", "", "reviewed repository VERSION; next version exceeds both this and latest tag")
 	bump := flags.String("bump", "", "major, minor, or patch")
 	date := flags.String("date", "", "release date YYYY-MM-DD")
 	notes := flags.String("notes", "", "file of git commit subjects")
@@ -242,7 +267,7 @@ func runPrepare(args []string, out, stderr io.Writer) int {
 		data, err = os.ReadFile(*notes) // #nosec G703 -- Explicit local CLI input file.
 		if err == nil {
 			var version string
-			version, err = prepare(*root, *latest, *bump, *date, string(data))
+			version, err = prepareWithFloor(*root, *latest, *floor, *bump, *date, string(data))
 			if err == nil {
 				_, err = fmt.Fprintln(out, version)
 			}
