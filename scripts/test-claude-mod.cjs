@@ -7,9 +7,12 @@ const path = require('node:path')
 const { spawn, spawnSync } = require('node:child_process')
 
 async function main() {
-  assert.equal(process.argv.length, 4, 'usage: node test-claude-mod.cjs SENTINEL_TOOLS CLAUDE')
+  assert.ok(process.argv.length === 4 || process.argv.length === 5, 'usage: node test-claude-mod.cjs SENTINEL_TOOLS CLAUDE [REPORT]')
   const tools = path.resolve(process.argv[2])
   const claude = path.resolve(process.argv[3])
+  const version = spawnSync(claude, ['--version'], { encoding: 'utf8', timeout: 10000 })
+  assert.equal(version.status, 0)
+  assert.match(version.stdout, /^2\.1\.291 \(Claude Code\)/)
   const root = fs.mkdtempSync(path.join(fs.realpathSync(os.tmpdir()), 'sentinel-mod-'))
   const lab = path.join(root, 'lab')
   const requests = []
@@ -71,7 +74,9 @@ async function main() {
     }
     assert.equal(requests.length, 3)
     assert.ok(requests.every(req => req.method === 'GET' && req.path === '/sentinel/control'), 'provider request attempted')
-    console.log(JSON.stringify({ native_commands: 3, controller_gets: requests.length, provider_requests: 0, model_turns: 0 }))
+    const report = { client_version: '2.1.291', native_commands: 3, controller_gets: requests.length, provider_requests: 0, model_turns: 0 }
+    if (process.argv[4]) fs.writeFileSync(process.argv[4], JSON.stringify(report) + '\n')
+    console.log(JSON.stringify(report))
   } finally {
     if (child && child.exitCode === null) child.kill('SIGKILL')
     await new Promise(resolve => server.close(resolve))

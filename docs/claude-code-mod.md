@@ -76,6 +76,11 @@ terminal/Desktop pane trees. They require no sign-in or model access; see
 Tree tests do not establish Desktop pixel rendering; inspect the panel in a
 real session when changing its layout.
 
+Every Build retains a sealed mod report alongside the API and actual
+Claude Code/Codex baseline. Current-commit results appear in the PR proof
+comment after the publisher is installed on main; see
+[CI compatibility proofs](ci-compatibility-proofs.md).
+
 The actual CLI fixture checks status, headless panel fallback and failure
 review against a rejecting local provider endpoint. It requires zero model
 turns and only the expected controller GETs. Startup waits boundedly for the

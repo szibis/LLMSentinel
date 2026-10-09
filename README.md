@@ -65,6 +65,7 @@ Use the actual highest stable tag, intended bump, and review date for your relea
 | Small decision helpers → OSS bridge → our Jes | [Migration design](docs/jes-decision-design.md) |
 | Actual quality/accounting evidence | [Client inspection](docs/client-quality-inspection.md), [progress checks](docs/agent-progress-quality.md), [dataset admission](docs/training-mode.md) |
 | Regression and real Metal API proofs | [Integration verification](docs/mlx-integration-verification.md) |
+| API, Claude Code and Codex proofs on each PR | [CI compatibility proofs](docs/ci-compatibility-proofs.md) |
 | Repository coverage, native quality gates and artifact provenance | [Verified quality foundation](docs/verified-quality-foundation.md) |
 
 The current decision policy is deterministic; Jes and the proposed Kev/Jeff
