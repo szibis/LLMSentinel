@@ -84,6 +84,11 @@ the PR descriptions and this plan. Existing artifacts remain private outside Git
 - Go 1.27.2 govulncheck: no vulnerabilities. Linter 2.14.0: zero issues.
   actionlint and four DOM contracts passed. Complete event logs compressed
   losslessly and retained with status, coverage, security and lint output.
+- Patched Build security, lint, four platform builds, Docker and web passed.
+  The separate Security & Performance workflow still pinned linter 2.13.2;
+  its job 113728437863 reproduced the export-version-5 decoder failure.
+  Updated that remaining workflow pin to 2.14.0 and checked all active build
+  and security entry points for stale pins. No runtime code changed.
 
 ### Review checkpoint, 2026-10-09
 
