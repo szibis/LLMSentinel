@@ -1,5 +1,9 @@
 # Sentinel controls from terminal or normal CLI commands
 
+Full Claude lab sessions also provide the native [`/sentinel` mod](claude-code-mod.md)
+with direct controls, a status pane and opt-in local observations. Classic
+skills below remain available; native commands do not start a model turn.
+
 `sentinel-tools control` controls an already configured local Sentinel process. Its direct terminal commands make no model/provider requests, require no credentials and do not change Claude/Codex provider configuration. The implementation uses Go's standard library. The server decides whether a requested update is allowed. Status reports its startup mode, billing opt-in state, training capture state, profiles and hybrid policy.
 
 From the repository root:

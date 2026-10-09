@@ -17,6 +17,33 @@ permissions:
   pull-requests: write
 
 jobs:
+  claude-mod:
+    runs-on: ubuntu-latest
+    env:
+      CLAUDE_CONFIG_DIR: ${{ github.workspace }}/.verification/claude-mod/config
+      DISABLE_TELEMETRY: '1'
+      CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: '1'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_sha || github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Install pinned mod test runner
+        run: npm install --prefix .verification/claude-mod/runner --no-audit --no-fund @anthropic-ai/claude-code@2.1.291
+      - name: Validate native mod
+        run: .verification/claude-mod/runner/node_modules/.bin/claude plugin validate internal/claudemod/plugin
+      - name: Test native controls, capture and terminal/Desktop pane
+        run: .verification/claude-mod/runner/node_modules/.bin/claude plugin test internal/claudemod/plugin
+      - name: Verify actual CLI startup without a model turn
+        run: |
+          go build -o .verification/claude-mod/sentinel-tools ./cmd/sentinel-tools
+          node scripts/test-claude-mod.cjs .verification/claude-mod/sentinel-tools .verification/claude-mod/runner/node_modules/.bin/claude
   web:
     runs-on: ubuntu-latest
     steps:

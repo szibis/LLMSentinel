@@ -5,12 +5,14 @@ direct-provider learning capture, or explicitly authorized hybrid routing.
 The guide includes startup examples, slash controls, billing boundaries and
 what is implemented versus planned.
 
-Sentinel is pure Go, including capture hooks, CLI controls, status lines,
+Sentinel's services and helpers are Go, including capture hooks, CLI controls, status lines,
 lab management and release/smoke helpers. `make build` produces `llm-sentinel`,
 `sentinel-gateway` and `sentinel-tools`; all three ship as native release binaries.
 MLX-Flash is an external inference service with its own dependencies. Sentinel
 communicates over HTTP and launches only its executable. Future OSS/Jes decision
-services use the same boundary, without Python adapters inside Sentinel.
+services use the same boundary, without Python adapters inside Sentinel. A thin
+[Claude Code mod](docs/claude-code-mod.md) provides a native panel and direct
+controls through the existing Go helpers.
 
 ### Release preparation and changelog maintenance
 

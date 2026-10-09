@@ -33,6 +33,8 @@ dist/
 .claude/
 .sentinel-lab/
 .verification/
+/internal/claudemod/plugin/.claude-plugin/types/
+/internal/claudemod/plugin/tsconfig.json
 __pycache__/
 
 # Prevent new root-level Markdown files (use docs/ folder instead)

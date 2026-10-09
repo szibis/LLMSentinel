@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 
+	"github.com/szibis/claude-escalate/internal/claudemod"
 	"github.com/szibis/claude-escalate/internal/clientcapture"
 	"github.com/szibis/claude-escalate/internal/clientcontrol"
 	"github.com/szibis/claude-escalate/internal/evidence"
@@ -22,7 +23,7 @@ import (
 
 func run(args []string, in io.Reader, out, stderr io.Writer) int {
 	if len(args) == 0 || args[0] == "--help" || args[0] == "help" {
-		fmt.Fprintln(out, "Usage: sentinel-tools <capture|control|statusline|dashboard|lab|runner|ci-lab|role-check|smoke|quality|cli-quality|benchmark|jes|evidence|coverage|release> [options]")
+		fmt.Fprintln(out, "Usage: sentinel-tools <capture|control|mod|statusline|dashboard|lab|runner|ci-lab|role-check|smoke|quality|cli-quality|benchmark|jes|evidence|coverage|release> [options]")
 		return 0
 	}
 	var entry func([]string, io.Reader, io.Writer, io.Writer) int
@@ -31,6 +32,8 @@ func run(args []string, in io.Reader, out, stderr io.Writer) int {
 		entry = clientcapture.Run
 	case "control":
 		entry = clientcontrol.Run
+	case "mod":
+		entry = claudemod.Run
 	case "statusline":
 		entry = labstatus.Run
 	case "dashboard":

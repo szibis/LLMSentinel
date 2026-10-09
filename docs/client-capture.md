@@ -1,5 +1,9 @@
 # Capture normal Claude Code and Codex sessions
 
+The [Claude Code mod](claude-code-mod.md) adds separate, session opt-in local
+observations through `capture --mod-event`. Local recording defaults off;
+gateway training capture and the local mod spool have separate controls.
+
 Learning mode keeps the original CLI connected directly to Anthropic or OpenAI. An optional local hook copies conversation evidence to a private JSONL spool, then optionally to Sentinel's learning collector. It never changes authentication, model/provider selection, subscription routing, or provider base URLs, and it never makes another commercial model request. Serving is the separate CLI → Sentinel → local model route. Start with the [mode guide](client-modes.md) to choose the path.
 
 Nothing is enabled or installed automatically. No global CLI configuration or running lab session is modified. `sentinel-tools capture` uses Go's standard library; it does not require Python, credentials, or external packages. Private file handling supports macOS and Linux; other platforms fail closed.
