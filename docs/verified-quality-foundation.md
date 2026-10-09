@@ -6,8 +6,9 @@ manifests. Each answers a different question. A passing Go test does not prove
 model quality; a native task pass does not establish stable performance, cost
 savings or commercial-model equivalence.
 
-These changes are prepared together for review. The expanded hardware workflow
-must run on the merged source before claiming a new hardware CI result.
+PR #66 merged as `ef3a63d690efe6ac08d5ab1296953ee1e8ccb505` on October 9.
+The merged hardware run retained failures and failed its baseline gate; no
+successful merged hardware result or route promotion is established.
 
 ## Repository coverage and reproducible evidence
 
@@ -148,8 +149,23 @@ review; the harness does not promote it automatically.
 
 The hardware job requires `QWEN_METAL_ENABLED=true`, a trusted main/tag ref and a
 configured self-hosted macOS ARM64 runner. Hosted harness tests or a skipped job
-do not prove native inference. The foundation's expanded hardware gate is wired
-for the next eligible merged run; no new hardware CI success is claimed here.
+do not prove native inference.
+
+Merged-main [Build 37906847282](https://github.com/szibis/LLMSentinel/actions/runs/37906847282)
+passed its hosted checks, including the 90% gate: 15,402/16,935 statements
+(90.947741%), 56 packages and 2,134 test cases. The complete compressed event stream
+and downloaded artifact hashes verified locally. Metal passed 36 API/cache checks,
+but recorded **43/48 native passes and 23/24 baseline passes**, failing the build.
+Three Codex literal-marker cases, Codex Opus recovery, and Claude Opus coding
+failed. Auto Release was skipped. Earlier local baseline success does not override
+this merged-source failure.
+
+The coding transcript completed six legitimate tool steps, including the correct
+edit and a passing Go test, then hit Claude's six-turn cap before its required final
+answer. The follow-up allows eight turns for Claude coding only. Recovery prompt
+translation also discarded the read verb; it now preserves that operation. Both
+changes retain the existing execution and final-answer assertions. Neither changes
+the literal-marker fixture or claims that all native failures are repaired.
 
 ## Paired-prefix benchmark and unknown measurements
 

@@ -396,7 +396,10 @@ func cliPrompt(f Fixture, workspace string) string {
 	if f.ID == "coding-fix" {
 		return "Read " + filepath.Join(workspace, "add.go") + " and add_test.go. Fix Add to return the sum. Edit only add.go; preserve the tests and go.mod. Run exactly go test -timeout 10s ./... in the current directory. After successful tests, reply exactly FIXED_AND_TESTED. Do not just describe a fix."
 	}
-	return strings.ReplaceAll(f.Prompt, "read_fixture", "your real file tools") + " The absolute fixture path is " + filepath.Join(workspace, f.Path) + "."
+	// Preserve the read imperative when translating the API-only tool name.
+	// "Attempt your real file tools" also permits listings, not a failed read.
+	prompt := strings.ReplaceAll(f.Prompt, "attempt read_fixture on ", "attempt to read ")
+	return strings.ReplaceAll(prompt, "read_fixture", "your real file tools") + " The absolute fixture path is " + filepath.Join(workspace, f.Path) + "."
 }
 func cliArguments(client, role, workspace string, f Fixture) []string {
 	prompt := cliPrompt(f, workspace)
@@ -404,15 +407,18 @@ func cliArguments(client, role, workspace string, f Fixture) []string {
 		return []string{"exec", "--ephemeral", "--skip-git-repo-check", "--json", "--sandbox", "workspace-write", "-c", "approval_policy=\"never\"", "-c", "model_reasoning_effort=\"medium\"", "-m", "sentinel-" + role, "-C", workspace, prompt}
 	}
 	tools := "Read"
+	maxTurns := "6"
 	allowed := []string{"Read(/" + filepath.Join(workspace, f.Path) + ")"}
 	if f.ID == "tool-recovery" {
 		allowed = append(allowed, "Read(/"+filepath.Join(workspace, "unavailable.txt")+")")
 	}
 	if f.ID == "coding-fix" {
 		tools = "Read,Edit,Write,Bash"
+		// Six legitimate tool steps can precede the required final answer.
+		maxTurns = "8"
 		allowed = []string{"Read(/" + workspace + "/*)", "Edit(/" + filepath.Join(workspace, "add.go") + ")", "Write(/" + filepath.Join(workspace, "add.go") + ")", "Bash(go test -timeout 10s ./...)"}
 	}
-	args := []string{"--bare", "--model", role, "--print", "--verbose", "--output-format", "stream-json", "--no-session-persistence", "--setting-sources", "user", "--strict-mcp-config", "--mcp-config", `{"mcpServers":{}}`, "--permission-mode", "dontAsk", "--tools", tools, "--max-turns", "6", "--allowedTools"}
+	args := []string{"--bare", "--model", role, "--print", "--verbose", "--output-format", "stream-json", "--no-session-persistence", "--setting-sources", "user", "--strict-mcp-config", "--mcp-config", `{"mcpServers":{}}`, "--permission-mode", "dontAsk", "--tools", tools, "--max-turns", maxTurns, "--allowedTools"}
 	args = append(args, allowed...)
 	// -- ends the variadic tool allow-list so the prompt cannot be parsed as another rule.
 	return append(args, "--", prompt)
