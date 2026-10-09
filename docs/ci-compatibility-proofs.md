@@ -43,6 +43,14 @@ revisions and links to the run and artifacts. Failed, skipped and unavailable
 real-model results stay explicit; synthetic compatibility cannot establish
 model quality or authorize training/promotion.
 
+Publishers serialize their comment updates and use GitHub's `queue: max` to
+retain up to 100 pending runs instead of replacing another PR's pending
+publisher. Current actionlint 1.7.12 predates this documented setting. The
+lint helper first validates its exact value/location and disables only that
+specific unsupported-key diagnostic for the publisher file; other workflows
+and other syntax errors remain checked normally. See
+[GitHub concurrency](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/control-workflow-concurrency).
+
 GitHub activates a `workflow_run` workflow only after its file exists on the
 default branch. The PR introducing this publisher therefore has a manually
 posted current-run proof comment; automatic updates start after merge. See

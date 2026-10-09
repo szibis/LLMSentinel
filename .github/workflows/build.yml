@@ -38,7 +38,7 @@ jobs:
           echo "SOURCE_REVISION=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
           go build -o .verification/sentinel-tools ./cmd/sentinel-tools
       - name: Test proof publishing and fixture rejection contracts
-        run: node --test scripts/test-ci-proof-record.cjs scripts/test-ci-proof-comment.cjs scripts/test-native-clients.test.cjs
+        run: node --test scripts/test-ci-proof-record.cjs scripts/test-ci-proof-comment.cjs scripts/test-native-clients.test.cjs scripts/test-lint-workflows.cjs
       - name: Run API and client adapter regressions
         id: regression
         run: go test -json -race -count=1 ./internal/localgateway ./internal/clientcapture ./internal/clientcontrol ./internal/claudemod ./internal/taskquality ./internal/labstatus > proof-api/regression-events.jsonl
@@ -332,11 +332,15 @@ jobs:
           go-version-file: go.mod
           cache: true
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
       - name: Run golangci-lint
         run: go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.14.0 run ./... --timeout 5m
 
       - name: Validate Actions workflows
-        run: go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12 -shellcheck= -pyflakes=
+        run: node scripts/lint-workflows.cjs go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
 
   security:
     runs-on: ubuntu-latest
