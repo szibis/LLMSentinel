@@ -91,7 +91,7 @@ jobs:
             git log --reverse --format=%s "${LATEST}..${COMMIT_SHA}" > "$RUNNER_TEMP/release-notes.txt"
           fi
           VERSION=$("$RUNNER_TEMP/sentinel-release-tools" release prepare --root . \
-            --latest "$LATEST" --bump "$BUMP" --date "$(date -u +%F)" --notes "$RUNNER_TEMP/release-notes.txt")
+            --latest "$LATEST" --version-floor "$(cat VERSION)" --bump "$BUMP" --date "$(date -u +%F)" --notes "$RUNNER_TEMP/release-notes.txt")
           BRANCH="release/$VERSION"
           # Never overwrite a preparation branch or reviewer edits on a rerun.
           REMOTE=$(git ls-remote --heads origin "refs/heads/$BRANCH")

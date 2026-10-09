@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	_ "github.com/mattn/go-sqlite3"
+	_ "modernc.org/sqlite"
 )
 
 // GraphDB manages knowledge graph operations
@@ -19,10 +19,20 @@ type GraphDB struct {
 
 // New creates a new graph database connection with a full path
 func New(dbPath string) (*GraphDB, error) {
-	db, err := sql.Open("sqlite3", dbPath)
+	db, err := sql.Open("sqlite", dbPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open database: %w", err)
 	}
+
+	// SQLite foreign-key enforcement is per connection. A single connection
+	// keeps the configured pragma and in-memory databases consistent.
+	db.SetMaxOpenConns(1)
+	initialized := false
+	defer func() {
+		if !initialized {
+			db.Close()
+		}
+	}()
 
 	if err := db.Ping(); err != nil {
 		return nil, fmt.Errorf("failed to ping database: %w", err)
@@ -37,6 +47,7 @@ func New(dbPath string) (*GraphDB, error) {
 		return nil, fmt.Errorf("failed to enable foreign keys: %w", err)
 	}
 
+	initialized = true
 	return &GraphDB{db: db}, nil
 }
 
@@ -290,11 +301,15 @@ func (g *GraphDB) Stats() (map[string]int64, error) {
 	stats := make(map[string]int64)
 
 	var nodeCount int64
-	g.db.QueryRow("SELECT COUNT(*) FROM nodes").Scan(&nodeCount)
+	if err := g.db.QueryRow("SELECT COUNT(*) FROM nodes").Scan(&nodeCount); err != nil {
+		return nil, fmt.Errorf("failed to count nodes: %w", err)
+	}
 	stats["node_count"] = nodeCount
 
 	var edgeCount int64
-	g.db.QueryRow("SELECT COUNT(*) FROM edges").Scan(&edgeCount)
+	if err := g.db.QueryRow("SELECT COUNT(*) FROM edges").Scan(&edgeCount); err != nil {
+		return nil, fmt.Errorf("failed to count edges: %w", err)
+	}
 	stats["edge_count"] = edgeCount
 
 	return stats, nil

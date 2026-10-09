@@ -6,7 +6,7 @@ import (
 )
 
 func TestClassifyQuickAnswer(t *testing.T) {
-	classifier := NewClassifier(90)
+	classifier := newOfflineClassifier(t)
 
 	tests := []struct {
 		name            string
@@ -49,7 +49,7 @@ func TestClassifyQuickAnswer(t *testing.T) {
 }
 
 func TestClassifyDetailedAnalysis(t *testing.T) {
-	classifier := NewClassifier(90)
+	classifier := newOfflineClassifier(t)
 
 	tests := []struct {
 		name            string
@@ -92,7 +92,7 @@ func TestClassifyDetailedAnalysis(t *testing.T) {
 }
 
 func TestClassifyRoutine(t *testing.T) {
-	classifier := NewClassifier(90)
+	classifier := newOfflineClassifier(t)
 
 	tests := []struct {
 		name            string
@@ -121,7 +121,7 @@ func TestClassifyRoutine(t *testing.T) {
 }
 
 func TestCacheBypassPattern_NoCache(t *testing.T) {
-	classifier := NewClassifier(90)
+	classifier := newOfflineClassifier(t)
 
 	tests := []struct {
 		name     string
@@ -172,7 +172,7 @@ func TestCacheBypassPattern_NoCache(t *testing.T) {
 }
 
 func TestCacheBypassHighestPriority(t *testing.T) {
-	classifier := NewClassifier(90)
+	classifier := newOfflineClassifier(t)
 
 	// Query with bypass pattern but QUICK intent
 	// Bypass should override and force NO caching
@@ -185,7 +185,7 @@ func TestCacheBypassHighestPriority(t *testing.T) {
 }
 
 func TestIntentAndModelCoupling(t *testing.T) {
-	classifier := NewClassifier(90)
+	classifier := newOfflineClassifier(t)
 
 	tests := []struct {
 		name            string
@@ -227,7 +227,7 @@ func TestIntentAndModelCoupling(t *testing.T) {
 }
 
 func TestConfidenceScoring(t *testing.T) {
-	classifier := NewClassifier(90)
+	classifier := newOfflineClassifier(t)
 
 	tests := []struct {
 		name           string
@@ -259,7 +259,7 @@ func TestConfidenceScoring(t *testing.T) {
 }
 
 func TestMaxTokensCalculation(t *testing.T) {
-	classifier := NewClassifier(90)
+	classifier := newOfflineClassifier(t)
 
 	tests := []struct {
 		name          string
@@ -291,7 +291,7 @@ func TestMaxTokensCalculation(t *testing.T) {
 
 // Benchmark test for classifier performance
 func BenchmarkIntentClassification(b *testing.B) {
-	classifier := NewClassifier(90)
+	classifier := newOfflineClassifier(b)
 	query := "Analyze this code for security issues"
 
 	b.ResetTimer()
@@ -302,10 +302,20 @@ func BenchmarkIntentClassification(b *testing.B) {
 
 // Test that classifier handles nil history gracefully
 func TestClassifyWithNilHistory(t *testing.T) {
-	classifier := NewClassifier(90)
+	classifier := newOfflineClassifier(t)
 
 	decision := classifier.Classify(context.TODO(), "Find functions", "test-user", nil)
 	if decision == nil {
 		t.Error("expected non-nil decision with nil history")
 	}
+}
+
+// newOfflineClassifier isolates filesystem setup and avoids optional model downloads.
+func newOfflineClassifier(t testing.TB) *Classifier {
+	t.Helper()
+	t.Setenv("HOME", t.TempDir())
+	t.Chdir(t.TempDir())
+	c := NewClassifier(90)
+	c.modelManager = nil
+	return c
 }

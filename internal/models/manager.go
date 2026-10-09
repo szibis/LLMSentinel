@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 )
@@ -50,12 +51,16 @@ func NewManager(cfg *ModelConfig) (*Manager, error) {
 	}
 
 	cachePath := cfg.CachePath
-	if cachePath == "" {
+	if cachePath == "" || strings.HasPrefix(cachePath, "~/") {
 		home, err := os.UserHomeDir()
 		if err != nil {
 			return nil, fmt.Errorf("failed to get home dir: %w", err)
 		}
-		cachePath = filepath.Join(home, ".claude-escalate", "models")
+		if cachePath == "" {
+			cachePath = filepath.Join(home, ".claude-escalate", "models")
+		} else {
+			cachePath = filepath.Join(home, cachePath[2:])
+		}
 	}
 
 	// Create cache directory
@@ -76,13 +81,14 @@ func NewManager(cfg *ModelConfig) (*Manager, error) {
 
 // LoadModel loads a model, downloading if necessary
 func (m *Manager) LoadModel(ctx context.Context, modelType ModelType) (*Model, error) {
-	m.mu.RLock()
+	m.mu.Lock()
 	if model, exists := m.loadedModels[string(modelType)]; exists {
-		m.mu.RUnlock()
 		model.LastUsed = time.Now()
-		return model, nil
+		snapshot := *model
+		m.mu.Unlock()
+		return &snapshot, nil
 	}
-	m.mu.RUnlock()
+	m.mu.Unlock()
 
 	// Determine model config based on type
 	var modelCfg ModelSubConfig
@@ -102,7 +108,13 @@ func (m *Manager) LoadModel(ctx context.Context, modelType ModelType) (*Model, e
 	}
 
 	// Download model if needed
-	modelPath, err := m.downloadManager.EnsureModel(ctx, modelCfg.ModelID, modelCfg.Source)
+	var modelPath string
+	var err error
+	if m.config.AutoDownload {
+		modelPath, err = m.downloadManager.EnsureModel(ctx, modelCfg.ModelID, modelCfg.Source)
+	} else {
+		modelPath, err = m.downloadManager.findLocalModel(modelCfg.ModelID)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to download model: %w", err)
 	}
@@ -122,9 +134,10 @@ func (m *Manager) LoadModel(ctx context.Context, modelType ModelType) (*Model, e
 
 	m.mu.Lock()
 	m.loadedModels[string(modelType)] = model
+	snapshot := *model
 	m.mu.Unlock()
 
-	return model, nil
+	return &snapshot, nil
 }
 
 // createInferenceFunc creates the appropriate inference function for a model type
@@ -253,7 +266,8 @@ func (m *Manager) GetLoadedModels() map[string]*Model {
 
 	result := make(map[string]*Model)
 	for k, v := range m.loadedModels {
-		result[k] = v
+		snapshot := *v
+		result[k] = &snapshot
 	}
 	return result
 }

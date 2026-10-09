@@ -45,11 +45,11 @@ func idleForCI(activity map[string]any) error {
 }
 func (e *environment) pauseCI() (string, error) {
 	return e.pauseCIWithReservation(func(token string) (map[string]any, error) {
-		if err := reserveGateway(http.MethodPost, token); err != nil {
+		if err := e.reserveGateway(http.MethodPost, token); err != nil {
 			if errors.Is(err, errCIGatewayRefused) {
 				return nil, err
 			}
-			if releaseErr := reserveGateway(http.MethodDelete, token); releaseErr != nil {
+			if releaseErr := e.reserveGateway(http.MethodDelete, token); releaseErr != nil {
 				return nil, errors.Join(errCIReservationUncertain, err, releaseErr)
 			}
 			return nil, err
@@ -62,13 +62,21 @@ var errCIReservationUncertain = errors.New("gateway reservation uncertain; inspe
 var errCIGatewayRefused = errors.New("gateway refused atomic idle reservation")
 
 func reserveGateway(method, token string) error {
+	client := localHTTP(2 * time.Second)
+	defer client.CloseIdleConnections()
+	return reserveGatewayWith(client, method, token)
+}
+func (e *environment) reserveGateway(method, token string) error {
+	client := e.localHTTP(2 * time.Second)
+	defer client.CloseIdleConnections()
+	return reserveGatewayWith(client, method, token)
+}
+func reserveGatewayWith(client *http.Client, method, token string) error {
 	req, err := http.NewRequest(method, endpoint+"/sentinel/ci-reservation", nil)
 	if err != nil {
 		return err
 	}
 	req.Header.Set("X-Sentinel-CI-Token", token)
-	client := &http.Client{Timeout: 2 * time.Second, Transport: &http.Transport{Proxy: nil}}
-	defer client.CloseIdleConnections()
 	response, err := client.Do(req)
 	if err != nil {
 		return err
@@ -168,7 +176,7 @@ func (e *environment) resumeCIWith(token string, startFn func() error) error {
 		return errors.New("lab ownership changed during CI; refusing restoration")
 	}
 	if lease.Resume && running(e.root) {
-		if err := reserveGateway(http.MethodPost, lease.Token); err != nil {
+		if err := e.reserveGateway(http.MethodPost, lease.Token); err != nil {
 			return err
 		}
 		if err := e.stopFor(true, true); err != nil {

@@ -3,6 +3,7 @@ package cache
 import (
 	"context"
 	"fmt"
+	"math"
 	"sync"
 
 	"github.com/szibis/claude-escalate/internal/config"
@@ -32,6 +33,9 @@ func NewEmbeddingModel(cfg *config.Config) (*EmbeddingModel, error) {
 
 // Embed computes embedding vector for text query (returns fixed 384-dim vector)
 func (e *EmbeddingModel) Embed(ctx context.Context, text string) ([]float32, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	e.mu.RLock()
 	defer e.mu.RUnlock()
 
@@ -122,12 +126,7 @@ func sqrtF32(x float32) float32 {
 	if x < 0 {
 		return 0
 	}
-	// Newton-Raphson approximation
-	z := x
-	for i := 0; i < 10; i++ {
-		z = (z + x/z) / 2
-	}
-	return z
+	return float32(math.Sqrt(float64(x)))
 }
 
 // EmbeddingDimension returns the dimension of embeddings from this model

@@ -240,7 +240,7 @@ func (cgl *CacheGraphLayer) lookupGraph(ctx context.Context, query string) *grap
 func (cgl *CacheGraphLayer) extractEntityName(query string) string {
 	// Look for patterns: "calling <name>", "of <name>", "calls <name>", etc
 	patterns := []string{
-		" calling ", " of ", " call ", " callers of ", " calls ", " imports ", " uses ", "who calls ",
+		" calling ", " of ", " call ", " callers of ", " calls ", " imports ", " uses ", "who calls ", "imports ", "uses ",
 	}
 
 	for _, pattern := range patterns {

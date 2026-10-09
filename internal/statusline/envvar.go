@@ -61,22 +61,20 @@ func (evs *EnvVarSource) Poll() (StatuslineData, error) {
 	// Try CLAUDE_TOKENS_ACTUAL first (convenience var)
 	if actual := os.Getenv("CLAUDE_TOKENS_ACTUAL"); actual != "" {
 		if val, err := strconv.Atoi(actual); err == nil {
-			// Split between input/output as 25/75
-			data.InputTokens = val / 4
-			data.OutputTokens = val * 3 / 4
+			data.TotalTokens = &val
 		}
 	}
 
 	// Override with specific vars if set
 	if input := os.Getenv("CLAUDE_TOKENS_INPUT"); input != "" {
 		if val, err := strconv.Atoi(input); err == nil {
-			data.InputTokens = val
+			data.InputTokens = &val
 		}
 	}
 
 	if output := os.Getenv("CLAUDE_TOKENS_OUTPUT"); output != "" {
 		if val, err := strconv.Atoi(output); err == nil {
-			data.OutputTokens = val
+			data.OutputTokens = &val
 		}
 	}
 
@@ -102,5 +100,9 @@ func (evs *EnvVarSource) Poll() (StatuslineData, error) {
 		}
 	}
 
+	if data.TotalTokens == nil && data.InputTokens != nil && data.OutputTokens != nil {
+		total := *data.InputTokens + *data.OutputTokens
+		data.TotalTokens = &total
+	}
 	return data, nil
 }

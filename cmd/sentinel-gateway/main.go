@@ -14,6 +14,9 @@ import (
 	"github.com/szibis/claude-escalate/internal/localgateway"
 )
 
+var listenGateway = net.Listen
+var gatewaySignalContext = signal.NotifyContext
+
 func main() { os.Exit(run()) }
 
 func run() int {
@@ -74,12 +77,12 @@ func run() int {
 		return 2
 	}
 	defer g.Close()
-	listener, err := net.Listen("tcp", *listen)
+	listener, err := listenGateway("tcp", *listen)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return 1
 	}
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	ctx, stop := gatewaySignalContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	server := &http.Server{Handler: g, ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 15 * time.Second, IdleTimeout: 30 * time.Second, MaxHeaderBytes: 64 * 1024, BaseContext: func(net.Listener) context.Context { return ctx }}
 	finished := make(chan error, 1)

@@ -2,6 +2,7 @@ package config
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 )
@@ -92,6 +93,10 @@ func WriteClaudeSettings(model, effort string) error {
 	var raw map[string]interface{}
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return err
+	}
+
+	if raw == nil {
+		return fmt.Errorf("settings must be a JSON object")
 	}
 
 	raw["model"] = model

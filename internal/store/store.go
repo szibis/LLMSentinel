@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"time"
 
 	bolt "go.etcd.io/bbolt"
@@ -155,7 +156,13 @@ func (s *Store) LogTurn(model, concepts string) error {
 		}
 
 		// Prune: keep last 100 turns
-		count := b.Stats().KeyN
+		// Stats can omit writes made in the current transaction. Count the
+		// cursor entries so the newly appended turn participates in pruning.
+		count := 0
+		cursor := b.Cursor()
+		for k, _ := cursor.First(); k != nil; k, _ = cursor.Next() {
+			count++
+		}
 		if count > 100 {
 			toDelete := count - 100
 			c := b.Cursor()
@@ -332,8 +339,14 @@ func (s *Store) DeleteSession(key string) error {
 
 // LogValidationMetric records estimated vs actual token usage for validation.
 func (s *Store) LogValidationMetric(metric ValidationMetric) error {
+	_, err := s.LogValidationMetricWithID(metric)
+	return err
+}
+
+// LogValidationMetricWithID records a metric and returns its committed ID.
+func (s *Store) LogValidationMetricWithID(metric ValidationMetric) (int64, error) {
 	metric.Timestamp = time.Now()
-	return s.db.Update(func(tx *bolt.Tx) error {
+	err := s.db.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket(bucketValidation)
 		id, _ := b.NextSequence()
 		metric.ID = int64(id) //nolint:gosec
@@ -343,6 +356,10 @@ func (s *Store) LogValidationMetric(metric ValidationMetric) error {
 		}
 		return b.Put(itob(id), data)
 	})
+	if err != nil {
+		return 0, err
+	}
+	return metric.ID, nil
 }
 
 // GetValidationMetrics retrieves the last N validation metrics.
@@ -427,6 +444,13 @@ func (s *Store) GetValidationMetric(id string) (ValidationMetric, error) {
 	err := s.db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket(bucketValidation)
 		v := b.Get([]byte(id))
+		if v == nil {
+			// Public APIs expose decimal sequence IDs. Retain the raw-key
+			// lookup above for callers using historical binary keys.
+			if numericID, err := strconv.ParseUint(id, 10, 64); err == nil {
+				v = b.Get(itob(numericID))
+			}
+		}
 		if v == nil {
 			return fmt.Errorf("validation metric not found: %s", id)
 		}

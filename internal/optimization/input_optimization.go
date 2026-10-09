@@ -159,6 +159,7 @@ func (io *InputOptimizer) OptimizeInputBatch(ctx context.Context, requests []*Pi
 
 		// Accumulate savings
 		totalSavings.TotalTokens += savings.TotalTokens
+		totalSavings.Percent += savings.Percent
 		for layer, tokens := range savings.ByLayer {
 			totalSavings.ByLayer[layer] += tokens
 		}

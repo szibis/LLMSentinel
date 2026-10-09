@@ -25,6 +25,9 @@ func (d *DashboardCLI) SentimentDashboard() error {
 		return fmt.Errorf("failed to fetch sentiment data: %w", err)
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("api returned %d", resp.StatusCode)
+	}
 
 	var data map[string]interface{}
 	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
@@ -118,6 +121,9 @@ func (d *DashboardCLI) BudgetDashboard() error {
 		return fmt.Errorf("failed to fetch budget data: %w", err)
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("api returned %d", resp.StatusCode)
+	}
 
 	var data map[string]interface{}
 	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
@@ -219,6 +225,9 @@ func (d *DashboardCLI) CostOptimizationDashboard() error {
 		return fmt.Errorf("failed to fetch optimization data: %w", err)
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("api returned %d", resp.StatusCode)
+	}
 
 	var data map[string]interface{}
 	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {

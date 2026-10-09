@@ -547,21 +547,21 @@ func appendPrivate(path string, record map[string]any) error {
 	return file.Sync()
 }
 
-func collectorAddress(value string) (*url.URL, error) {
+func collectorAddress(value string) error {
 	address, err := url.Parse(value)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	if address.Scheme != "http" || (address.Hostname() != "127.0.0.1" && address.Hostname() != "::1") || address.User != nil || address.RawQuery != "" || address.ForceQuery || address.Fragment != "" {
-		return nil, errors.New("collector must be literal HTTP loopback")
+		return errors.New("collector must be literal HTTP loopback")
 	}
 	if address.Port() != "" {
 		port, e := strconv.Atoi(address.Port())
 		if e != nil || port < 1 || port > 65535 {
-			return nil, errors.New("invalid collector port")
+			return errors.New("invalid collector port")
 		}
 	}
-	return address, nil
+	return nil
 }
 
 func deliver(address string, record map[string]any) bool {
@@ -645,7 +645,7 @@ func Run(args []string, in io.Reader, out, stderr io.Writer) int {
 		return fail()
 	}
 	if *collector != "" {
-		if _, err := collectorAddress(*collector); err != nil {
+		if err := collectorAddress(*collector); err != nil {
 			return fail()
 		}
 	}

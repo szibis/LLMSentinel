@@ -34,6 +34,9 @@ type LocalFilePublisher struct {
 
 // NewLocalFilePublisher creates a new local file publisher
 func NewLocalFilePublisher(logDir string) (*LocalFilePublisher, error) {
+	if logDir == "" {
+		return nil, fmt.Errorf("metrics log directory is empty")
+	}
 	// Expand home directory
 	if logDir[0] == '~' {
 		home, err := os.UserHomeDir()

@@ -118,12 +118,16 @@ func (taa *TaskAccuracyAnalyzer) GetBestModelForTask(taskType string, days int) 
 	query := `
 		SELECT
 			model,
-			CAST(SUM(CASE WHEN token_error < 0.15 THEN 1 ELSE 0 END) AS FLOAT) / COUNT(*) as success_rate
+			CAST(SUM(CASE WHEN token_error < 0.15 THEN 1 ELSE 0 END) AS FLOAT) / COUNT(*) as computed_success_rate
 		FROM validation_metrics
 		WHERE task_type = ? AND timestamp >= datetime('now', '-' || ? || ' days')
 		GROUP BY model
-		HAVING success_rate >= 0.80
-		ORDER BY model ASC
+		HAVING computed_success_rate >= 0.80
+		ORDER BY CASE
+            WHEN model = 'haiku' OR model GLOB 'claude-haiku-*' THEN 1
+            WHEN model = 'sonnet' OR model GLOB 'claude-sonnet-*' THEN 2
+            WHEN model = 'opus' OR model GLOB 'claude-opus-*' THEN 3
+            ELSE 4 END, model ASC
 	`
 
 	rows, err := taa.db.Query(query, taskType, days)
@@ -132,7 +136,8 @@ func (taa *TaskAccuracyAnalyzer) GetBestModelForTask(taskType string, days int) 
 	}
 	defer rows.Close()
 
-	// Return first model (cheapest: haiku < sonnet < opus alphabetically)
+	// Known Claude model families have cost tiers haiku < sonnet < opus.
+	// Unrecognized labels retain a deterministic order after the known families.
 	if rows.Next() {
 		var model string
 		var successRate float64

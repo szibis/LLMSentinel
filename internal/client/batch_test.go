@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
-	"net/http/httptest"
 	"testing"
 	"time"
 )
@@ -124,7 +123,7 @@ func TestBatchQueueRequests(t *testing.T) {
 
 func TestBatchPoller(t *testing.T) {
 	callCount := 0
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := newMemoryHTTPServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		callCount++
 		job := BatchJob{
 			ID:   "batch_123",
@@ -146,6 +145,7 @@ func TestBatchPoller(t *testing.T) {
 
 	client := NewAnthropicClient("test-api-key")
 	client.baseURL = server.URL
+	client.httpClient = server.Client()
 
 	poller := NewBatchPoller(client, 50*time.Millisecond, 5*time.Second)
 	job, err := poller.Poll(context.Background(), "batch_123")
@@ -162,7 +162,7 @@ func TestBatchPoller(t *testing.T) {
 }
 
 func TestBatchPollerTimeout(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := newMemoryHTTPServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		job := BatchJob{
 			ID:               "batch_123",
 			Type:             "batch",
@@ -176,6 +176,7 @@ func TestBatchPollerTimeout(t *testing.T) {
 
 	client := NewAnthropicClient("test-api-key")
 	client.baseURL = server.URL
+	client.httpClient = server.Client()
 
 	poller := NewBatchPoller(client, 50*time.Millisecond, 100*time.Millisecond)
 	_, err := poller.Poll(context.Background(), "batch_123")
@@ -232,7 +233,7 @@ func TestNewBatchResultProcessor(t *testing.T) {
 
 func TestBatchResultProcessor(t *testing.T) {
 	callCount := 0
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := newMemoryHTTPServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		callCount++
 
 		// First call: return job status with output file
@@ -281,6 +282,7 @@ func TestBatchResultProcessor(t *testing.T) {
 
 	client := NewAnthropicClient("test-api-key")
 	client.baseURL = server.URL
+	client.httpClient = server.Client()
 
 	processor := NewBatchResultProcessor(client)
 	results, err := processor.ProcessResults(context.Background(), "batch_123")

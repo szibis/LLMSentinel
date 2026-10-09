@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"os/user"
 	"path/filepath"
 	"strings"
 
@@ -18,11 +17,11 @@ func expandHome(path string) string {
 	if !strings.HasPrefix(path, "~") {
 		return path
 	}
-	usr, err := user.Current()
+	home, err := os.UserHomeDir()
 	if err != nil {
 		return path
 	}
-	return filepath.Join(usr.HomeDir, path[1:])
+	return filepath.Join(home, path[1:])
 }
 
 // isToolAvailable checks if tool exists in PATH
@@ -68,9 +67,10 @@ func (l *Loader) GetLoadedPath() string {
 func (l *Loader) Load() (*Config, error) {
 	// Try to load from provided path
 	if l.configPath != "" {
-		if err := l.loadFromFile(l.configPath); err == nil {
-			return l.config, nil
+		if err := l.loadFromFile(l.configPath); err != nil {
+			return nil, fmt.Errorf("failed to load explicit configuration: %w", err)
 		}
+		return l.config, nil
 	}
 
 	// Try default locations
@@ -116,7 +116,8 @@ func (l *Loader) loadFromFile(path string) error {
 
 	cfg := &Config{}
 	if err := yaml.Unmarshal(data, cfg); err != nil {
-		return err
+		// YAML type errors can include configuration values such as credentials.
+		return fmt.Errorf("invalid YAML configuration: syntax or field type mismatch")
 	}
 
 	// Apply defaults for any missing configuration sections

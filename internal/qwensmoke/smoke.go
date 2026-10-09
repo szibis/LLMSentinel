@@ -466,7 +466,17 @@ func runSmoke(ctx context.Context, gateway, raw string, result document, out io.
 			}
 			result["health"] = append(result["health"].([]any), document{"model_size": model[0], "scope": "gateway", "capabilities": state["capabilities"]})
 			if len(integrationProofs) > 0 && integrationProofs[0] {
-				return runIntegrationProofs(ctx, gatewayURL, model[0], result, out)
+				if e := runIntegrationProofs(ctx, gatewayURL, model[0], result, out); e != nil {
+					return e
+				}
+				if model[0] == "large" && len(integrationProofs) > 1 && integrationProofs[1] {
+					artifacts, ok := result["artifacts"].(string)
+					if !ok || artifacts == "" {
+						return errors.New("native quality artifacts directory required")
+					}
+					return runNativeQuality(ctx, artifacts, result, out)
+				}
+				return nil
 			}
 			roles := []string{"haiku"}
 			if model[0] == "large" {
@@ -536,6 +546,7 @@ func Run(args []string, _ io.Reader, out, stderr io.Writer) int {
 	flags.SetOutput(stderr)
 	gateway := flags.String("gateway", "", "fresh gateway binary")
 	proofs := flags.Bool("integration-proofs", false, "verify provider API, tools, telemetry, and native cache contracts")
+	native := flags.Bool("native-quality", false, "capture installed CLI extended quality and benchmark evidence; requires integration proofs")
 	artifacts := flags.String("artifacts", "qwen-metal-artifacts", "sanitized output directory")
 	if flags.Parse(args) != nil || flags.NArg() != 0 {
 		return 2
@@ -544,6 +555,16 @@ func Run(args []string, _ io.Reader, out, stderr io.Writer) int {
 		fmt.Fprintln(stderr, "--integration-proofs requires --gateway")
 		return 2
 	}
+	if *native && !*proofs {
+		fmt.Fprintln(stderr, "--native-quality requires --integration-proofs")
+		return 2
+	}
+	if *native {
+		if _, err := parseExtendedQualityRequirement(os.Getenv("SENTINEL_EXTENDED_QUALITY_REQUIRED")); err != nil {
+			fmt.Fprintln(stderr, err)
+			return 2
+		}
+	}
 	if err := os.MkdirAll(*artifacts, 0700); err != nil {
 		fmt.Fprintln(stderr, "cannot create smoke artifacts")
 		return 1
@@ -551,6 +572,7 @@ func Run(args []string, _ io.Reader, out, stderr io.Writer) int {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 	result := document{"passed": false, "health": []any{}, "checks": []any{}}
+	result["artifacts"] = *artifacts
 	err := func() (runErr error) {
 		lock := os.Getenv("QWEN_CI_LOCK_PATH")
 		if lock == "" {
@@ -575,7 +597,7 @@ func Run(args []string, _ io.Reader, out, stderr io.Writer) int {
 			return errors.New("cannot create private smoke logs")
 		}
 		defer func() { _ = os.RemoveAll(raw) }()
-		e = runSmoke(ctx, *gateway, raw, result, out, *proofs)
+		e = runSmoke(ctx, *gateway, raw, result, out, *proofs, *native)
 		logsErr := sanitizedLogs(raw, *artifacts)
 		if e == nil {
 			e = logsErr

@@ -61,7 +61,7 @@ func NewCacheManager() *CacheManager {
 
 // CachePrompt stores a prompt in the cache
 func (cm *CacheManager) CachePrompt(content string, model string, estimatedTokens int) string {
-	hash := cm.hashContent(content)
+	hash := cm.hashContent(fmt.Sprintf("%d:%s%s", len(model), model, content))
 
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
@@ -86,7 +86,7 @@ func (cm *CacheManager) CachePrompt(content string, model string, estimatedToken
 
 // CacheResponse stores a response in the cache
 func (cm *CacheManager) CacheResponse(content string, model string, estimatedTokens int) string {
-	hash := cm.hashContent(content)
+	hash := cm.hashContent(fmt.Sprintf("%d:%s%s", len(model), model, content))
 
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
@@ -115,7 +115,7 @@ func (cm *CacheManager) FindSimilarPrompt(content string, model string, similari
 	cm.mu.RLock()
 	defer cm.mu.RUnlock()
 
-	contentHash := cm.hashContent(content)
+	contentHash := cm.hashContent(fmt.Sprintf("%d:%s%s", len(model), model, content))
 
 	// First try exact match
 	if entry, exists := cm.prompts[contentHash]; exists {
@@ -161,7 +161,7 @@ func (cm *CacheManager) GetCacheOptimizations(prompt string, estimatedOutput int
 			// Calculate savings from cache
 			// Cached prompts cost 10% of normal input cost
 			tokens := costs.TokenCosts{
-				InputTokens:     len(prompt),
+				InputTokens:     0,
 				OutputTokens:    estimatedOutput,
 				CacheReadTokens: len(prompt),
 				IsCached:        true,
@@ -182,21 +182,29 @@ func (cm *CacheManager) GetCacheOptimizations(prompt string, estimatedOutput int
 		OutputTokens: estimatedOutput,
 		IsBatchAPI:   true,
 	}
+	if opt.CanUseCachedPrompt {
+		batchTokens.InputTokens = 0
+		batchTokens.CacheReadTokens = len(prompt)
+		batchTokens.IsCached = true
+	}
 	batchBreakdown, _ := cm.calculator.CalculateCost(model, batchTokens)
 	normalBreakdown, _ := cm.calculator.CalculateCost(model, costs.TokenCosts{
 		InputTokens:  len(prompt),
 		OutputTokens: estimatedOutput,
 	})
 
-	batchSavings := normalBreakdown.TotalCost - batchBreakdown.TotalCost
+	batchSavings := normalBreakdown.TotalCost - opt.EstimatedSavings - batchBreakdown.TotalCost
 	totalSavings := opt.EstimatedSavings + batchSavings
 
 	if normalBreakdown.TotalCost > 0 {
 		opt.SavingsPercent = (totalSavings / normalBreakdown.TotalCost) * 100
 	}
 
-	// Recommend batching if cache + batch saves significant amount
+	// Recommend batching using candidate savings; report only the selected strategy.
 	opt.RecommendBatching = opt.SavingsPercent >= cm.minSavingsPercent
+	if !opt.RecommendBatching && normalBreakdown.TotalCost > 0 {
+		opt.SavingsPercent = opt.EstimatedSavings / normalBreakdown.TotalCost * 100
+	}
 
 	if opt.CanUseCachedPrompt && opt.RecommendBatching {
 		opt.Rationale = fmt.Sprintf("use cached prompt + batch API: save %.1f%% ($%.4f)",
@@ -338,7 +346,7 @@ func (cm *CacheManager) calculateSimilarity(s1, s2 string) float64 {
 }
 
 func (cm *CacheManager) findSimilarPromptLocked(content string, model string, threshold float64) string {
-	contentHash := cm.hashContent(content)
+	contentHash := cm.hashContent(fmt.Sprintf("%d:%s%s", len(model), model, content))
 
 	// Exact match first
 	if entry, exists := cm.prompts[contentHash]; exists && entry.Model == model {
@@ -366,6 +374,7 @@ func (cm *CacheManager) evictIfNeeded() {
 		// Find and remove oldest entry
 		var oldestHash string
 		var oldestTime time.Time
+		oldestIsResponse := false
 
 		for hash, entry := range cm.prompts {
 			if oldestTime.IsZero() || entry.LastAccessedAt.Before(oldestTime) {
@@ -375,15 +384,19 @@ func (cm *CacheManager) evictIfNeeded() {
 		}
 
 		for hash, entry := range cm.responses {
-			if entry.LastAccessedAt.Before(oldestTime) {
+			if oldestTime.IsZero() || entry.LastAccessedAt.Before(oldestTime) {
 				oldestHash = hash
 				oldestTime = entry.LastAccessedAt
+				oldestIsResponse = true
 			}
 		}
 
 		if oldestHash != "" {
-			delete(cm.prompts, oldestHash)
-			delete(cm.responses, oldestHash)
+			if oldestIsResponse {
+				delete(cm.responses, oldestHash)
+			} else {
+				delete(cm.prompts, oldestHash)
+			}
 		}
 	}
 }

@@ -3,7 +3,9 @@ package cache
 import (
 	"context"
 	"crypto/sha256"
+	"encoding/json"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/szibis/claude-escalate/internal/config"
@@ -12,6 +14,7 @@ import (
 
 // Layer represents the cache layer in the 7-layer optimization pipeline
 type Layer struct {
+	mu              sync.RWMutex
 	exactCache      map[string]string         // Exact dedup cache (Layer 1)
 	semanticCache   *SemanticCache            // Semantic cache (Layer 5)
 	metrics         *metrics.MetricsCollector // Metrics tracking
@@ -74,9 +77,13 @@ func (l *Layer) LookupExact(req *Request) (string, bool, error) {
 		return "", false, nil
 	}
 
-	key := l.hashRequest(req)
-
+	key, err := l.hashRequest(req)
+	if err != nil {
+		return "", false, err
+	}
+	l.mu.RLock()
 	response, found := l.exactCache[key]
+	l.mu.RUnlock()
 	if found && l.metrics != nil {
 		l.metrics.RecordCacheHit()
 	}
@@ -87,7 +94,7 @@ func (l *Layer) LookupExact(req *Request) (string, bool, error) {
 // LookupSemantic performs semantic cache lookup (Layer 5)
 // Returns: (response, similarity_score, found, error)
 func (l *Layer) LookupSemantic(ctx context.Context, req *Request) (string, float32, bool, error) {
-	if !l.semanticEnabled || req == nil {
+	if !l.semanticEnabled || req == nil || !semanticRequestEligible(req) {
 		return "", 0, false, nil
 	}
 
@@ -114,13 +121,22 @@ func (l *Layer) Store(ctx context.Context, req *Request, resp *Response) error {
 		return nil // Don't cache errors
 	}
 
-	key := l.hashRequest(req)
+	key, err := l.hashRequest(req)
+	if err != nil {
+		return err
+	}
 
 	// Store in exact dedup cache
+	l.mu.Lock()
 	l.exactCache[key] = resp.Content
+	l.mu.Unlock()
 
+	// Tool and parameter requests require exact identity; embeddings cannot isolate resources.
+	if !semanticRequestEligible(req) {
+		return nil
+	}
 	// Store in semantic cache
-	err := l.semanticCache.Store(ctx, key, req.Content, resp.Content)
+	err = l.semanticCache.Store(ctx, key, req.Content, resp.Content)
 	if err != nil {
 		// Log but don't fail - semantic cache is optional optimization
 		// In production, could emit a metric or log error here
@@ -140,9 +156,12 @@ func (l *Layer) RecordFalsePositive() {
 // GetStats returns cache statistics for monitoring
 func (l *Layer) GetStats() LayerStats {
 	stats := l.semanticCache.Stats()
+	l.mu.RLock()
+	exactSize := len(l.exactCache)
+	l.mu.RUnlock()
 
 	return LayerStats{
-		ExactCacheSize:      len(l.exactCache),
+		ExactCacheSize:      exactSize,
 		SemanticCacheSize:   stats.EntriesCount,
 		SemanticHits:        stats.TotalSemanticHits,
 		FalsePositives:      stats.FalsePositives,
@@ -172,16 +191,22 @@ func (l *Layer) Prune() {
 
 // Clear removes all cached entries
 func (l *Layer) Clear() {
+	l.mu.Lock()
 	l.exactCache = make(map[string]string)
+	l.mu.Unlock()
 	if l.semanticCache != nil {
 		l.semanticCache.Clear()
 	}
 }
 
 // hashRequest creates a deterministic hash of the request for exact matching
-func (l *Layer) hashRequest(req *Request) string {
-	hash := sha256.Sum256([]byte(req.Content + req.Tool))
-	return fmt.Sprintf("%x", hash)
+func (l *Layer) hashRequest(req *Request) (string, error) {
+	data, err := json.Marshal(req)
+	if err != nil {
+		return "", fmt.Errorf("request parameters cannot be encoded for cache: %w", err)
+	}
+	hash := sha256.Sum256(data)
+	return fmt.Sprintf("%x", hash), nil
 }
 
 // CacheSafetyDecision determines if caching is safe for a query based on intent
@@ -219,4 +244,18 @@ func (l *Layer) EvaluateCacheSafety(intent string) CacheSafetyDecision {
 			Confidence: 0.5,
 		}
 	}
+}
+
+// Semantic reuse is limited to plain content. estimated_tokens is accounting metadata,
+// while tool names and all other parameters can identify a different resource.
+func semanticRequestEligible(req *Request) bool {
+	if req.Tool != "" {
+		return false
+	}
+	for key := range req.Params {
+		if key != "estimated_tokens" {
+			return false
+		}
+	}
+	return true
 }

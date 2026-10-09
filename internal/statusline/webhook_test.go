@@ -1,9 +1,9 @@
 package statusline
 
 import (
+	"io"
 	"net"
 	"net/http"
-	"net/http/httptest"
 	"strings"
 	"testing"
 )
@@ -131,17 +131,13 @@ func TestWebhookPoll_PayloadValidation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				w.Header().Set("Content-Type", "application/json")
-				_, _ = w.Write([]byte(tt.body))
-			}))
-			defer srv.Close()
-
-			// Bypass URL validation for unit-level tests by constructing directly.
+			// Exercise the production HTTP decoder without requiring sockets.
 			ws := &WebhookSource{
-				url:     srv.URL,
+				url:     "https://8.8.8.8/metrics",
 				enabled: true,
-				client:  srv.Client(),
+				client: &http.Client{Transport: localTransport(func(r *http.Request) (*http.Response, error) {
+					return &http.Response{StatusCode: 200, Body: io.NopCloser(strings.NewReader(tt.body))}, nil
+				})},
 			}
 
 			_, err := ws.Poll()

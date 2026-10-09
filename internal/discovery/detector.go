@@ -153,6 +153,9 @@ func DetectToolsWithConfig(configPath string) (*DetectedTools, error) {
 
 // findTool searches for a tool in the given paths
 func findTool(searchPaths []string) string {
+	if len(searchPaths) == 0 {
+		return ""
+	}
 	for _, pathPattern := range searchPaths {
 		// Expand home directory and environment variables
 		expanded := expandPath(pathPattern)

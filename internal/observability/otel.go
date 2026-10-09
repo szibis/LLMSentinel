@@ -54,13 +54,8 @@ func (ome *OTELMetricsExporter) Start(ctx context.Context) error {
 	if ome.config.Endpoint == "" {
 		return fmt.Errorf("OTEL endpoint not configured")
 	}
-
-	ome.isRunning = true
-
-	// Start background push routine
-	go ome.pushLoop(ctx)
-
-	return nil
+	// Do not advertise an active exporter when its transport cannot deliver.
+	return ome.pushMetrics(ctx)
 }
 
 // Stop stops the metrics exporter.
@@ -227,7 +222,7 @@ func (ome *OTELMetricsExporter) buildOTLPMetrics(snapshot map[string]interface{}
 
 // sendOTLPPayload sends the OTLP payload to the configured endpoint.
 // In production, this would use HTTP/gRPC with proper error handling.
-func (ome *OTELMetricsExporter) sendOTLPPayload(ctx context.Context, payload map[string]interface{}) error {
+func (ome *OTELMetricsExporter) sendOTLPPayload(_ context.Context, _ map[string]interface{}) error {
 	// Placeholder for actual HTTP/gRPC send
 	// In production:
 	// 1. Marshal payload to protobuf
@@ -235,7 +230,7 @@ func (ome *OTELMetricsExporter) sendOTLPPayload(ctx context.Context, payload map
 	// 3. Handle 4xx/5xx responses
 	// 4. Retry on timeout
 
-	return nil
+	return fmt.Errorf("OTEL transport %q is not implemented; metrics were not delivered", ome.config.ExporterType)
 }
 
 // IsRunning returns whether the exporter is actively pushing metrics.

@@ -10,7 +10,7 @@ import (
 func TestHistoryUsesFreshCountersAndLeavesGaps(t *testing.T) {
 	h := newHistory()
 	sample := func(at int, requests, tokens int, stale bool, run string) {
-		runtime := map[string]any{"sample_time": at, "stale": stale, "model": "Qwen", "endpoint": "large", "stats": map[string]any{"requests": requests, "tokens_generated": tokens}, "last_generation": map[string]any{"generation_tps": 40, "native_generation_metadata": true}, "memory": map[string]any{"available_gb": 12}}
+		runtime := map[string]any{"sample_time": at, "stale": stale, "model": "Qwen", "endpoint": "large", "stats": map[string]any{"requests": requests, "tokens_generated": tokens, "uptime_s": at}, "last_generation": map[string]any{"generation_tps": 40, "native_generation_metadata": true}, "memory": map[string]any{"available_gb": 12}}
 		raw, _ := json.Marshal(map[string]any{"sample_time": at, "run_id": run, "runtimes": map[string]any{"large": runtime}})
 		h.record(raw, nil, time.Unix(int64(at), 0))
 	}
@@ -53,6 +53,24 @@ func TestHistoryBoundsAndSanitizesObservedAttempts(t *testing.T) {
 	points, events := h.snapshot(time.Unix(1100, 0))
 	if len(points) != 0 || len(events) != 0 {
 		t.Fatal("history exceeded retention")
+	}
+}
+
+func TestHistoryMissingUptimeLeavesRatesAndCacheUnknown(t *testing.T) {
+	h := newHistory()
+	for i := 0; i < 2; i++ {
+		at := 100 + 4*i
+		r := map[string]any{"sample_time": at, "model": "Qwen", "endpoint": "large", "stats": map[string]any{"requests": 1 + i, "tokens_generated": 20 + 40*i}, "prompt_cache": map[string]any{"reused_tokens": 100 * i, "processed_tokens": 100 + 100*i}, "last_generation": map[string]any{"native_generation_metadata": true, "ttft_ms": 125, "cached_prompt_tokens": 100, "generation_tps": 40}}
+		raw, _ := json.Marshal(map[string]any{"sample_time": at, "run_id": "one", "runtimes": map[string]any{"large": r}})
+		h.record(raw, nil, time.Unix(int64(at), 0))
+	}
+	points, _ := h.snapshot(time.Unix(104, 0))
+	if len(points) != 2 {
+		t.Fatal(points)
+	}
+	r := points[1].Runtimes["large"]
+	if r.CacheReuseRatio != nil || r.TokensPerSecond != nil || r.RequestsPerMinute != nil || r.Decode != nil || r.WarmTTFT != nil {
+		t.Fatalf("missing continuity fabricated derived metrics: %+v", r)
 	}
 }
 

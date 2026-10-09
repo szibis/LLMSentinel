@@ -229,10 +229,10 @@ func (mc *MetricsCollector) GetMetrics() MetricSnapshot {
 
 	snapshot := MetricSnapshot{
 		Timestamp:        time.Now(),
-		CacheMetrics:     mc.cacheMetrics,
-		SecurityMetrics:  mc.securityMetrics,
-		TokenMetrics:     mc.tokenMetrics,
-		LatencyMetrics:   mc.latencyMetrics,
+		CacheMetrics:     copyMetrics(mc.cacheMetrics),
+		SecurityMetrics:  copySecurityMetrics(mc.securityMetrics),
+		TokenMetrics:     copyTokenMetrics(mc.tokenMetrics),
+		LatencyMetrics:   copyLatencyMetrics(mc.latencyMetrics),
 		OptimizerMetrics: make(map[string]*OptimizerMetrics),
 		RequestCount:     mc.requestCount,
 	}
@@ -259,7 +259,18 @@ func (mc *MetricsCollector) GetMetricsHistory() []MetricSnapshot {
 	defer mc.mu.RUnlock()
 
 	history := make([]MetricSnapshot, len(mc.metricsHistory))
-	copy(history, mc.metricsHistory)
+	for i, snapshot := range mc.metricsHistory {
+		history[i] = snapshot
+		history[i].CacheMetrics = copyMetrics(snapshot.CacheMetrics)
+		history[i].SecurityMetrics = copySecurityMetrics(snapshot.SecurityMetrics)
+		history[i].TokenMetrics = copyTokenMetrics(snapshot.TokenMetrics)
+		history[i].LatencyMetrics = copyLatencyMetrics(snapshot.LatencyMetrics)
+		history[i].OptimizerMetrics = make(map[string]*OptimizerMetrics, len(snapshot.OptimizerMetrics))
+		for name, metric := range snapshot.OptimizerMetrics {
+			copy := *metric
+			history[i].OptimizerMetrics[name] = &copy
+		}
+	}
 	return history
 }
 

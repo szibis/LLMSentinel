@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
-	"net/http/httptest"
 	"testing"
 	"time"
 )
@@ -20,7 +19,7 @@ func TestNewAnthropicClient(t *testing.T) {
 }
 
 func TestCreateMessage(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := newMemoryHTTPServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Header.Get("x-api-key") != "test-api-key" {
 			t.Error("expected x-api-key header")
 		}
@@ -48,6 +47,7 @@ func TestCreateMessage(t *testing.T) {
 
 	client := NewAnthropicClient("test-api-key")
 	client.baseURL = server.URL
+	client.httpClient = server.Client()
 
 	req := &MessageRequest{
 		Model:     "claude-3-sonnet",
@@ -68,7 +68,7 @@ func TestCreateMessage(t *testing.T) {
 }
 
 func TestSubmitBatch(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := newMemoryHTTPServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != "POST" {
 			t.Errorf("expected POST, got %s", r.Method)
 		}
@@ -88,6 +88,7 @@ func TestSubmitBatch(t *testing.T) {
 
 	client := NewAnthropicClient("test-api-key")
 	client.baseURL = server.URL
+	client.httpClient = server.Client()
 
 	requests := []BatchRequest{
 		{
@@ -120,7 +121,7 @@ func TestSubmitBatch(t *testing.T) {
 }
 
 func TestGetBatchStatus(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := newMemoryHTTPServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		job := BatchJob{
 			ID:               "batch_123",
 			Type:             "batch",
@@ -138,6 +139,7 @@ func TestGetBatchStatus(t *testing.T) {
 
 	client := NewAnthropicClient("test-api-key")
 	client.baseURL = server.URL
+	client.httpClient = server.Client()
 
 	job, err := client.GetBatchStatus(context.Background(), "batch_123")
 	if err != nil {
@@ -153,7 +155,7 @@ func TestGetBatchStatus(t *testing.T) {
 }
 
 func TestCancelBatch(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := newMemoryHTTPServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != "POST" {
 			t.Errorf("expected POST, got %s", r.Method)
 		}
@@ -172,6 +174,7 @@ func TestCancelBatch(t *testing.T) {
 
 	client := NewAnthropicClient("test-api-key")
 	client.baseURL = server.URL
+	client.httpClient = server.Client()
 
 	job, err := client.CancelBatch(context.Background(), "batch_123")
 	if err != nil {

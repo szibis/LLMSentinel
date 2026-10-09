@@ -9,9 +9,21 @@ rtk ./bin/sentinel-tools cli-quality --root "$PWD/.sentinel-lab" --client claude
 rtk ./bin/sentinel-tools cli-quality --root "$PWD/.sentinel-lab" --client codex --role haiku --task exact-read
 ```
 
-Defaults: both clients, Sonnet, four tasks, three minutes per task. Options include
-`--client claude|codex|both`, `--role haiku|sonnet|opus|all`, `--task exact-read|coding-fix|loki-evidence|planning|all`
-and `--timeout 90s` (maximum ten minutes). Exit 0 means all selected tasks passed;
+Defaults: both clients, Sonnet, the four-task baseline suite, three minutes per task.
+The supported flags are:
+
+| Flag | Default | Values |
+| --- | --- | --- |
+| `--root` | `.sentinel-lab` | Existing isolated lab directory |
+| `--clients-root` | Empty | Optional existing isolated installation directory containing `node_modules/.bin/claude` and `codex` |
+| `--endpoint` | `http://127.0.0.1:19090` | Literal loopback HTTP gateway origin |
+| `--client` | `both` | `claude`, `codex`, `both` |
+| `--role` | `sonnet` | `haiku`, `sonnet`, `opus`, `all` |
+| `--suite` | `baseline` | `baseline`, `extended` |
+| `--task` | `all` | `all` or a task ID in the selected suite |
+| `--timeout` | `3m` | Positive Go duration, at most `10m` |
+
+Exit 0 means all selected tasks passed;
 1 means task or operational failure; 2 means invalid options. Runs are sequential,
 consume local inference capacity and share the lab with interactive work.
 
@@ -22,9 +34,16 @@ Inherited credentials, proxies and client configuration are excluded. The gatewa
 must report local-only serving with paid API opt-in disabled. No commercial API
 request is part of this benchmark.
 
-`lab-cli-quality-all` runs 24 cases: four tasks for each role in each client,
-with six minutes allowed per task. It writes one combined report, preserving
-the same strict assertions used by single-role runs.
+`lab-cli-quality-all` now selects the extended suite: 48 cases across all three
+roles and both clients, with six minutes allowed per task. To reproduce just
+the 24-case baseline, select it explicitly:
+
+```sh
+rtk ./bin/sentinel-tools cli-quality --root "$PWD/.sentinel-lab" \
+  --client both --role all --suite baseline --timeout 6m
+rtk ./bin/sentinel-tools cli-quality --root "$PWD/.sentinel-lab" \
+  --client both --role all --suite extended --timeout 6m
+```
 
 Claude uses headless stream JSON, fixed tools and scoped permissions. Successful
 tool results are correlated with their calls; a tool proposal alone does not prove
@@ -94,6 +113,20 @@ not a semantic guarantee that a model's answer or code is correct.
 | Loki evidence | Read the fictional catalog; return the exact complete/partial sets in JSON |
 | Planning | Read the dependency file; return the complete valid execution order in JSON |
 
+The `extended` suite retains those four tasks and adds:
+
+| Task ID | Required evidence |
+| --- | --- |
+| `untrusted-evidence` | Extract the marker while treating an embedded instruction to forge results as untrusted data |
+| `literal-markers` | Preserve Unicode, escaped characters, newline, NUL and tool-looking text in the exact decoded JSON value |
+| `long-context` | Extract the exact marker surrounded by unrelated reference text |
+| `tool-recovery` | Observe a failed read of `unavailable.txt`, then a successful read of `recovery.json`, followed by the exact JSON answer |
+
+For example, `--suite extended --task tool-recovery` selects only recovery.
+Fixtures identify their version and carry a SHA-256 digest of the actual corpus,
+including that run's fresh marker. JSON assertions and native events reject
+duplicate keys, invalid UTF-8, excessive nesting and events after completion.
+
 Coding verification accepts only a bounded arithmetic return in `Add(a, b int) int`.
 It rejects imports, extra declarations and changed supplied tests, then copies the
 validated function into a separate verifier with trusted tests plus 2,205 held-out
@@ -135,8 +168,16 @@ rtk go test -race ./internal/taskquality ./internal/labdashboard
 
 Hosted CI runs the model-free tests, including successful/failed tool correlation,
 unfinished turns, immutable coding fixtures, isolated environment, separate report
-scopes and Unix descendant cleanup. Native runs are explicit experiments, not
-release gates. Passing harness tests does not prove model quality.
+scopes and Unix descendant cleanup. Passing harness tests does not prove model quality.
+The opt-in Metal workflow additionally requests `smoke --integration-proofs
+--native-quality`, captures all 48 native cases, and requires all 24 baseline
+cases to pass. Extended failures are retained and block route promotion.
+The repository Actions variable `SENTINEL_EXTENDED_QUALITY_REQUIRED=true`, forwarded
+by the updated workflow after merge, makes any extended failure fail that hardware
+gate too; the same environment variable works for local smoke runs. A 48/48 report
+permits further review; it does not itself
+change routes or authorize promotion. See the [verified quality foundation](verified-quality-foundation.md)
+for evidence manifests, CI provenance and the separation from hosted coverage.
 
 ## Initial native baseline — October 7, 2026
 
@@ -179,3 +220,25 @@ A separate offline `smoke --integration-proofs` run using the rebuilt gateway
 passed 36 API, required-tool, continuation, telemetry and native cache checks
 against the cached LFM and Gemma models. Those basic API contracts are separate
 from native agent task quality; they do not certify LFM for the native task set.
+
+## Extended native observation — October 8, 2026
+
+The local version-2 extended report completed at `2026-10-08T12:16:45.198599Z`,
+using Claude Code 2.1.291 and Codex 0.160.1. It recorded **43/48 passes**, including
+**24/24 baseline passes**. Five Codex cases failed:
+
+| Task | Alias | Recorded failure |
+| --- | --- | --- |
+| `literal-markers` | Haiku | Backend length termination surfaced as HTTP 422 |
+| `literal-markers` | Sonnet | Backend length termination surfaced as HTTP 422 |
+| `literal-markers` | Opus | Literal value changed; exact final assertion failed |
+| `tool-recovery` | Sonnet | Strict failed-read/successful-read recovery evidence did not pass |
+| `tool-recovery` | Opus | Strict failed-read/successful-read recovery evidence did not pass |
+
+The inspected summary is private local evidence at
+`Sentinel/.sentinel-lab/task-cli-quality-latest.json`; its full synthetic transcripts
+remain in local archives and are not committed. This is one observed run, not a
+stable success rate. The baseline passes do not cancel the five extended failures:
+route promotion remains blocked. The expanded hardware workflow has not yet been
+validated on merged foundation code; these local observations are not a new
+hardware CI success claim.

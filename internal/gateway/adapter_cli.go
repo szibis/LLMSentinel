@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-// CLIAdapter implements ToolAdapter for shell commands
+// CLIAdapter implements ToolAdapter for a limited set of direct utility calls.
 type CLIAdapter struct {
 	maxExecutionTime time.Duration
 	signature        *ToolSignature
@@ -35,7 +35,7 @@ func (a *CLIAdapter) Type() ToolType {
 	return ToolTypeCLI
 }
 
-// Execute executes a shell command
+// Execute executes supported arguments directly, without shell interpretation.
 func (a *CLIAdapter) Execute(ctx context.Context, req *ToolRequest) (*ToolResponse, error) {
 	command, ok := req.Params["command"].(string)
 	if !ok {
@@ -47,7 +47,8 @@ func (a *CLIAdapter) Execute(ctx context.Context, req *ToolRequest) (*ToolRespon
 	}
 
 	// Check for allowed commands (security whitelist)
-	if !a.isCommandAllowed(command) {
+	argv, valid := simpleCLIArguments(command)
+	if !valid {
 		return &ToolResponse{
 			ID:      req.ID,
 			Success: false,
@@ -62,7 +63,7 @@ func (a *CLIAdapter) Execute(ctx context.Context, req *ToolRequest) (*ToolRespon
 	defer cancel()
 
 	// Execute command
-	cmd := exec.CommandContext(execCtx, "sh", "-c", command)
+	cmd := exec.CommandContext(execCtx, argv[0], argv[1:]...) // #nosec G204 -- simpleCLIArguments restricts executable names to bounded utilities and rejects shell syntax and execution-capable modes; direct argv uses the operator's PATH, not a shell or filesystem sandbox.
 
 	// Capture output
 	var stdout, stderr bytes.Buffer
@@ -128,34 +129,65 @@ func (a *CLIAdapter) Close() error {
 
 // isCommandAllowed checks if a command is in the whitelist
 func (a *CLIAdapter) isCommandAllowed(command string) bool {
-	// Whitelist of safe commands
-	allowedPrefixes := []string{
-		"git",
-		"ls",
-		"cat",
-		"echo",
-		"grep",
-		"find",
-		"pwd",
-		"date",
-		"head",
-		"tail",
-		"wc",
-		"sort",
-		"uniq",
-		"cut",
-		"tr",
-		"sed",
-	}
+	_, ok := simpleCLIArguments(command)
+	return ok
+}
 
-	command = strings.TrimSpace(command)
-	for _, prefix := range allowedPrefixes {
-		if strings.HasPrefix(command, prefix+" ") || command == prefix {
-			return true
+// simpleCLIArguments supports whitespace-separated arguments and whole or
+// partial single/double quoted literals. It deliberately does not implement a
+// shell: substitutions, escapes, composition, globbing and redirection fail.
+// This capability filter is not filesystem/process isolation. Utilities with
+// execution-capable modes (git, find, sed, sort) are unsupported.
+func simpleCLIArguments(command string) ([]string, bool) {
+	if len(command) == 0 || len(command) > 8192 || strings.ContainsAny(command, "\x00\r\n\\$`;|&<>(){}*?[]~#") {
+		return nil, false
+	}
+	var argv []string
+	var word strings.Builder
+	var quote rune
+	started := false
+	for _, c := range command {
+		if quote != 0 {
+			if c == quote {
+				quote = 0
+			} else {
+				word.WriteRune(c)
+			}
+			continue
 		}
+		if c == '\'' || c == '"' {
+			quote = c
+			started = true
+			continue
+		}
+		if c == ' ' || c == '\t' {
+			if started {
+				argv = append(argv, word.String())
+				word.Reset()
+				started = false
+			}
+			continue
+		}
+		started = true
+		word.WriteRune(c)
 	}
-
-	return false
+	if quote != 0 {
+		return nil, false
+	}
+	if started {
+		argv = append(argv, word.String())
+	}
+	if len(argv) == 0 {
+		return nil, false
+	}
+	switch argv[0] {
+	case "echo", "ls", "cat", "grep", "head", "tail", "wc", "uniq", "cut", "tr":
+		return argv, true
+	case "pwd", "date":
+		return argv, len(argv) == 1
+	default:
+		return nil, false
+	}
 }
 
 // initializeSignature sets up the tool signature
@@ -163,7 +195,7 @@ func (a *CLIAdapter) initializeSignature() {
 	a.signature = &ToolSignature{
 		Name:        "cli",
 		Type:        ToolTypeCLI,
-		Description: "Execute shell commands (whitelisted only)",
+		Description: "Execute limited utility argv directly; no shell composition, expansion, redirects, git/find/sed/sort",
 		Parameters: map[string]*ParamSchema{
 			"command": {
 				Type:        "string",

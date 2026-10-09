@@ -156,7 +156,7 @@ func TestFilePoll_ValidPayload(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Poll: %v", err)
 	}
-	if data.InputTokens != 100 || data.OutputTokens != 200 {
+	if data.InputTokens == nil || *data.InputTokens != 100 || data.OutputTokens == nil || *data.OutputTokens != 200 {
 		t.Errorf("got %+v, want input=100 output=200", data)
 	}
 }

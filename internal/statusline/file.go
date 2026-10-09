@@ -197,8 +197,8 @@ func (fs *FileSource) Poll() (StatuslineData, error) {
 	return StatuslineData{
 		Source:              fs.Name(),
 		Timestamp:           time.Now(),
-		InputTokens:         *fileMetrics.InputTokens,
-		OutputTokens:        *fileMetrics.OutputTokens,
+		InputTokens:         fileMetrics.InputTokens,
+		OutputTokens:        fileMetrics.OutputTokens,
 		CacheHitTokens:      cacheHit,
 		CacheCreationTokens: cacheCreate,
 		ContextWindowUsage:  contextUsage,

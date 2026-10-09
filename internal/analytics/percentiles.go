@@ -4,6 +4,7 @@ package analytics
 import (
 	"database/sql"
 	"fmt"
+	"math"
 	"sort"
 )
 
@@ -57,8 +58,7 @@ func (pc *PercentileCalculator) CalculateLatencyPercentiles(days int) (*LatencyP
 	models, err := pc.getDistinctValues("validation_metrics", "model", days)
 	if err == nil {
 		for _, model := range models {
-			where := fmt.Sprintf("model = '%s'", model)
-			metrics, err := pc.queryLatencyPercentiles(where, days)
+			metrics, err := pc.queryPercentiles("latency_ms", "model = ?", days, model)
 			if err == nil {
 				lp.ByModel[model] = metrics
 			}
@@ -69,8 +69,7 @@ func (pc *PercentileCalculator) CalculateLatencyPercentiles(days int) (*LatencyP
 	tasks, err := pc.getDistinctValues("validation_metrics", "task_type", days)
 	if err == nil {
 		for _, task := range tasks {
-			where := fmt.Sprintf("task_type = '%s'", task)
-			metrics, err := pc.queryLatencyPercentiles(where, days)
+			metrics, err := pc.queryPercentiles("latency_ms", "task_type = ?", days, task)
 			if err == nil {
 				lp.ByTask[task] = metrics
 			}
@@ -82,6 +81,11 @@ func (pc *PercentileCalculator) CalculateLatencyPercentiles(days int) (*LatencyP
 
 // queryLatencyPercentiles computes percentiles for a specific query condition.
 func (pc *PercentileCalculator) queryLatencyPercentiles(where string, days int) (PercentileMetrics, error) {
+	return pc.queryPercentiles("latency_ms", where, days)
+}
+
+// queryPercentiles uses a fixed metric name and parameterized group filters.
+func (pc *PercentileCalculator) queryPercentiles(metric, where string, days int, args ...interface{}) (PercentileMetrics, error) {
 	pm := PercentileMetrics{}
 
 	// Build WHERE clause
@@ -91,12 +95,12 @@ func (pc *PercentileCalculator) queryLatencyPercentiles(where string, days int) 
 	}
 
 	// Get all latency values
-	// #nosec G201 - where clause is built from database-derived values only (SELECT DISTINCT results), not user input
+	// #nosec G201 - metric and filter expressions are fixed by callers; group values are bound parameters.
 	query := fmt.Sprintf(`
-		SELECT latency_ms FROM validation_metrics WHERE %s ORDER BY latency_ms
-	`, whereClause)
+		SELECT %s FROM validation_metrics WHERE %s ORDER BY %s
+	`, metric, whereClause, metric)
 
-	rows, err := pc.db.Query(query)
+	rows, err := pc.db.Query(query, args...)
 	if err != nil {
 		return pm, fmt.Errorf("failed to query latencies: %w", err)
 	}
@@ -137,7 +141,7 @@ func (pc *PercentileCalculator) queryLatencyPercentiles(where string, days int) 
 
 // CalculateTokenErrorPercentiles computes token error distribution metrics.
 func (pc *PercentileCalculator) CalculateTokenErrorPercentiles(days int) (PercentileMetrics, error) {
-	return pc.queryLatencyPercentiles("", days)
+	return pc.queryPercentiles("token_error", "", days)
 }
 
 // getDistinctValues retrieves distinct values for a column.
@@ -218,5 +222,5 @@ func calculateStdDev(data []float64, mean float64) float64 {
 	}
 
 	variance := sumSquaredDiff / float64(len(data)-1)
-	return variance * variance // sqrt approximation
+	return math.Sqrt(variance)
 }

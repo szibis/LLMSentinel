@@ -28,10 +28,18 @@ import (
 	"github.com/szibis/claude-escalate/internal/store"
 )
 
+var exitCommand = os.Exit
+var waitMonitor = func() { select {} }
+
+type commandService interface{ Start(string) error }
+
+var newCommandService = func(cfg *config.Config) (commandService, error) { return service.New(cfg) }
+var startCommandDashboard = func(server *dashboard.Server) error { return server.Start() }
+
 func main() {
 	if len(os.Args) < 2 {
 		printUsage()
-		os.Exit(1)
+		exitCommand(1)
 	}
 
 	switch os.Args[1] {
@@ -57,7 +65,7 @@ func main() {
 		fmt.Printf("claude-escalate %s\n", config.Version)
 	default:
 		printUsage()
-		os.Exit(1)
+		exitCommand(1)
 	}
 }
 
@@ -331,9 +339,9 @@ func runDashboard() {
 	}
 
 	dashServer := dashboard.NewServer(bind, port, loader, nil, nil, factory)
-	if err := dashServer.Start(); err != nil {
+	if err := startCommandDashboard(dashServer); err != nil {
 		fmt.Fprintf(os.Stderr, "Dashboard error: %v\n", err)
-		os.Exit(1)
+		exitCommand(1)
 	}
 }
 
@@ -347,7 +355,7 @@ func runStats() {
 	db, err := store.Open(cfg.Gateway.DataDir)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error opening database: %v\n", err)
-		os.Exit(1)
+		exitCommand(1)
 	}
 	defer func() { _ = db.Close() }()
 
@@ -470,16 +478,16 @@ func runService() {
 		}
 	}
 
-	svc, err := service.New(cfg)
+	svc, err := newCommandService(cfg)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to create service: %v\n", err)
-		os.Exit(1)
+		exitCommand(1)
 	}
 
 	addr := "0.0.0.0:" + port
 	if err := svc.Start(addr); err != nil {
 		fmt.Fprintf(os.Stderr, "Service error: %v\n", err)
-		os.Exit(1)
+		exitCommand(1)
 	}
 }
 
@@ -506,7 +514,7 @@ func runMonitor() {
 	db, err := store.Open(cfg.Gateway.DataDir)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to open database: %v\n", err)
-		os.Exit(1)
+		exitCommand(1)
 	}
 	defer func() { _ = db.Close() }()
 
@@ -523,7 +531,7 @@ func runMonitor() {
 	fmt.Printf("Press Ctrl+C to stop.\n")
 
 	// Keep running indefinitely
-	select {}
+	waitMonitor()
 }
 
 func capitalize(s string) string {
@@ -576,7 +584,7 @@ func runAnalytics() {
 	reader, err := execlog.NewReader(logFile)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error reading execution log: %v\n", err)
-		os.Exit(1)
+		exitCommand(1)
 	}
 
 	// Default: show summary if no specific flags
@@ -654,14 +662,14 @@ func runGeneratePatterns() {
 	reader, err := execlog.NewReader(logFile)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error reading execution log: %v\n", err)
-		os.Exit(1)
+		exitCommand(1)
 	}
 
 	// Generate and write patterns
 	gen := patterns.New(reader)
 	if err := gen.WriteFile(outputFile); err != nil {
 		fmt.Fprintf(os.Stderr, "Error writing patterns: %v\n", err)
-		os.Exit(1)
+		exitCommand(1)
 	}
 
 	fmt.Printf("✅ Generated %s from %d operations\n", outputFile, reader.Count())

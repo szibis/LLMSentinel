@@ -71,7 +71,9 @@ type Classifier struct {
 	learningKeywords    []string
 	userFeedback        map[string]*UserFeedbackPattern
 	feedbackHistoryDays int
-	modelManager        *models.Manager
+	modelManager        interface {
+		Infer(context.Context, models.ModelType, interface{}) (interface{}, error)
+	}
 }
 
 // NewClassifier creates a new intent classifier
@@ -437,7 +439,7 @@ func (c *Classifier) RecordFeedback(userID string, decision *IntentDecision, rat
 		feedback.RecentAccuracy = 0.2
 		feedback.NegativeFeedbackCount++
 		// If user gives negative feedback on cached responses, mark preference for freshness
-		if !decision.CacheSafe {
+		if decision.CacheSafe {
 			feedback.PrefersFreshness = true
 		}
 	}

@@ -34,7 +34,7 @@ lab-cli-quality: tools-build
 
 .PHONY: lab-cli-quality-all
 lab-cli-quality-all: tools-build
-	$(TOOLS) cli-quality --root $(abspath .sentinel-lab) --role all --timeout 6m
+	$(TOOLS) cli-quality --root $(abspath .sentinel-lab) --role all --suite extended --timeout 6m
 
 lab-run: lab-start
 

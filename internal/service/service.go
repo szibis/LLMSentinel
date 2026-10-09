@@ -211,7 +211,7 @@ func (s *Service) handleHook(w http.ResponseWriter, r *http.Request) {
 		if err := s.db.LogEscalation("haiku", target, "manual", "user_command"); err != nil {
 			fmt.Printf("error logging escalation: %v\n", err)
 		}
-		if err := updateClaudeSettings(target); err != nil {
+		if err := updateClaudeSettings(modelToFull(target)); err != nil {
 			fmt.Printf("error updating settings: %v\n", err)
 		}
 	}
@@ -227,7 +227,7 @@ func (s *Service) handleHook(w http.ResponseWriter, r *http.Request) {
 			if err := s.db.LogEscalation(settings.Model, nextModel, "success", "success_signal"); err != nil {
 				fmt.Printf("error logging deescalation: %v\n", err)
 			}
-			if err := updateClaudeSettings(nextModel); err != nil {
+			if err := updateClaudeSettings(modelToFull(nextModel)); err != nil {
 				fmt.Printf("error updating settings: %v\n", err)
 			}
 		}
@@ -235,13 +235,13 @@ func (s *Service) handleHook(w http.ResponseWriter, r *http.Request) {
 
 	// Auto-effort detection
 	effort := detectEffort(prompt)
-	if effort != "" {
+	if response.Action == "" && effort != "" {
 		model := effortToModel(effort)
 		response.CurrentModel = model
 		if err := s.db.LogEscalation("haiku", model, "auto", effort); err != nil {
 			fmt.Printf("error logging effort detection: %v\n", err)
 		}
-		if err := updateClaudeSettings(model); err != nil {
+		if err := updateClaudeSettings(modelToFull(model)); err != nil {
 			fmt.Printf("error updating settings: %v\n", err)
 		}
 	}
@@ -445,7 +445,8 @@ func (s *Service) handleValidate(w http.ResponseWriter, r *http.Request) {
 		Validated:          true,
 	}
 
-	if err := s.db.LogValidationMetric(metric); err != nil {
+	validationID, err := s.db.LogValidationMetricWithID(metric)
+	if err != nil {
 		http.Error(w, "failed to log metric", http.StatusInternalServerError)
 		return
 	}
@@ -453,7 +454,7 @@ func (s *Service) handleValidate(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(map[string]interface{}{
 		"success":         true,
-		"validation_id":   metric.ID,
+		"validation_id":   validationID,
 		"tokens_recorded": metric.ActualTotalTokens,
 		"timestamp":       time.Now().UTC().Format(time.RFC3339),
 	}); err != nil {
@@ -620,7 +621,8 @@ func (s *Service) handleHookMetrics(w http.ResponseWriter, r *http.Request) {
 		Validated:             false, // Not validated yet (waiting for barista)
 	}
 
-	if err := s.db.LogValidationMetric(metric); err != nil {
+	validationID, err := s.db.LogValidationMetricWithID(metric)
+	if err != nil {
 		http.Error(w, "failed to log metric", http.StatusInternalServerError)
 		return
 	}
@@ -628,7 +630,7 @@ func (s *Service) handleHookMetrics(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(map[string]interface{}{
 		"success":       true,
-		"validation_id": metric.ID,
+		"validation_id": validationID,
 		"estimated":     metric.EstimatedTotalTokens,
 		"effort":        metric.DetectedEffort,
 		"model":         metric.RoutedModel,
@@ -736,20 +738,13 @@ func cascadeDown(model string) string {
 }
 
 func modelShortName(fullModel string) string {
-	if len(fullModel) >= 6 && fullModel[:6] == "claude" {
-		if len(fullModel) >= 15 && fullModel[14:15] == "4" {
-			if len(fullModel) >= 22 && fullModel[20:22] == "op" {
-				return "opus"
-			}
-			if len(fullModel) >= 20 && fullModel[18:20] == "on" {
-				return "sonnet"
-			}
-		}
-		if len(fullModel) >= 12 && fullModel[10:12] == "ha" {
-			return "haiku"
-		}
+	short := config.ModelShortName(fullModel)
+	switch short {
+	case "haiku", "sonnet", "opus":
+		return short
+	default:
+		return "haiku"
 	}
-	return "haiku"
 }
 
 func modelToFull(short string) string {

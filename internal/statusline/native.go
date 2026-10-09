@@ -158,8 +158,8 @@ func (ns *NativeSource) Poll() (StatuslineData, error) {
 	return StatuslineData{
 		Source:              ns.Name(),
 		Timestamp:           time.Now(),
-		InputTokens:         *nativeMetrics.InputTokens,
-		OutputTokens:        *nativeMetrics.OutputTokens,
+		InputTokens:         nativeMetrics.InputTokens,
+		OutputTokens:        nativeMetrics.OutputTokens,
 		CacheHitTokens:      cacheHit,
 		CacheCreationTokens: cacheCreate,
 		ContextWindowUsage:  contextUsage,

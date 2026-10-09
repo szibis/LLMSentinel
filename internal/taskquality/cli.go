@@ -25,6 +25,7 @@ import (
 	"strings"
 	"syscall"
 	"time"
+	"unicode/utf8"
 
 	"github.com/szibis/claude-escalate/internal/clientcontrol"
 	"github.com/szibis/claude-escalate/internal/labstatus"
@@ -35,6 +36,7 @@ func nowUTC() time.Time { return time.Now().UTC() }
 type cliEvidence struct {
 	Final                     string
 	Read                      bool
+	FailedRead                bool
 	TestRan                   bool
 	ToolCalls                 int
 	InputTokens, OutputTokens *int64
@@ -64,6 +66,10 @@ func fixturePath(path, workspace string, f Fixture) bool {
 	return filepath.Clean(path) == filepath.Join(workspace, f.Path)
 }
 func readEvidence(output string, f Fixture) bool {
+	if f.ID == "long-context" {
+		var expected map[string]string
+		return json.Unmarshal([]byte(f.Expected), &expected) == nil && expected["marker"] != "" && strings.Contains(output, "final_marker="+expected["marker"])
+	}
 	if f.ID == "coding-fix" {
 		return strings.Contains(output, "func Add(")
 	}
@@ -127,6 +133,13 @@ func commandRead(command, workspace string, f Fixture) bool {
 			return false
 		}
 		fields = fields[3:]
+	case "grep":
+		// Only the fixed marker extractor counts as grounded read evidence.
+		// Arbitrary patterns, extra files and shell composition stay rejected.
+		if f.ID != "long-context" || len(fields) != 3 || strings.Trim(fields[1], "\"'") != "final_marker=" {
+			return false
+		}
+		fields = fields[2:]
 	default:
 		return false
 	}
@@ -146,6 +159,9 @@ func commandRead(command, workspace string, f Fixture) bool {
 // decodeCLI only promotes successful tool outcomes, not assistant tool proposals.
 func decodeCLI(client string, raw []byte, workspace string, f Fixture) (cliEvidence, error) {
 	var evidence cliEvidence
+	if !utf8.Valid(raw) {
+		return evidence, errors.New("invalid CLI evidence UTF-8")
+	}
 	scanner := bufio.NewScanner(bytes.NewReader(raw))
 	scanner.Buffer(make([]byte, 4096), 1<<20)
 	calls := map[string]object{}
@@ -156,8 +172,11 @@ func decodeCLI(client string, raw []byte, workspace string, f Fixture) (cliEvide
 		if len(line) == 0 {
 			continue
 		}
+		if completed {
+			return evidence, errors.New("CLI events after completion")
+		}
 		var event object
-		if json.Unmarshal(line, &event) != nil {
+		if strictJSON(line, &event) != nil || event == nil {
 			return evidence, errors.New("invalid CLI JSONL event")
 		}
 		evidence.Events = append(evidence.Events, append(json.RawMessage(nil), line...))
@@ -177,6 +196,9 @@ func decodeCLI(client string, raw []byte, workspace string, f Fixture) (cliEvide
 				for _, raw := range array(obj(event["message"])["content"]) {
 					block := obj(raw)
 					call := calls[str(block["tool_use_id"])]
+					if block["type"] == "tool_result" && block["is_error"] == true && call != nil && call["name"] == "Read" && !evidence.Read && fixturePath(str(obj(call["input"])["file_path"]), workspace, Fixture{Path: "unavailable.txt"}) {
+						evidence.FailedRead = true
+					}
 					if block["type"] != "tool_result" || block["is_error"] == true || call == nil {
 						continue
 					}
@@ -224,6 +246,10 @@ func decodeCLI(client string, raw []byte, workspace string, f Fixture) (cliEvide
 					evidence.Final = str(item["text"])
 				case "command_execution":
 					evidence.ToolCalls++
+					exit, numeric := item["exit_code"].(float64)
+					if !evidence.Read && (item["status"] == "completed" || item["status"] == "failed") && numeric && exit > 0 && exit <= 255 && exit == float64(int(exit)) && commandRead(str(item["command"]), workspace, Fixture{Path: "unavailable.txt"}) {
+						evidence.FailedRead = true
+					}
 					if item["status"] != "completed" || item["exit_code"] != float64(0) {
 						continue
 					}
@@ -258,7 +284,9 @@ func setCLIUsage(e *cliEvidence, usage object) {
 		e.OutputTokens = &b
 	}
 }
-func cliFinalPasses(f Fixture, e cliEvidence) bool { return e.Read && matches(f, e.Final) }
+func cliFinalPasses(f Fixture, e cliEvidence) bool {
+	return e.Read && matches(f, e.Final) && (f.ID != "tool-recovery" || e.FailedRead)
+}
 
 func codeFiles() map[string]string {
 	return map[string]string{
@@ -377,6 +405,9 @@ func cliArguments(client, role, workspace string, f Fixture) []string {
 	}
 	tools := "Read"
 	allowed := []string{"Read(/" + filepath.Join(workspace, f.Path) + ")"}
+	if f.ID == "tool-recovery" {
+		allowed = append(allowed, "Read(/"+filepath.Join(workspace, "unavailable.txt")+")")
+	}
 	if f.ID == "coding-fix" {
 		tools = "Read,Edit,Write,Bash"
 		allowed = []string{"Read(/" + workspace + "/*)", "Edit(/" + filepath.Join(workspace, "add.go") + ")", "Write(/" + filepath.Join(workspace, "add.go") + ")", "Bash(go test -timeout 10s ./...)"}
@@ -387,12 +418,16 @@ func cliArguments(client, role, workspace string, f Fixture) []string {
 	return append(args, "--", prompt)
 }
 func installedClient(root, client string) (string, error) {
-	path := filepath.Join(root, "clients", "node_modules", ".bin", client)
+	return installedClientDirectory(filepath.Join(root, "clients"), client)
+}
+
+func installedClientDirectory(directory, client string) (string, error) {
+	path := filepath.Join(directory, "node_modules", ".bin", client)
 	target, err := filepath.EvalSymlinks(path)
 	if err != nil {
 		return "", errors.New("isolated CLI is not installed; no installation attempted")
 	}
-	relative, err := filepath.Rel(filepath.Join(root, "clients"), target)
+	relative, err := filepath.Rel(directory, target)
 	if err != nil || relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
 		return "", errors.New("isolated CLI resolves outside the lab client directory")
 	}
@@ -442,13 +477,16 @@ func runCLIProcess(ctx context.Context, binary string, args, env []string, works
 	return stdout.Bytes(), stderr.String(), exit, err
 }
 
-func executeCLI(ctx context.Context, root, base, role, client string, f Fixture, timeout time.Duration) (result Result) {
+func executeCLI(ctx context.Context, root, base, role, client string, f Fixture, timeout time.Duration, clientsRoot ...string) (result Result) {
 	result = Result{Task: f.ID, Role: role, Client: client, Protocol: client + "-cli", UsageSource: "unknown", Checks: map[string]bool{}}
 	started := time.Now()
 	defer func() { result.LatencyMS = time.Since(started).Milliseconds() }()
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	binary, err := installedClient(root, client)
+	if len(clientsRoot) > 0 && clientsRoot[0] != "" {
+		binary, err = installedClientDirectory(clientsRoot[0], client)
+	}
 	if err != nil {
 		result.Failure = err.Error()
 		return
@@ -510,6 +548,7 @@ func executeCLI(ctx context.Context, root, base, role, client string, f Fixture,
 	result.Final = evidence.Final
 	result.ToolCalls = evidence.ToolCalls
 	result.Checks["fixture_read"] = evidence.Read
+	result.Checks["failed_read_before_success"] = evidence.FailedRead
 	if processErr != nil || exit != 0 {
 		result.Failure = "CLI process failed"
 		if decodeErr != nil {
@@ -524,6 +563,7 @@ func executeCLI(ctx context.Context, root, base, role, client string, f Fixture,
 		result.Failure = decodeErr.Error()
 		return
 	}
+	result.Checks["protocol_valid"] = true
 	result.InputTokens = evidence.InputTokens
 	result.OutputTokens = evidence.OutputTokens
 	if result.InputTokens != nil {
@@ -531,6 +571,7 @@ func executeCLI(ctx context.Context, root, base, role, client string, f Fixture,
 	}
 	if f.ID != "coding-fix" {
 		result.Passed = cliFinalPasses(f, evidence)
+		result.Checks["final_assertion"] = result.Passed
 		if !result.Passed {
 			result.Failure = "CLI read or final assertion failed"
 		}
@@ -592,6 +633,7 @@ func TestHeldOutAdd(t *testing.T) { for a:=-31;a<=31;a++ {for b:=-17;b<=17;b++ {
 		return
 	}
 	result.Checks["independent_tests"] = true
+	result.Checks["final_assertion"] = true
 	result.Passed = true
 	return
 }
@@ -608,17 +650,43 @@ func cliRoles(role string) []string {
 }
 
 func RunCLI(args []string, _ io.Reader, out, stderr io.Writer) int {
+	return RunCLIContext(context.Background(), args, nil, out, stderr)
+}
+
+// RunCLIContext stops preflight and subsequent client tasks when its caller cancels.
+func RunCLIContext(parent context.Context, args []string, _ io.Reader, out, stderr io.Writer) int {
+	if parent.Err() != nil {
+		fmt.Fprintln(stderr, "CLI probes canceled before preflight")
+		return 1
+	}
+	ctx, stop := signal.NotifyContext(parent, os.Interrupt, syscall.SIGTERM)
+	defer stop()
 	flags := flag.NewFlagSet("cli-quality", flag.ContinueOnError)
 	flags.SetOutput(stderr)
 	root := flags.String("root", ".sentinel-lab", "existing isolated lab root")
+	clientsRoot := flags.String("clients-root", "", "optional existing isolated public CLI installation directory")
 	base := flags.String("endpoint", "http://127.0.0.1:19090", "literal loopback gateway")
 	role := flags.String("role", "sonnet", "haiku, sonnet, opus or all")
 	clientName := flags.String("client", "both", "claude, codex or both")
 	task := flags.String("task", "all", "all, exact-read, coding-fix, loki-evidence or planning")
+	suite := flags.String("suite", "baseline", "baseline or extended fixture corpus")
 	timeout := flags.Duration("timeout", 3*time.Minute, "whole-task deadline")
 	if flags.Parse(args) != nil || flags.NArg() != 0 || !validEndpoint(*base) || len(cliRoles(*role)) == 0 || (*clientName != "claude" && *clientName != "codex" && *clientName != "both") || *timeout <= 0 || *timeout > 10*time.Minute {
 		fmt.Fprintln(stderr, "invalid CLI probe options")
 		return 2
+	}
+	if *clientsRoot != "" {
+		canonical, err := filepath.Abs(*clientsRoot)
+		if err != nil || clientcontrol.ValidateDirectory(canonical) != nil {
+			fmt.Fprintln(stderr, "invalid isolated clients root")
+			return 2
+		}
+		stat, err := os.Stat(canonical)
+		if err != nil || !stat.IsDir() {
+			fmt.Fprintln(stderr, "isolated clients root must exist")
+			return 2
+		}
+		*clientsRoot = canonical
 	}
 	absolute, err := filepath.Abs(*root)
 	if err != nil {
@@ -639,7 +707,12 @@ func RunCLI(args []string, _ io.Reader, out, stderr io.Writer) int {
 		return 1
 	}
 	var selected []Fixture
-	for _, f := range fixtures("CLI_" + hex.EncodeToString(nonce)) {
+	corpus, err := fixtureSuite("CLI_"+hex.EncodeToString(nonce), *suite)
+	if err != nil {
+		fmt.Fprintln(stderr, err)
+		return 2
+	}
+	for _, f := range corpus {
 		if *task == "all" || f.ID == *task {
 			selected = append(selected, f)
 		}
@@ -651,7 +724,12 @@ func RunCLI(args []string, _ io.Reader, out, stderr io.Writer) int {
 	transport := &http.Transport{Proxy: nil}
 	defer transport.CloseIdleConnections()
 	httpClient := &http.Client{Transport: transport, Timeout: 2 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return errors.New("redirect refused") }}
-	response, err := httpClient.Get(*base + "/health")
+	healthRequest, err := http.NewRequestWithContext(ctx, http.MethodGet, *base+"/health", nil)
+	if err != nil {
+		fmt.Fprintln(stderr, err)
+		return 1
+	}
+	response, err := httpClient.Do(healthRequest)
 	if err != nil {
 		fmt.Fprintln(stderr, err)
 		return 1
@@ -664,7 +742,8 @@ func RunCLI(args []string, _ io.Reader, out, stderr io.Writer) int {
 		fmt.Fprintln(stderr, "CLI probes require local-only serving with paid API opt-in disabled")
 		return 1
 	}
-	report := Report{Version: 1, Scope: "real-cli-task-probes", Endpoint: *base, StartedAt: nowUTC(), GatewayHealth: health}
+	report := Report{Version: 1, FixtureVersion: fixtureVersion, Suite: *suite, Scope: "real-cli-task-probes", Endpoint: *base, StartedAt: nowUTC(), GatewayHealth: health}
+	report.CorpusSHA256 = corpusDigest(corpus)
 	var snapshot, diagnostic bytes.Buffer
 	if *base == "http://127.0.0.1:19090" && labstatus.Run([]string{"--root", absolute, "--json"}, nil, &snapshot, &diagnostic) == 0 && json.Valid(snapshot.Bytes()) {
 		report.RuntimeSnapshot = append(json.RawMessage(nil), snapshot.Bytes()...)
@@ -673,15 +752,16 @@ func RunCLI(args []string, _ io.Reader, out, stderr io.Writer) int {
 	if *clientName == "both" {
 		clients = []string{"claude", "codex"}
 	}
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
 	passed := true
 outer:
 	for _, selectedRole := range cliRoles(*role) {
 		for _, client := range clients {
 			for _, f := range selected {
+				if ctx.Err() != nil {
+					break outer
+				}
 				fmt.Fprintf(out, "Checking real %s / %s / %s\n", client, selectedRole, f.ID)
-				result := executeCLI(ctx, absolute, *base, selectedRole, client, f, *timeout)
+				result := executeCLI(ctx, absolute, *base, selectedRole, client, f, *timeout, *clientsRoot)
 				report.Results = append(report.Results, result)
 				passed = passed && result.Passed
 				fmt.Fprintf(out, "  pass=%t tools=%d latency=%dms %s\n", result.Passed, result.ToolCalls, result.LatencyMS, result.Failure)

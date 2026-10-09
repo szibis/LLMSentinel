@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-	"os/user"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -170,10 +169,10 @@ func (s *Server) handleConfigSet(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
+	w.WriteHeader(http.StatusNotImplemented)
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"success": true,
-		"message": "Configuration updated successfully",
+		"success": false,
+		"message": "Configuration persistence is not implemented; no configuration was updated",
 	})
 }
 
@@ -272,15 +271,15 @@ func (s *Server) handleExecutionAnalytics(w http.ResponseWriter, r *http.Request
 
 	analytics := map[string]interface{}{
 		"session_metrics": map[string]interface{}{
-			"total_operations":  0,
-			"total_duration_ms": 0,
-			"total_tokens":      0,
-			"success_rate":      0.0,
+			"total_operations":   0,
+			"total_duration_ms":  0,
+			"total_tokens":       0,
+			"success_rate":       0.0,
 			"operations_by_type": map[string]int{},
 		},
-		"slowest_operations": []interface{}{},
+		"slowest_operations":         []interface{}{},
 		"optimization_opportunities": []interface{}{},
-		"performance_trends": map[string]interface{}{},
+		"performance_trends":         map[string]interface{}{},
 	}
 
 	// Parse execution log if it exists
@@ -836,7 +835,7 @@ func saveConfigToFile(cfg *config.Config, optionalPath string) error {
 
 	// Ensure directory exists
 	configDir := filepath.Dir(configPath)
-	if err := os.MkdirAll(configDir, 0700); err != nil {
+	if err := os.MkdirAll(configDir, 0700); err != nil { // #nosec G703 -- configPath is the operator-selected Loader configuration path or private HOME default, never an HTTP request path.
 		return err
 	}
 
@@ -847,7 +846,7 @@ func saveConfigToFile(cfg *config.Config, optionalPath string) error {
 	}
 
 	// Write to file
-	return os.WriteFile(configPath, data, 0600)
+	return os.WriteFile(configPath, data, 0600) // #nosec G703 -- persists validated configuration to the operator's selected Loader path or private HOME default with mode 0600.
 }
 
 // Helper function to expand ~ in paths
@@ -856,12 +855,12 @@ func expandHome(path string) string {
 		return path
 	}
 
-	usr, err := user.Current()
+	home, err := os.UserHomeDir()
 	if err != nil {
 		return path
 	}
 
-	return filepath.Join(usr.HomeDir, path[1:])
+	return filepath.Join(home, path[1:])
 }
 
 // Helper to get dashboard HTML

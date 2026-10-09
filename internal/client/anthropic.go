@@ -279,6 +279,16 @@ func (c *AnthropicClient) doWithRetry(req *http.Request) (*http.Response, error)
 	var lastErr error
 
 	for attempt := 0; attempt <= c.retryMax; attempt++ {
+		if err := req.Context().Err(); err != nil {
+			return nil, err
+		}
+		if attempt > 0 && req.GetBody != nil {
+			body, err := req.GetBody()
+			if err != nil {
+				return nil, fmt.Errorf("replay request body: %w", err)
+			}
+			req.Body = body
+		}
 		resp, err := c.httpClient.Do(req)
 		if err != nil {
 			lastErr = err
@@ -289,7 +299,13 @@ func (c *AnthropicClient) doWithRetry(req *http.Request) (*http.Response, error)
 					shift = 30
 				}
 				// #nosec G115: shift is bounded to 30, safe to convert to uint
-				time.Sleep(c.retryDelay * time.Duration(1<<uint(shift)))
+				timer := time.NewTimer(c.retryDelay * time.Duration(1<<uint(shift)))
+				select {
+				case <-req.Context().Done():
+					timer.Stop()
+					return nil, req.Context().Err()
+				case <-timer.C:
+				}
 				continue
 			}
 			return nil, fmt.Errorf("HTTP error: %w", err)
@@ -305,7 +321,13 @@ func (c *AnthropicClient) doWithRetry(req *http.Request) (*http.Response, error)
 					shift = 30
 				}
 				// #nosec G115: shift is bounded to 30, safe to convert to uint
-				time.Sleep(c.retryDelay * time.Duration(1<<uint(shift)))
+				timer := time.NewTimer(c.retryDelay * time.Duration(1<<uint(shift)))
+				select {
+				case <-req.Context().Done():
+					timer.Stop()
+					return nil, req.Context().Err()
+				case <-timer.C:
+				}
 				continue
 			}
 			return nil, fmt.Errorf("API error: status %d", resp.StatusCode)

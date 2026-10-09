@@ -4,15 +4,23 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/szibis/claude-escalate/internal/batch"
 	"github.com/szibis/claude-escalate/internal/client"
 )
 
-func setupBatchHandlers() *BatchHandlers {
+func setupBatchHandlers(t *testing.T) *BatchHandlers {
+	t.Helper()
+	old := http.DefaultTransport
+	http.DefaultTransport = serviceRoundTrip(func(r *http.Request) (*http.Response, error) {
+		return &http.Response{StatusCode: http.StatusUnauthorized, Body: io.NopCloser(strings.NewReader(`{"error":"offline test"}`)), Header: make(http.Header), Request: r}, nil
+	})
+	t.Cleanup(func() { http.DefaultTransport = old })
 	ac := client.NewAnthropicClient("test-key")
 	queue := batch.NewBatchQueue()
 	poller := batch.NewBatchPoller(ac)
@@ -20,7 +28,7 @@ func setupBatchHandlers() *BatchHandlers {
 }
 
 func TestNewBatchHandlers(t *testing.T) {
-	handlers := setupBatchHandlers()
+	handlers := setupBatchHandlers(t)
 	if handlers == nil {
 		t.Fatal("expected non-nil handlers")
 	}
@@ -33,7 +41,7 @@ func TestNewBatchHandlers(t *testing.T) {
 }
 
 func TestHandleSubmitBatchInvalidMethod(t *testing.T) {
-	handlers := setupBatchHandlers()
+	handlers := setupBatchHandlers(t)
 
 	req := httptest.NewRequest("GET", "/api/batch/submit", nil)
 	w := httptest.NewRecorder()
@@ -46,7 +54,7 @@ func TestHandleSubmitBatchInvalidMethod(t *testing.T) {
 }
 
 func TestHandleSubmitBatchEmptyQueue(t *testing.T) {
-	handlers := setupBatchHandlers()
+	handlers := setupBatchHandlers(t)
 
 	req := httptest.NewRequest("POST", "/api/batch/submit", nil)
 	w := httptest.NewRecorder()
@@ -59,7 +67,7 @@ func TestHandleSubmitBatchEmptyQueue(t *testing.T) {
 }
 
 func TestHandleQueueStatus(t *testing.T) {
-	handlers := setupBatchHandlers()
+	handlers := setupBatchHandlers(t)
 
 	// Add requests to queue
 	handlers.batchQueue.Enqueue(&batch.BatchRequest{ID: "req_1"})
@@ -83,7 +91,7 @@ func TestHandleQueueStatus(t *testing.T) {
 }
 
 func TestHandleQueueStatusInvalidMethod(t *testing.T) {
-	handlers := setupBatchHandlers()
+	handlers := setupBatchHandlers(t)
 
 	req := httptest.NewRequest("POST", "/api/batch/queue", nil)
 	w := httptest.NewRecorder()
@@ -96,7 +104,7 @@ func TestHandleQueueStatusInvalidMethod(t *testing.T) {
 }
 
 func TestHandlePollerStats(t *testing.T) {
-	handlers := setupBatchHandlers()
+	handlers := setupBatchHandlers(t)
 
 	// Track a job
 	handlers.batchPoller.TrackJob("job_1", 5)
@@ -119,7 +127,7 @@ func TestHandlePollerStats(t *testing.T) {
 }
 
 func TestHandlePollerStatsInvalidMethod(t *testing.T) {
-	handlers := setupBatchHandlers()
+	handlers := setupBatchHandlers(t)
 
 	req := httptest.NewRequest("POST", "/api/batch/poller", nil)
 	w := httptest.NewRecorder()
@@ -132,7 +140,7 @@ func TestHandlePollerStatsInvalidMethod(t *testing.T) {
 }
 
 func TestHandleBatchStatusNotFound(t *testing.T) {
-	handlers := setupBatchHandlers()
+	handlers := setupBatchHandlers(t)
 
 	req := httptest.NewRequest("GET", "/api/batch/status/nonexistent", nil)
 	w := httptest.NewRecorder()
@@ -145,7 +153,7 @@ func TestHandleBatchStatusNotFound(t *testing.T) {
 }
 
 func TestHandleBatchStatusInvalidMethod(t *testing.T) {
-	handlers := setupBatchHandlers()
+	handlers := setupBatchHandlers(t)
 
 	req := httptest.NewRequest("POST", "/api/batch/status/job_1", nil)
 	w := httptest.NewRecorder()
@@ -158,7 +166,7 @@ func TestHandleBatchStatusInvalidMethod(t *testing.T) {
 }
 
 func TestHandleBatchStatusMissingJobID(t *testing.T) {
-	handlers := setupBatchHandlers()
+	handlers := setupBatchHandlers(t)
 
 	req := httptest.NewRequest("GET", "/api/batch/status/", nil)
 	w := httptest.NewRecorder()
@@ -171,7 +179,7 @@ func TestHandleBatchStatusMissingJobID(t *testing.T) {
 }
 
 func TestHandleBatchResultsNotFound(t *testing.T) {
-	handlers := setupBatchHandlers()
+	handlers := setupBatchHandlers(t)
 
 	req := httptest.NewRequest("GET", "/api/batch/results/nonexistent", nil)
 	w := httptest.NewRecorder()
@@ -184,7 +192,7 @@ func TestHandleBatchResultsNotFound(t *testing.T) {
 }
 
 func TestHandleBatchResultsInvalidMethod(t *testing.T) {
-	handlers := setupBatchHandlers()
+	handlers := setupBatchHandlers(t)
 
 	req := httptest.NewRequest("POST", "/api/batch/results/job_1", nil)
 	w := httptest.NewRecorder()
@@ -197,7 +205,7 @@ func TestHandleBatchResultsInvalidMethod(t *testing.T) {
 }
 
 func TestHandleCancelBatchInvalidMethod(t *testing.T) {
-	handlers := setupBatchHandlers()
+	handlers := setupBatchHandlers(t)
 
 	req := httptest.NewRequest("GET", "/api/batch/cancel/job_1", nil)
 	w := httptest.NewRecorder()
@@ -210,7 +218,7 @@ func TestHandleCancelBatchInvalidMethod(t *testing.T) {
 }
 
 func TestHandleCancelBatchMissingJobID(t *testing.T) {
-	handlers := setupBatchHandlers()
+	handlers := setupBatchHandlers(t)
 
 	req := httptest.NewRequest("POST", "/api/batch/cancel/", nil)
 	w := httptest.NewRecorder()
@@ -223,7 +231,7 @@ func TestHandleCancelBatchMissingJobID(t *testing.T) {
 }
 
 func TestSubmitBatchRequestParsing(t *testing.T) {
-	handlers := setupBatchHandlers()
+	handlers := setupBatchHandlers(t)
 
 	submitReq := SubmitBatchRequest{
 		Requests: []*batch.BatchRequest{
@@ -239,13 +247,14 @@ func TestSubmitBatchRequestParsing(t *testing.T) {
 
 	handlers.HandleSubmitBatch(w, req)
 
-	// Request body parsing should work (response depends on API, which we're mocking)
-	// We're checking that JSON parsing works without error
-	// A 4xx response may occur if API call fails, which is expected in tests
+	// The offline transport rejects the provider request after successful parsing.
+	if w.Code != http.StatusInternalServerError || !strings.Contains(w.Body.String(), "failed to submit batch") {
+		t.Fatalf("expected offline submission failure, got %d %s", w.Code, w.Body)
+	}
 }
 
 func TestRegisterBatchRoutes(t *testing.T) {
-	handlers := setupBatchHandlers()
+	handlers := setupBatchHandlers(t)
 	mux := http.NewServeMux()
 
 	RegisterBatchRoutes(mux, handlers)
@@ -264,12 +273,14 @@ func TestRegisterBatchRoutes(t *testing.T) {
 		req := httptest.NewRequest("OPTIONS", route, nil)
 		w := httptest.NewRecorder()
 		mux.ServeHTTP(w, req)
-		// Just verify routes are registered (OPTIONS may not be handled, but GET/POST will be)
+		if w.Code != http.StatusMethodNotAllowed {
+			t.Errorf("route %s: expected 405, got %d", route, w.Code)
+		}
 	}
 }
 
 func TestBatchStatusResponse(t *testing.T) {
-	handlers := setupBatchHandlers()
+	handlers := setupBatchHandlers(t)
 
 	// Setup a tracked job
 	handlers.batchPoller.TrackJob("job_1", 10)
@@ -298,7 +309,7 @@ func TestBatchStatusResponse(t *testing.T) {
 }
 
 func TestQueueStatusResponse(t *testing.T) {
-	handlers := setupBatchHandlers()
+	handlers := setupBatchHandlers(t)
 
 	// Add to queue
 	handlers.batchQueue.Enqueue(&batch.BatchRequest{
@@ -331,7 +342,7 @@ func TestQueueStatusResponse(t *testing.T) {
 }
 
 func TestPollerStatsResponse(t *testing.T) {
-	handlers := setupBatchHandlers()
+	handlers := setupBatchHandlers(t)
 
 	ctx := context.Background()
 	handlers.batchPoller.Start(ctx)

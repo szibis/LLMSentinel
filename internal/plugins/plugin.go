@@ -107,18 +107,11 @@ func (p *RTKOptimizationPlugin) OptimizeInput(ctx context.Context, req interface
 
 // OptimizeOutput applies RTK compression to output
 func (p *RTKOptimizationPlugin) OptimizeOutput(ctx context.Context, resp interface{}) (interface{}, *Metrics, error) {
-	// In production, this would call RTK to compress command output
-	// For now, return metrics indicating potential savings
-	metrics := &Metrics{
-		TokensOut:      1000, // Example
-		TokensSaved:    994,  // 99.4% savings
-		SavingsPercent: 99.4,
-		CacheHit:       false,
-	}
+	// This adapter currently passes through output. Until it measures an
+	// actual transformation, no token usage or savings can be attributed.
+	metrics := &Metrics{}
 
 	p.metrics.TotalRequestsProcessed++
-	p.metrics.TotalTokensSaved += metrics.TokensSaved
-	p.metrics.AverageSavingsPercent = 99.4
 
 	return resp, metrics, nil
 }
