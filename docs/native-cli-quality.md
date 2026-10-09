@@ -47,7 +47,11 @@ rtk ./bin/sentinel-tools cli-quality --root "$PWD/.sentinel-lab" \
 
 Claude uses headless stream JSON, fixed tools and scoped permissions. Successful
 tool results are correlated with their calls; a tool proposal alone does not prove
-execution. See [Claude headless operation](https://code.claude.com/docs/en/headless)
+execution. Claude probes allow six turns, except coding probes, which allow eight:
+reading the workspace and three files, editing, and running tests can consume six
+tool turns before the required final answer. The bound does not replace successful
+test execution, preserved fixtures, held-out verification or the final assertion.
+See [Claude headless operation](https://code.claude.com/docs/en/headless)
 and [permission modes](https://code.claude.com/docs/en/permissions).
 Codex uses ephemeral `exec --json`, workspace-write and approval policy `never`;
 the harness requires completed command results and a completed turn. See
@@ -123,6 +127,9 @@ The `extended` suite retains those four tasks and adds:
 | `tool-recovery` | Observe a failed read of `unavailable.txt`, then a successful read of `recovery.json`, followed by the exact JSON answer |
 
 For example, `--suite extended --task tool-recovery` selects only recovery.
+The native prompt explicitly requests reading the missing file. A failed directory
+listing such as `ls unavailable.txt` cannot establish failed-read evidence, even
+when the subsequent read and final JSON are correct.
 Fixtures identify their version and carry a SHA-256 digest of the actual corpus,
 including that run's fresh marker. JSON assertions and native events reject
 duplicate keys, invalid UTF-8, excessive nesting and events after completion.
@@ -239,6 +246,33 @@ The inspected summary is private local evidence at
 `Sentinel/.sentinel-lab/task-cli-quality-latest.json`; its full synthetic transcripts
 remain in local archives and are not committed. This is one observed run, not a
 stable success rate. The baseline passes do not cancel the five extended failures:
-route promotion remains blocked. The expanded hardware workflow has not yet been
-validated on merged foundation code; these local observations are not a new
-hardware CI success claim.
+route promotion remains blocked. At the time of that local observation, the
+expanded hardware workflow had not yet run on merged foundation code; these
+local observations are not a hardware CI success claim.
+
+## Merged foundation and targeted follow-up — October 9, 2026
+
+Merged-main [Build 37906847282](https://github.com/szibis/LLMSentinel/actions/runs/37906847282)
+tested source `ef3a63d690efe6ac08d5ab1296953ee1e8ccb505`. Its 36 API/cache checks
+passed, while native tasks recorded **43/48 passes, including 23/24 baseline**.
+Claude Opus coding hit the six-turn cap after a correct edit and successful tests,
+before the required final answer. Codex failed all three literal-marker cases and
+Opus recovery. The baseline regression failed the build; Auto Release was skipped.
+
+Using merged-main gateway code and the follow-up harness, the fresh Claude coding
+run completed at `2026-10-09T09:17:27.006096Z` with **3/3 passes**. Each passed the
+client test command, fixture preservation, independent held-out tests and final
+assertion. The corrected recovery instruction's separate Codex run completed at
+`2026-10-09T09:12:02.37809Z` with **2/3 passes**: Haiku and Opus read the missing file;
+Sonnet listed it instead and correctly failed the unchanged strict read assertion.
+
+A subsequent complete local baseline finished at `2026-10-09T09:25:38.344003Z`
+with **23/24 passes**. All 12 Claude cases passed, including Opus coding. Codex
+Opus coding read the fixture, then failed with HTTP 422 for incomplete local
+reasoning before editing or running tests. Its invocation is unchanged by this
+follow-up. The failure remains retained; the baseline command exited 1.
+
+Neither run establishes a fresh baseline or 48-case pass. The literal-marker
+failures remain unresolved, the original failures remain archived, and route
+promotion remains blocked. Neither a turn-budget correction nor a more precise
+prompt establishes reliable model compliance.
