@@ -511,7 +511,7 @@ func (e *environment) launch(client string) error {
 	if err != nil {
 		return err
 	}
-	info, err := os.Stat(workspace)
+	info, err := os.Stat(workspace) // #nosec G703 -- LAB_WORKSPACE is the local caller's explicit working directory; launching their chosen project is intentional.
 	if err != nil || !info.IsDir() {
 		return errors.New("LAB_WORKSPACE must be an existing directory")
 	}

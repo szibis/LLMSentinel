@@ -2,7 +2,7 @@
 
 ## System Requirements
 
-- **Go 1.27.1** (current local distribution, enforced in `go.mod`; older references below describe upstream tooling)
+- **Go 1.27.2** (enforced in `go.mod`; includes the October 2026 security fixes)
 - **SQLite 3.x** (for analytics storage)
 - **Make** (optional, for helper targets)
 
@@ -14,7 +14,7 @@ git clone <repo-url>
 cd LLMSentinel
 
 # 2. Verify Go version
-go version  # Should be go1.27.1
+go version  # Should be go1.27.2
 
 # 3. Download dependencies
 go mod download
@@ -50,11 +50,11 @@ go test -race ./...
 
 ### Linting & Type Checking
 
-The project uses golangci-lint v2.13.2, compiled with the Go version in go.mod:
+The project uses golangci-lint v2.14.0, compiled with the Go version in go.mod:
 
 ```bash
 make lint
-go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.13.2 run ./... --timeout 5m
+go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.14.0 run ./... --timeout 5m
 ```
 
 ### Type Checking
@@ -143,7 +143,7 @@ To add a new statusline source:
 
 ### Go and lint compatibility
 
-Use Go 1.27.1 and the pinned golangci-lint v2.13.2 command above. `.golangci.yml` uses the v2 format. Running through Go builds the linter with the project's toolchain. See [CI and release checks](docs/ci-release.md).
+Use Go 1.27.2 and the pinned golangci-lint v2.14.0 command above. `.golangci.yml` uses the v2 format. Running through Go builds the linter with the project's toolchain. See [CI and release checks](docs/ci-release.md).
 
 **Disabled Linters** (planned for re-enabling in v3.0.1):
 

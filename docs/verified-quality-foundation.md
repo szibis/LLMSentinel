@@ -27,11 +27,31 @@ the CI artifact from the reviewed commit is the evidence for future changes.
 Tests use local HTTP fixtures, synthetic subprocesses and temporary directories;
 they do not require a paid provider, model download or GPU.
 
-The continuation's final race run passed 56 packages and 2,133 test cases at
+The continuation's Go 1.27.1 race run passed 56 packages and 2,133 test cases at
 **92.892135%** global coverage (20,858/22,454 statements), including the subsequent
 history and report-validation fixes. Pinned lint, workflow syntax and four DOM
 rendering contracts passed. Fresh bounded fuzz runs passed 596,955 admission,
 389,754 persisted-attribution and 728,430 coverage-profile executions.
+
+The first PR Build run, [37901269295](https://github.com/szibis/LLMSentinel/actions/runs/37901269295),
+passed its test, global coverage, complete-log compression, manifest verification
+and artifact-upload steps. The downloaded manifest also verified locally;
+coverage was 20,858/22,454 statements (92.892135%). Its source and control
+revision is the PR merge commit `978fbd5eafc6381836728a30b12bba9fef2bfe59`.
+That run failed security scanning because nine reachable standard-library
+vulnerabilities required [Go 1.27.2](https://go.dev/doc/devel/release#go1.27.2).
+The module and container now use that patch. The linter pin is 2.14.0 because
+2.13.2 could not decode the patched compiler's export format.
+
+The patched-toolchain local race run passed the same 56 packages and 2,133
+test cases at **90.953646%** global coverage (15,403/16,935 statements), above
+the unchanged 90% gate. Both profiles contain the same 150 files and 11,552
+block locations, while 1,839 block statement counts changed; two blocks changed
+between covered and uncovered. The Go release also contains a cover-tool fix.
+The changed statement accounting therefore prevents a direct percentage
+comparison with the earlier profile. Go 1.27.2 govulncheck found no
+vulnerabilities; golangci-lint 2.14.0 reported zero issues; actionlint and all
+four DOM contracts passed. Complete logs remain preserved losslessly.
 
 To reproduce the hosted checks from a clean checkout:
 
@@ -40,7 +60,7 @@ rtk proxy go test -json -race -coverprofile=coverage.out -count=1 ./... > test-r
 rtk gzip -n -c test-results.jsonl > test-results.jsonl.gz
 rtk gzip -t test-results.jsonl.gz
 rtk go run ./cmd/sentinel-tools coverage --profile coverage.out --min 90 > coverage-summary.json
-rtk go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.13.2 run ./... --timeout 5m
+rtk go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.14.0 run ./... --timeout 5m
 ```
 
 `rtk proxy` preserves the raw JSON test stream used as evidence. The hosted

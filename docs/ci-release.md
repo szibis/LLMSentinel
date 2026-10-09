@@ -15,7 +15,7 @@ building release assets from the reviewed source. A branch name, a new tag, a
 different tagged commit or failed Build is refused before hardware or publishing.
 This retries that release's contents; newer fixes require a new reviewed release.
 
-Build runs on main pushes and pull requests. Its required checks retain their existing names: four cross-platform builds, test, lint, security and docker-build. `llm-sentinel`, `sentinel-gateway` and `sentinel-tools` are built. Tests include the Go race suite and model-free Go lab/capture/controls/release/lifecycle tests. Lint uses golangci-lint v2.13.2 built with the project's Go version and validates workflow YAML with actionlint v1.7.12. Security uses govulncheck v1.8.0. The project and Docker builder use Go 1.27.1.
+Build runs on main pushes and pull requests. Its required checks retain their existing names: four cross-platform builds, test, lint, security and docker-build. `llm-sentinel`, `sentinel-gateway` and `sentinel-tools` are built. Tests include the Go race suite and model-free Go lab/capture/controls/release/lifecycle tests. Lint uses golangci-lint v2.14.0 built with the project's Go version and validates workflow YAML with actionlint v1.7.12. Security uses govulncheck v1.8.0. The project and Docker builder use Go 1.27.2, including the [October security fixes](https://go.dev/doc/devel/release#go1.27.2).
 
 Auto Release runs after a successful Build for a main push. Changes select a bump from merged PR titles: `feat:` selects minor, `feat!:` or a breaking-change title selects major, and `fix:`, `perf:` or `refactor:` selects patch. At the current main tip it prepares a reviewable release PR containing VERSION and changelog changes and dispatches a Build pinned to that preparation commit. Publication follows the reviewed release PR's merge and successful main Build. The reviewed commit may remain an ancestor after newer merges; publication still uses its exact tested SHA. Unsupported titles and commits without a merged PR skip release preparation. The old competing Auto-Tag workflow is removed.
 
@@ -26,7 +26,7 @@ Checks to run locally:
 ```sh
 make lab-test
 go test -race ./...
-go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.13.2 run ./... --timeout 5m
+go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.14.0 run ./... --timeout 5m
 go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12 -shellcheck= -pyflakes=
 go run golang.org/x/vuln/cmd/govulncheck@v1.8.0 ./...
 docker build -t sentinel:check .

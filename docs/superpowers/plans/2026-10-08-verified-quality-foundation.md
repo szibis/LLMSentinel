@@ -65,6 +65,26 @@ the PR descriptions and this plan. Existing artifacts remain private outside Git
   the restart, and GitHub reports them online. Expanded merged-main hardware
   execution and the five native extended-quality failures remain pending.
 
+### Patched toolchain and hosted evidence, 2026-10-09
+
+- The first PR Build run 37901269295 passed test, global coverage, compression,
+  evidence verification and upload. Downloaded artifacts verified locally at
+  merge source/control `978fbd5eafc6381836728a30b12bba9fef2bfe59`; coverage
+  was 20,858/22,454 statements (92.892135%). Security failed on nine reachable
+  Go standard-library vulnerabilities fixed by Go 1.27.2.
+- Updated module/container/docs to Go 1.27.2. Linter 2.13.2 could not decode
+  its compiler export format; 2.14.0 passes. The newer gosec's G703 report on
+  LAB_WORKSPACE Stat is suppressed only at that operation: selecting the local
+  caller's existing project directory is intentional, not a remote sandbox.
+- Patched local full race suite: exit 0, 56 packages, 2,133 cases; global
+  coverage 15,403/16,935 statements (90.953646%), unchanged 90% gate passed.
+  Same 150 files and 11,552 blocks as the earlier profile; 1,839 block statement
+  counts changed and two coverage-presence bits changed. The toolchain includes
+  a cover fix; percentages across toolchains are not directly comparable.
+- Go 1.27.2 govulncheck: no vulnerabilities. Linter 2.14.0: zero issues.
+  actionlint and four DOM contracts passed. Complete event logs compressed
+  losslessly and retained with status, coverage, security and lint output.
+
 ### Review checkpoint, 2026-10-09
 
 All five implementation areas are connected. The repository-wide local race
