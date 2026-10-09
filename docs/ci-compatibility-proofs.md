@@ -18,6 +18,14 @@ loopback backend without a model download, GPU or provider inference. It proves
 these client versions' read/tool protocol compatibility. Other roles, tools,
 interactive rendering and model answer quality need their relevant checks.
 
+Hosted Linux checks first run the pinned Codex sandbox with `/bin/true`. If it
+reports Ubuntu's documented Bubblewrap namespace failure, the ephemeral runner
+enables the user-namespace prerequisites used by
+[OpenAI's Codex action](https://github.com/openai/codex-action/blob/main/action.yml)
+and repeats the sandbox check. The actual fixture retains `workspace-write`
+isolation and requires a successful native read. Other preflight failures stop
+the job. Local host configuration is unaffected.
+
 Each public proof artifact contains a versioned report, tested/source and
 control revisions, and a SHA-256 manifest. PR head and tested merge-checkout
 revisions are distinct. The publisher checks hashes and confirms that a tested

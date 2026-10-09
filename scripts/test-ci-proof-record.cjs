@@ -45,3 +45,18 @@ test('wrong revisions and stale regression evidence are rejected before rewritin
   assert.throws(() => record('api-regression', root, env), /Stale/)
   assert.equal(JSON.parse(fs.readFileSync(path.join(root, 'regression.json'))).source_revision, 'c'.repeat(40))
 })
+test('native failure diagnostics retain only fixed codes and integer exit status', t => {
+  const root = fixture(t)
+  const r = { passed: false, model_inference: false, external_provider_requests: 0, failure_code: 'sandbox_unavailable', failure_kind: 'native_tool', failed_stage: 'client_execution', clients: [{ client: 'claude-code', version: '2.1.291' }, { client: 'codex', version: '0.160.1', failure_code: 'sandbox_unavailable', failure_kind: 'native_tool', exit_code: 1, stderr: 'PRIVATE PATH/TRANSCRIPT' }] }
+  write(root, 'native-clients.json', r)
+  const output = record('native-client-fixture', root, { ...env, PROOF_OUTCOME: 'failure' })
+  assert.equal(output.failure_code, 'sandbox_unavailable')
+  assert.equal(output.clients[1].exit_code, 1)
+  assert.equal(JSON.stringify(output).includes('PRIVATE'), false)
+  r.failure_code = r.clients[1].failure_code = 'PRIVATE_UNKNOWN_DIAGNOSTIC'
+  r.clients[1].exit_code = 'PRIVATE_EXIT'
+  write(root, 'native-clients.json', r)
+  const invalid = record('native-client-fixture', root, env)
+  assert.equal(invalid.passed, false)
+  assert.equal(JSON.stringify(invalid).includes('PRIVATE'), false)
+})

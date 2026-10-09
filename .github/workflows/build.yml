@@ -82,6 +82,32 @@ jobs:
           cache: true
       - name: Install pinned native clients
         run: npm install --prefix .verification/client-proof --no-audit --no-fund @anthropic-ai/claude-code@2.1.291 @openai/codex@0.160.1
+      - name: Verify hosted Linux sandbox prerequisites
+        env:
+          CODEX_HOME: ${{ github.workspace }}/.verification/client-proof/preflight-home
+        run: |
+          mkdir -p "$CODEX_HOME"
+          codex_cli="$PWD/.verification/client-proof/node_modules/.bin/codex"
+          if "$codex_cli" sandbox -c 'sandbox_mode="workspace-write"' -- /bin/true > "$RUNNER_TEMP/codex-sandbox-preflight.log" 2>&1; then
+            echo 'Pinned Codex Linux sandbox preflight passed.'
+          else
+            cat "$RUNNER_TEMP/codex-sandbox-preflight.log"
+            # Match the documented Ubuntu hosted-runner namespace failure.
+            # Keep workspace-write isolation; never fall back to unsafe mode.
+            # https://github.com/openai/codex-action/blob/main/action.yml
+            if ! grep -Eq 'bwrap:.*(Failed RTM_NEWADDR|Creating new namespace failed|unshare.*not permitted)' "$RUNNER_TEMP/codex-sandbox-preflight.log"; then
+              exit 1
+            fi
+            codex_userns_value="$(sysctl -n kernel.unprivileged_userns_clone 2>/dev/null || true)"
+            if [ -n "$codex_userns_value" ] && [ "$codex_userns_value" != 1 ]; then
+              sudo sysctl -w kernel.unprivileged_userns_clone=1
+            fi
+            codex_apparmor_value="$(sysctl -n kernel.apparmor_restrict_unprivileged_userns 2>/dev/null || true)"
+            if [ -n "$codex_apparmor_value" ] && [ "$codex_apparmor_value" != 0 ]; then
+              sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+            fi
+            "$codex_cli" sandbox -c 'sandbox_mode="workspace-write"' -- /bin/true
+          fi
       - name: Build production gateway and evidence helper
         run: |
           mkdir -p proof-clients

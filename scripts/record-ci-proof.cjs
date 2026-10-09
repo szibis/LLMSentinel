@@ -2,6 +2,10 @@
 const fs = require('node:fs')
 const path = require('node:path')
 const revision = /^[a-f0-9]{40}(?:[a-f0-9]{24})?$/
+const failureKinds = { sandbox_unavailable: 'native_tool', tool_exit_nonzero: 'native_tool', tool_exit_evidence_missing: 'native_tool', tool_marker_missing: 'native_tool', tool_result_error: 'native_tool', tool_result_count_invalid: 'native_tool', client_exit_nonzero: 'client_process', fixture_assertion_failed: 'validation' }
+function diagnostic(value) {
+  return Object.hasOwn(failureKinds, value?.failure_code) ? { failure_code: value.failure_code, failure_kind: failureKinds[value.failure_code] } : {}
+}
 function readJSON(root, name) {
   try { return JSON.parse(fs.readFileSync(path.join(root, name), 'utf8')) } catch { return null }
 }
@@ -38,10 +42,11 @@ function record(scope, root, env) {
       return { client, version: item?.version === version ? version : 'unknown',
         passed: item?.passed === true && item?.version === version && observed && routed && backendObserved && item?.role === 'sonnet' && item?.requested_alias === 'sentinel-sonnet' && item?.backend_model === 'local' && item.tool_continuations === 1,
         requests: item ? calls.length : null, request_path: route, role: 'sonnet', requested_alias: 'sentinel-sonnet', backend: 'synthetic-local',
-        tool_continuations: Number.isSafeInteger(item?.tool_continuations) && item.tool_continuations >= 0 ? item.tool_continuations : null }
+        tool_continuations: Number.isSafeInteger(item?.tool_continuations) && item.tool_continuations >= 0 ? item.tool_continuations : null,
+        exit_code: Number.isSafeInteger(item?.exit_code) && item.exit_code >= 0 && item.exit_code <= 255 ? item.exit_code : null, ...diagnostic(item) }
     })
     report = { version: 1, scope, passed: env.PROOF_OUTCOME === 'success' && r?.passed === true && r?.model_inference === false && r?.external_provider_requests === 0 && clients.every(c => c.passed),
-      model_inference: false, external_provider_requests: r?.external_provider_requests === 0 ? 0 : null, clients }
+      model_inference: false, external_provider_requests: r?.external_provider_requests === 0 ? 0 : null, clients, ...diagnostic(r) }
   } else if (scope === 'claude-mod') {
     name = 'claude-mod.json'
     const r = readJSON(root, 'native-mod.json')

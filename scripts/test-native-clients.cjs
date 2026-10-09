@@ -11,6 +11,27 @@ const { spawn } = require('node:child_process')
 const VERSIONS = { 'claude-code': '2.1.291', codex: '0.160.1' }
 const READ_COMMAND = 'cat -- marker.txt'
 const LIMIT = 4 * 1024 * 1024
+const FAILURE_KINDS = Object.freeze({
+  sandbox_unavailable: 'native_tool', tool_exit_nonzero: 'native_tool',
+  tool_exit_evidence_missing: 'native_tool', tool_marker_missing: 'native_tool',
+  tool_result_error: 'native_tool', tool_result_count_invalid: 'native_tool',
+  client_exit_nonzero: 'client_process', fixture_assertion_failed: 'validation'
+})
+
+function codedFailure(code) {
+  const error = new Error(code)
+  error.fixtureCode = code
+  return error
+}
+
+function failureDetails(error) {
+  const code = Object.hasOwn(FAILURE_KINDS, error?.fixtureCode) ? error.fixtureCode : 'fixture_assertion_failed'
+  return { failure_code: code, failure_kind: FAILURE_KINDS[code] }
+}
+
+function sandboxUnavailable(output) {
+  return /bwrap: (?:Creating new namespace failed|No permissions to create (?:a )?new namespace)|loopback: Failed RTM_NEWADDR: Operation not permitted|Sandbox\(SeccompInstallFailed\)|Failed to create (?:a )?(?:new )?user namespace|failed to apply landlock restrictions/i.test(output)
+}
 
 function contentText(content) {
   if (typeof content === 'string') return content
@@ -188,11 +209,16 @@ function toolResults(payload, client, marker) {
     ? payload.messages.flatMap(message => Array.isArray(message.content) ? message.content.filter(block => block.type === 'tool_result') : [])
     : payload.input.filter(item => item.type === 'function_call_output')
   if (results.length) {
-    assert.equal(results.length, 1)
-    assert.notEqual(results[0].is_error, true)
+    if (results.length !== 1) throw codedFailure('tool_result_count_invalid')
     const output = client === 'claude-code' ? contentText(results[0].content) : contentText(results[0].output)
-    assert.ok(output.includes(marker), 'native continuation omitted actual read evidence')
-    if (client === 'codex') assert.match(output, /Process exited with code 0/)
+    if (client === 'codex' && sandboxUnavailable(output)) throw codedFailure('sandbox_unavailable')
+    if (results[0].is_error === true) throw codedFailure('tool_result_error')
+    if (client === 'codex') {
+      const exit = output.match(/Process exited with code (-?\d+)\b/)
+      if (!exit) throw codedFailure('tool_exit_evidence_missing')
+      if (exit[1] !== '0') throw codedFailure('tool_exit_nonzero')
+    }
+    if (!output.includes(marker)) throw codedFailure('tool_marker_missing')
   }
   return results.length
 }
@@ -210,7 +236,15 @@ async function runFixture(gatewayExecutable, claude, codex, outputPath) {
   let gatewayRun
   let gatewayFailure
   let phase = 'executable_validation'
-  const rejectRequest = (error, res) => { failures.push(error.message); if (!res.headersSent) { res.writeHead(400, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: error.message })) } else res.destroy(error) }
+  const rejectRequest = (error, res) => {
+    const details = failureDetails(error)
+    failures.push(details)
+    if (active && !active.record.failure_code) Object.assign(active.record, details)
+    if (!res.headersSent) {
+      res.writeHead(400, { 'Content-Type': 'application/json' })
+      res.end(JSON.stringify({ error: details.failure_code }))
+    } else res.destroy(error)
+  }
   try {
     ;[gatewayExecutable, claude, codex] = [gatewayExecutable, claude, codex].map(value => {
       const canonical = fs.realpathSync(path.resolve(value)); const info = fs.statSync(canonical)
@@ -282,7 +316,13 @@ async function runFixture(gatewayExecutable, claude, codex, outputPath) {
         forwarded.on('error', error => rejectRequest(error, res))
         res.on('close', () => forwarded.destroy())
         forwarded.end(raw)
-      } catch (error) { rejectRequest(error, res) }
+      } catch (error) {
+        // This is the audit response status, even when no production request
+        // can be forwarded because the native continuation failed validation.
+        const latest = active?.requests.at(-1)
+        if (latest && latest.status === null && !res.headersSent) latest.status = 400
+        rejectRequest(error, res)
+      }
     })
     servers.push(audit)
     const endpoint = await listen(audit)
@@ -318,7 +358,8 @@ async function runFixture(gatewayExecutable, claude, codex, outputPath) {
       assert.match(version.stdout.trim(), new RegExp(`^(?:${record.client === 'codex' ? 'codex-cli ' : ''})${record.version.replaceAll('.', '\\.')}(${record.client === 'claude-code' ? ' \\(Claude Code\\)' : ''})?$`), 'client version differs from pinned compatibility target')
       phase = 'client_execution'
       const result = await launch(executable, args, env, workspace, 45000, children).finished
-      assert.equal(result.code, 0, record.client + ' failed: ' + result.stderr.slice(-2000))
+      if (Number.isInteger(result.code)) record.exit_code = result.code
+      if (result.code !== 0) throw codedFailure(sandboxUnavailable(result.stderr + '\n' + result.stdout) ? 'sandbox_unavailable' : 'client_exit_nonzero')
       phase = 'native_tool_evidence'
       const events = result.stdout.trim().split('\n').map(line => JSON.parse(line))
       record.tool_continuations = record.client === 'claude-code' ? validateClaude(events, filename, marker) : validateCodex(events, marker)
@@ -334,12 +375,16 @@ async function runFixture(gatewayExecutable, claude, codex, outputPath) {
       record.passed = true
     }
     report.passed = true
-  } catch {
+  } catch (error) {
     // Public CI artifacts never receive raw assertions, transcripts, paths,
     // random file contents, or native subprocess diagnostics.
     report.error = 'fixture_validation_failed'
     report.failed_stage = phase
-    if (active) report.failed_client = active.client
+    const details = active?.record.failure_code
+      ? { failure_code: active.record.failure_code, failure_kind: active.record.failure_kind }
+      : failureDetails(error)
+    Object.assign(report, details)
+    if (active) { report.failed_client = active.client; Object.assign(active.record, details) }
   } finally {
     for (const child of children) { try { process.kill(-child.pid, 'SIGKILL') } catch (error) { if (error.code !== 'ESRCH') { report.passed = false; report.error = 'fixture_cleanup_failed'; report.failed_stage = 'cleanup' } } }
     if (gatewayRun) {
@@ -362,7 +407,7 @@ async function runFixture(gatewayExecutable, claude, codex, outputPath) {
   return report
 }
 
-module.exports = { validateClaude, validateCodex, validateRequests, validateActivity, runFixture }
+module.exports = { validateClaude, validateCodex, validateRequests, validateActivity, toolResults, failureDetails, runFixture }
 if (require.main === module) {
   ;(async () => {
     assert.ok(process.argv.length === 5 || process.argv.length === 6, 'usage: node test-native-clients.cjs SENTINEL_GATEWAY CLAUDE CODEX [outputJSON]')
