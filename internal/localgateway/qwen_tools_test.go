@@ -28,6 +28,46 @@ func TestQwenToolPromptUsesModelFormatAndKeepsHistory(t *testing.T) {
 	}
 }
 
+func TestJSONToolPromptTreatsForcedToolChoiceAsMandatory(t *testing.T) {
+	for _, tc := range []struct {
+		name, choice, toolName string
+		forced                 bool
+	}{
+		{name: "named", choice: "tool", toolName: "record_marker", forced: true},
+		{name: "any", choice: "any", forced: true},
+		{name: "auto", choice: "auto", forced: false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			req := claudeRequest{
+				Model: "sentinel-haiku", MaxTokens: 128, JSONTools: true,
+				Tools:    []claudeTool{{Name: "record_marker", Schema: map[string]any{"type": "object"}}},
+				Messages: []claudeMessage{{Role: "user", Content: json.RawMessage(`"Call record_marker once."`)}},
+			}
+			req.ToolChoice.Type = tc.choice
+			req.ToolChoice.Name = tc.toolName
+			messages, err := prepareClaude(req)
+			if err != nil {
+				t.Fatal(err)
+			}
+			prompt := messages[0]["content"] + "\n" + messages[1]["content"]
+			conditional := "Use tools only when the user's task requires file access or command execution."
+			if tc.forced {
+				if strings.Contains(prompt, conditional) || !strings.Contains(prompt, "The caller requires a tool call") {
+					t.Fatalf("forced tool choice received optional-tool guidance: %s", prompt)
+				}
+				if strings.Contains(prompt, `"tool_calls":[]`) {
+					t.Fatalf("forced tool choice received a text-only final-answer example: %s", prompt)
+				}
+				if tc.choice == "tool" && !strings.Contains(prompt, `"name":"record_marker"`) {
+					t.Fatalf("named tool choice was not preserved: %s", prompt)
+				}
+			} else if !strings.Contains(prompt, conditional) || strings.Contains(prompt, "The caller requires a tool call") || !strings.Contains(prompt, `"tool_calls":[]`) {
+				t.Fatalf("optional tool guidance changed: %s", prompt)
+			}
+		})
+	}
+}
+
 func TestQwenNativeCallsUseExistingArgumentAndToolChoiceValidation(t *testing.T) {
 	for _, tc := range []struct {
 		name, output, choice string
