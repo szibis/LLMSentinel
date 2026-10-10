@@ -1,5 +1,10 @@
 # Verified quality foundation
 
+Every Build also runs the API and actual Claude Code/Codex compatibility
+baseline. Sealed reports feed a current-commit PR comment; see
+[CI compatibility proofs](ci-compatibility-proofs.md) for the measured scope,
+artifact checks and publisher activation.
+
 The foundation combines repository-wide Go regression coverage, bounded native
 client task evidence, synthetic request measurements and verifiable artifact
 manifests. Each answers a different question. A passing Go test does not prove

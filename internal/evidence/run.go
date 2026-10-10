@@ -14,8 +14,11 @@ func (a *artifactFlags) Set(s string) error { *a = append(*a, s); return nil }
 // Run creates or verifies bounded synthetic CI evidence. It does not contact
 // providers, capture clients, or inspect private lab contents.
 func Run(args []string, in io.Reader, out, stderr io.Writer) int {
+	if len(args) > 0 && args[0] == "regression" {
+		return runRegression(args[1:], out, stderr)
+	}
 	if len(args) == 0 || (args[0] != "create" && args[0] != "verify") {
-		fmt.Fprintln(stderr, "usage: evidence create|verify --root DIR --manifest FILE (synthetic CI artifacts only)")
+		fmt.Fprintln(stderr, "usage: evidence create|verify --root DIR --manifest FILE; evidence regression --events FILE --report FILE --source-revision SHA --control-revision SHA (synthetic CI evidence only)")
 		return 2
 	}
 	fs := flag.NewFlagSet("evidence "+args[0], flag.ContinueOnError)

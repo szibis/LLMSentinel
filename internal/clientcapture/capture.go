@@ -634,11 +634,12 @@ func Run(args []string, in io.Reader, out, stderr io.Writer) int {
 	billing := flags.String("billing-class", "direct_unknown", "direct_unknown, subscription or api")
 	native := flags.Bool("native-hooks", false, "preview native Codex hooks")
 	preview := flags.Bool("preview-config", false, "print configuration only")
+	mod := flags.Bool("mod-event", false, "capture a structured native Claude mod observation")
 	fail := func() int {
 		_, _ = fmt.Fprintln(stderr, "Sentinel capture skipped: invalid event or inaccessible private file")
 		return 1
 	}
-	if flags.Parse(args) != nil || (*client != "claude" && *client != "codex") || (*billing != "direct_unknown" && *billing != "subscription" && *billing != "api") || flags.NArg() > 1 {
+	if flags.Parse(args) != nil || (*client != "claude" && *client != "codex") || (*billing != "direct_unknown" && *billing != "subscription" && *billing != "api") || flags.NArg() > 1 || (*mod && (*client != "claude" || *preview || *native)) {
 		return fail()
 	}
 	if _, err := canonicalPath(*output); err != nil {
@@ -672,7 +673,12 @@ func Run(args []string, in io.Reader, out, stderr io.Writer) int {
 	if err != nil {
 		return fail()
 	}
-	record, err := normalize(*client, *billing, event)
+	var record map[string]any
+	if *mod {
+		record, err = normalizeMod(*billing, event)
+	} else {
+		record, err = normalize(*client, *billing, event)
+	}
 	if err != nil {
 		return fail()
 	}

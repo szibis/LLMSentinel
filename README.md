@@ -5,12 +5,14 @@ direct-provider learning capture, or explicitly authorized hybrid routing.
 The guide includes startup examples, slash controls, billing boundaries and
 what is implemented versus planned.
 
-Sentinel is pure Go, including capture hooks, CLI controls, status lines,
+Sentinel's services and helpers are Go, including capture hooks, CLI controls, status lines,
 lab management and release/smoke helpers. `make build` produces `llm-sentinel`,
 `sentinel-gateway` and `sentinel-tools`; all three ship as native release binaries.
 MLX-Flash is an external inference service with its own dependencies. Sentinel
 communicates over HTTP and launches only its executable. Future OSS/Jes decision
-services use the same boundary, without Python adapters inside Sentinel.
+services use the same boundary, without Python adapters inside Sentinel. A thin
+[Claude Code mod](docs/claude-code-mod.md) provides a native panel and direct
+controls through the existing Go helpers.
 
 ### Release preparation and changelog maintenance
 
@@ -63,6 +65,7 @@ Use the actual highest stable tag, intended bump, and review date for your relea
 | Small decision helpers → OSS bridge → our Jes | [Migration design](docs/jes-decision-design.md) |
 | Actual quality/accounting evidence | [Client inspection](docs/client-quality-inspection.md), [progress checks](docs/agent-progress-quality.md), [dataset admission](docs/training-mode.md) |
 | Regression and real Metal API proofs | [Integration verification](docs/mlx-integration-verification.md) |
+| API, Claude Code and Codex proofs on each PR | [CI compatibility proofs](docs/ci-compatibility-proofs.md) |
 | Repository coverage, native quality gates and artifact provenance | [Verified quality foundation](docs/verified-quality-foundation.md) |
 
 The current decision policy is deterministic; Jes and the proposed Kev/Jeff

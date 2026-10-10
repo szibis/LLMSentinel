@@ -14,9 +14,179 @@ on:
 
 permissions:
   contents: read
-  pull-requests: write
 
 jobs:
+  api-regression:
+    runs-on: ubuntu-latest
+    env:
+      HEAD_REVISION: ${{ inputs.source_sha || github.event.pull_request.head.sha || github.sha }}
+      CONTROL_REVISION: ${{ github.workflow_sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_sha || github.sha }}
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Build evidence helper and record checkout
+        run: |
+          mkdir -p proof-api .verification
+          echo "SOURCE_REVISION=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+          go build -o .verification/sentinel-tools ./cmd/sentinel-tools
+      - name: Test proof publishing and fixture rejection contracts
+        run: node --test scripts/test-ci-proof-record.cjs scripts/test-ci-proof-comment.cjs scripts/test-native-clients.test.cjs scripts/test-lint-workflows.cjs
+      - name: Run API and client adapter regressions
+        id: regression
+        run: go test -json -race -count=1 ./internal/localgateway ./internal/clientcapture ./internal/clientcontrol ./internal/claudemod ./internal/taskquality ./internal/labstatus > proof-api/regression-events.jsonl
+      - name: Validate and seal complete regression evidence
+        if: always()
+        run: |
+          .verification/sentinel-tools evidence regression --events proof-api/regression-events.jsonl --report proof-api/regression.json --source-revision "$SOURCE_REVISION" --control-revision "$CONTROL_REVISION"
+      - name: Record immutable provenance and retain complete log
+        if: always()
+        run: |
+          node scripts/record-ci-proof.cjs api-regression proof-api
+          gzip -n -9 proof-api/regression-events.jsonl
+          .verification/sentinel-tools evidence create --root "$PWD/proof-api" --manifest "$PWD/proof-api/evidence.json" --source-revision "$SOURCE_REVISION" --control-revision "$CONTROL_REVISION" --artifact provenance.json --artifact regression.json --artifact regression-events.jsonl.gz
+          .verification/sentinel-tools evidence verify --root "$PWD/proof-api" --manifest "$PWD/proof-api/evidence.json"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: api-regression-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            proof-api/evidence.json
+            proof-api/provenance.json
+            proof-api/regression.json
+            proof-api/regression-events.jsonl.gz
+          retention-days: 14
+          if-no-files-found: error
+  client-compatibility:
+    runs-on: ubuntu-latest
+    env:
+      HEAD_REVISION: ${{ inputs.source_sha || github.event.pull_request.head.sha || github.sha }}
+      CONTROL_REVISION: ${{ github.workflow_sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_sha || github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Install pinned native clients
+        run: npm install --prefix .verification/client-proof --no-audit --no-fund @anthropic-ai/claude-code@2.1.291 @openai/codex@0.160.1
+      - name: Verify hosted Linux sandbox prerequisites
+        env:
+          CODEX_HOME: ${{ github.workspace }}/.verification/client-proof/preflight-home
+        run: |
+          mkdir -p "$CODEX_HOME"
+          codex_cli="$PWD/.verification/client-proof/node_modules/.bin/codex"
+          if "$codex_cli" sandbox -c 'sandbox_mode="workspace-write"' -- /bin/true > "$RUNNER_TEMP/codex-sandbox-preflight.log" 2>&1; then
+            echo 'Pinned Codex Linux sandbox preflight passed.'
+          else
+            cat "$RUNNER_TEMP/codex-sandbox-preflight.log"
+            # Match the documented Ubuntu hosted-runner namespace failure.
+            # Keep workspace-write isolation; never fall back to unsafe mode.
+            # https://github.com/openai/codex-action/blob/main/action.yml
+            if ! grep -Eq 'bwrap:.*(Failed RTM_NEWADDR|Creating new namespace failed|unshare.*not permitted)' "$RUNNER_TEMP/codex-sandbox-preflight.log"; then
+              exit 1
+            fi
+            codex_userns_value="$(sysctl -n kernel.unprivileged_userns_clone 2>/dev/null || true)"
+            if [ -n "$codex_userns_value" ] && [ "$codex_userns_value" != 1 ]; then
+              sudo sysctl -w kernel.unprivileged_userns_clone=1
+            fi
+            codex_apparmor_value="$(sysctl -n kernel.apparmor_restrict_unprivileged_userns 2>/dev/null || true)"
+            if [ -n "$codex_apparmor_value" ] && [ "$codex_apparmor_value" != 0 ]; then
+              sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+            fi
+            "$codex_cli" sandbox -c 'sandbox_mode="workspace-write"' -- /bin/true
+          fi
+      - name: Build production gateway and evidence helper
+        run: |
+          mkdir -p proof-clients
+          echo "SOURCE_REVISION=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+          go build -o .verification/sentinel-gateway ./cmd/sentinel-gateway
+          go build -o .verification/sentinel-tools ./cmd/sentinel-tools
+      - name: Verify real Claude Code and Codex through production API adapters
+        id: native
+        run: node scripts/test-native-clients.cjs .verification/sentinel-gateway .verification/client-proof/node_modules/.bin/claude .verification/client-proof/node_modules/.bin/codex proof-clients/native-clients.json
+      - name: Seal public native-client compatibility evidence
+        if: always()
+        env:
+          PROOF_OUTCOME: ${{ steps.native.outcome }}
+        run: |
+          node scripts/record-ci-proof.cjs native-client-fixture proof-clients
+          .verification/sentinel-tools evidence create --root "$PWD/proof-clients" --manifest "$PWD/proof-clients/evidence.json" --source-revision "$SOURCE_REVISION" --control-revision "$CONTROL_REVISION" --artifact provenance.json --artifact native-clients.json
+          .verification/sentinel-tools evidence verify --root "$PWD/proof-clients" --manifest "$PWD/proof-clients/evidence.json"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: native-client-fixture-${{ github.run_id }}-${{ github.run_attempt }}
+          path: proof-clients/
+          retention-days: 14
+          if-no-files-found: error
+  claude-mod:
+    runs-on: ubuntu-latest
+    env:
+      CLAUDE_CONFIG_DIR: ${{ github.workspace }}/.verification/claude-mod/config
+      DISABLE_TELEMETRY: '1'
+      CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: '1'
+      HEAD_REVISION: ${{ inputs.source_sha || github.event.pull_request.head.sha || github.sha }}
+      CONTROL_REVISION: ${{ github.workflow_sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_sha || github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Install pinned mod test runner
+        run: npm install --prefix .verification/claude-mod/runner --no-audit --no-fund @anthropic-ai/claude-code@2.1.291
+      - name: Build native controller and record checkout
+        run: |
+          mkdir -p proof-mod
+          echo "SOURCE_REVISION=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+          go build -o .verification/claude-mod/sentinel-tools ./cmd/sentinel-tools
+      - name: Validate native mod
+        id: validate
+        run: .verification/claude-mod/runner/node_modules/.bin/claude plugin validate internal/claudemod/plugin
+      - name: Test native controls, capture and terminal/Desktop pane
+        id: framework
+        run: .verification/claude-mod/runner/node_modules/.bin/claude plugin test internal/claudemod/plugin > proof-mod/framework.log 2>&1
+      - name: Verify actual CLI startup without a model turn
+        id: native
+        run: node scripts/test-claude-mod.cjs .verification/claude-mod/sentinel-tools .verification/claude-mod/runner/node_modules/.bin/claude proof-mod/native-mod.json
+      - name: Seal public mod compatibility evidence
+        if: always()
+        env:
+          VALIDATE_OUTCOME: ${{ steps.validate.outcome }}
+          FRAMEWORK_OUTCOME: ${{ steps.framework.outcome }}
+          PROOF_OUTCOME: ${{ steps.native.outcome }}
+        run: |
+          node scripts/record-ci-proof.cjs claude-mod proof-mod
+          .verification/claude-mod/sentinel-tools evidence create --root "$PWD/proof-mod" --manifest "$PWD/proof-mod/evidence.json" --source-revision "$SOURCE_REVISION" --control-revision "$CONTROL_REVISION" --artifact provenance.json --artifact claude-mod.json
+          .verification/claude-mod/sentinel-tools evidence verify --root "$PWD/proof-mod" --manifest "$PWD/proof-mod/evidence.json"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: claude-mod-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            proof-mod/evidence.json
+            proof-mod/provenance.json
+            proof-mod/claude-mod.json
+          retention-days: 14
+          if-no-files-found: error
   web:
     runs-on: ubuntu-latest
     steps:
@@ -162,11 +332,15 @@ jobs:
           go-version-file: go.mod
           cache: true
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
       - name: Run golangci-lint
         run: go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.14.0 run ./... --timeout 5m
 
       - name: Validate Actions workflows
-        run: go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12 -shellcheck= -pyflakes=
+        run: node scripts/lint-workflows.cjs go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
 
   security:
     runs-on: ubuntu-latest

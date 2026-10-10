@@ -2,6 +2,7 @@
 package lab
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -18,6 +19,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/szibis/claude-escalate/internal/claudemod"
 	"github.com/szibis/claude-escalate/internal/clientcontrol"
 )
 
@@ -286,7 +288,67 @@ enabled = false
 			}
 		}
 	}
-	return seedFile(filepath.Join(e.root, "control-plugin", ".claude-plugin", "plugin.json"), []byte("{\"name\":\"sentinel\",\"version\":\"1.0.0\"}\n"))
+	return e.prepareNativeMod()
+}
+
+// prepareNativeMod upgrades only exactly owned manifests. Configuration and
+// modules already present remain user-owned, as do all seeded control skills.
+func (e *environment) prepareNativeMod() error {
+	assets, err := claudemod.Assets(e.root, endpoint, e.executable)
+	if err != nil {
+		return err
+	}
+	plugin := filepath.Join(e.root, "control-plugin")
+	manifest := filepath.Join(plugin, ".claude-plugin", "plugin.json")
+	if err := clientcontrol.ValidateDirectory(filepath.Dir(manifest)); err != nil {
+		return err
+	}
+	if err := regularDestination(manifest); err != nil {
+		return err
+	}
+	legacy := []byte("{\"name\":\"sentinel\",\"version\":\"1.0.0\"}\n")
+	current := assets[".claude-plugin/plugin.json"]
+	migrate := false
+	file, err := os.Open(manifest)
+	if err == nil {
+		data, readErr := io.ReadAll(io.LimitReader(file, 65537))
+		closeErr := file.Close()
+		if readErr != nil {
+			return readErr
+		}
+		if closeErr != nil {
+			return closeErr
+		}
+		migrate = bytes.Equal(data, legacy)
+		if !migrate && !bytes.Equal(data, current) {
+			return nil // A custom manifest never acquires native mod modules.
+		}
+	} else if !os.IsNotExist(err) {
+		return err
+	}
+	// Check every ancestor and leaf before seeding anything native. An invalid
+	// late destination must leave the old plugin unactivated and safe to retry.
+	names := []string{"sentinel-config.json", "hooks/register.js", "hooks/hooks.json", ".claude-plugin/plugin.json"}
+	for _, name := range names {
+		path := filepath.Join(plugin, name)
+		if err := clientcontrol.ValidateDirectory(filepath.Dir(path)); err != nil {
+			return err
+		}
+		if err := regularDestination(path); err != nil {
+			return err
+		}
+	}
+	// Configuration and adapter precede hooks activation; manifest migration is
+	// last and atomic. Existing files are retained even after a partial attempt.
+	for _, name := range names[:len(names)-1] {
+		if err := seedFile(filepath.Join(plugin, name), assets[name]); err != nil {
+			return err
+		}
+	}
+	if migrate {
+		return atomicFile(manifest, current)
+	}
+	return seedFile(manifest, current)
 }
 func allowedEnvironment(keys ...string) []string {
 	env := []string{}

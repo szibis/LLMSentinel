@@ -1,0 +1,55 @@
+name: PR compatibility proofs
+
+on:
+  workflow_run:
+    workflows: [Build]
+    types: [completed]
+
+permissions:
+  contents: read
+  actions: read
+  pull-requests: write
+
+# Serialize read/update operations so an older completed run cannot replace a
+# newer comment. The publisher also rechecks current PR head immediately.
+concurrency:
+  group: sentinel-ci-proof-publisher
+  cancel-in-progress: false
+  queue: max
+
+jobs:
+  publish:
+    if: github.event.workflow_run.repository.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      # workflow_run uses trusted default-branch code. Never check out or execute
+      # the triggering PR branch, downloaded logs, or artifact scripts here.
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.workflow_sha }}
+          persist-credentials: false
+      - name: Download public proof data from the completed run
+        id: download
+        continue-on-error: true
+        uses: actions/download-artifact@v5
+        with:
+          github-token: ${{ github.token }}
+          run-id: ${{ github.event.workflow_run.id }}
+          pattern: '*-${{ github.event.workflow_run.id }}-${{ github.event.workflow_run.run_attempt }}'
+          path: proof-evidence
+          merge-multiple: false
+      - name: Download existing sealed repository coverage
+        continue-on-error: true
+        uses: actions/download-artifact@v5
+        with:
+          github-token: ${{ github.token }}
+          run-id: ${{ github.event.workflow_run.id }}
+          name: coverage
+          path: proof-evidence/coverage
+      - name: Publish verified current-commit proof comment
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { publish } = require('./scripts/ci-proof-comment.cjs')
+            await publish({ github, context, artifactRoot: 'proof-evidence', core })
