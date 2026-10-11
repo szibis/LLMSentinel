@@ -89,6 +89,12 @@ processed/reused prompt tokens before and after each client exchange. Exact
 provider totals must match the entire window, including the bounded correction
 attempt. Missing, reset, fractional or inconsistent counters fail the proof;
 the latest generation must still carry native metadata and a normal stop.
+The session-cache check runs only when the runtime is not under memory warning
+pressure. MLX-Flash deliberately clears prompt snapshots and suppresses new
+snapshots while pressure is `warning`; in that state the artifact records the
+cache check as skipped with `memory_pressure_warning`. Cache reuse remains a
+required proof when pressure is normal, and critical pressure still fails the
+inference job.
 The shared lock is close-on-exec, so a restored supervisor cannot retain it and
 block the next hardware job. Forced tool choices omit a generated text preamble
 while preserving schema-validated calls and all native usage. Automatic tool
