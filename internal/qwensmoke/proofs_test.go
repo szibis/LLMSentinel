@@ -114,6 +114,79 @@ func TestCacheAccountingRejectsCrossSessionReuse(t *testing.T) {
 	}
 }
 
+func TestCacheProofSkipsOnlyForReportedWarningPressure(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		status document
+		want   string
+	}{
+		{
+			name:   "warning pressure",
+			status: document{"memory": document{"pressure": "warning"}, "prompt_cache": document{"enabled": true}},
+			want:   "memory_pressure_warning",
+		},
+		{
+			name:   "normal pressure still requires reuse",
+			status: document{"memory": document{"pressure": "normal"}, "prompt_cache": document{"enabled": true}},
+		},
+		{
+			name:   "critical pressure is not treated as an optional skip",
+			status: document{"memory": document{"pressure": "critical"}, "prompt_cache": document{"enabled": true}},
+		},
+		{
+			name:   "missing pressure is not treated as a skip",
+			status: document{"prompt_cache": document{"enabled": true}},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := cacheProofSkipReason(tc.status); got != tc.want {
+				t.Fatalf("cache proof skip reason = %q, want %q", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestRunCacheProofSkipsOnlyUnderWarningPressure(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		pressure string
+		wantSkip bool
+	}{
+		{name: "warning", pressure: "warning", wantSkip: true},
+		{name: "normal", pressure: "normal"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var cacheCalls int
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				switch r.URL.Path {
+				case "/status":
+					_ = json.NewEncoder(w).Encode(document{"memory": document{"pressure": tc.pressure}})
+				case "/v1/messages":
+					cacheCalls++
+					http.Error(w, "fixture stops before generation", http.StatusServiceUnavailable)
+				default:
+					t.Errorf("unexpected request path %q", r.URL.Path)
+					http.NotFound(w, r)
+				}
+			}))
+			defer server.Close()
+
+			result := document{"checks": []any{}}
+			err := runCacheProof(context.Background(), server.URL, server.URL, "small", "haiku", result)
+			check := mapping(result["checks"].([]any)[0])
+			if tc.wantSkip {
+				if err != nil || check["skipped"] != true || check["skip_reason"] != "memory_pressure_warning" || check["passed"] != false || cacheCalls != 0 {
+					t.Fatalf("warning pressure was not recorded as a skip: check=%v calls=%d err=%v", check, cacheCalls, err)
+				}
+				return
+			}
+			if err == nil || check["skipped"] == true || cacheCalls != 1 {
+				t.Fatalf("normal pressure did not require the live cache proof: check=%v calls=%d err=%v", check, cacheCalls, err)
+			}
+		})
+	}
+}
+
 func responseStreamEvents(tool bool) []document {
 	part := document{"type": "output_text", "text": marker, "annotations": []any{}, "logprobs": []any{}}
 	item := document{"id": "msg_item", "type": "message", "role": "assistant", "status": "completed", "content": []any{part}}
