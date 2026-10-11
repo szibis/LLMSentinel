@@ -211,7 +211,16 @@ func prepareClaude(req claudeRequest) ([]map[string]string, error) {
 	instruction := "You are the model behind an interactive coding agent. Never claim files were changed or commands ran without tool-result evidence."
 	if len(req.Tools) > 0 {
 		defs, _ := json.Marshal(req.Tools)
-		instruction += ` Reply ONLY with one JSON object: {"text":"your answer or empty string","tool_calls":[{"name":"exact available tool name","input":{"argument":"value"}}]}. A final answer must have this JSON shape: {"text":"Hello","tool_calls":[]}. Use tools only when the user's task requires file access or command execution. Greetings and answers that need no tools must have an empty tool_calls array. Never invent file paths. Do not use Markdown fences. Use only defined tools with their required arguments. The client executes tools and returns evidence; never invent results. Available tools: ` + string(defs)
+		instruction += ` Reply ONLY with one JSON object: {"text":"your answer or empty string","tool_calls":[{"name":"exact available tool name","input":{"argument":"value"}}]}. `
+		if req.ToolChoice.Type == "any" || req.ToolChoice.Type == "tool" {
+			instruction += "The caller requires a tool call. Do not answer with text instead of the required call."
+			if req.ToolChoice.Type == "tool" {
+				instruction += " Call only the named tool " + req.ToolChoice.Name + "."
+			}
+		} else {
+			instruction += ` A final answer must have this JSON shape: {"text":"Hello","tool_calls":[]}. Use tools only when the user's task requires file access or command execution. Greetings and answers that need no tools must have an empty tool_calls array.`
+		}
+		instruction += " Never invent file paths. Do not use Markdown fences. Use only defined tools with their required arguments. The client executes tools and returns evidence; never invent results. Available tools: " + string(defs)
 		choice, _ := json.Marshal(req.ToolChoice)
 		instruction += " Tool choice policy: " + string(choice)
 		if qwenRole(req.Model) && !req.JSONTools {
@@ -361,7 +370,18 @@ func prepareClaude(req claudeRequest) ([]map[string]string, error) {
 	}
 	if len(req.Tools) > 0 {
 		if req.ToolFormat != "gemma4" && (!qwenRole(req.Model) || req.JSONTools) {
-			messages[len(messages)-1]["content"] += "\nOutput contract: return ONLY one JSON object. A tool step is {\"text\":\"\",\"tool_calls\":[{\"name\":\"EXACT_AVAILABLE_TOOL_NAME\",\"input\":{\"ARGUMENT_NAME\":\"value\"}}]}. Wait for the real tool result before proceeding. A final answer is {\"text\":\"FINAL_ANSWER_IN_USER_REQUESTED_FORMAT\",\"tool_calls\":[]}. If the user requests JSON, encode that JSON answer inside the text string; never replace the envelope with the user's answer fields. Use one tool at a time for dependent steps. For exec_command, omit justification on ordinary sandbox commands; never request escalation just to read or edit workspace files or run tests."
+			contract := "\nOutput contract: return ONLY one JSON object. A tool step is {\"text\":\"\",\"tool_calls\":[{\"name\":\"EXACT_AVAILABLE_TOOL_NAME\",\"input\":{\"ARGUMENT_NAME\":\"value\"}}]}. Wait for the real tool result before proceeding. A final answer is {\"text\":\"FINAL_ANSWER_IN_USER_REQUESTED_FORMAT\",\"tool_calls\":[]}. If the user requests JSON, encode that JSON answer inside the text string; never replace the envelope with the user's answer fields. Use one tool at a time for dependent steps. For exec_command, omit justification on ordinary sandbox commands; never request escalation just to read or edit workspace files or run tests."
+			if req.ToolChoice.Type == "any" || req.ToolChoice.Type == "tool" {
+				contract = "\nOutput contract: return ONLY one JSON object for the required tool step, with a nonempty tool_calls array: {\"text\":\"\",\"tool_calls\":[{\"name\":\"EXACT_AVAILABLE_TOOL_NAME\",\"input\":{\"ARGUMENT_NAME\":\"value\"}}]}. Wait for the real tool result before proceeding."
+				if req.ToolChoice.Type == "tool" {
+					contract += " The tool call must use " + req.ToolChoice.Name + "."
+				}
+				contract += " Use only defined tools with valid required arguments."
+				if strings.Contains(messages[0]["content"], "For exec_command,") {
+					contract += " For exec_command, omit justification on ordinary sandbox commands; never request escalation just to read or edit workspace files or run tests."
+				}
+			}
+			messages[len(messages)-1]["content"] += contract
 		}
 	}
 	return messages, nil
