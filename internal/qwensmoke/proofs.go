@@ -755,7 +755,7 @@ func runIntegrationProofs(ctx context.Context, base, size string, result documen
 			return err
 		}
 	}
-	if err := runCacheProof(ctx, base, size, role, result); err != nil {
+	if err := runCacheProof(ctx, base, runtimeURL, size, role, result); err != nil {
 		return err
 	}
 	return runTelemetryProof(ctx, base, size, role, result)
@@ -856,6 +856,13 @@ func validateCacheAccounting(samples []document) error {
 	return nil
 }
 
+func cacheProofSkipReason(runtimeStatus document) string {
+	if mapping(runtimeStatus["memory"])["pressure"] == "warning" {
+		return "memory_pressure_warning"
+	}
+	return ""
+}
+
 func validateNativeAccounting(native, provider document) error {
 	if native["native_generation_metadata"] != true || native["finish_reason"] != "stop" || native["prompt_tokens"] != provider["input_tokens"] || native["generation_tokens"] != provider["output_tokens"] {
 		return errors.New("native EOS or token accounting disagrees with provider usage")
@@ -911,7 +918,7 @@ func validateNativeAccountingWindow(before, after, provider document) error {
 	return positiveUsage(provider, "input_tokens", "output_tokens", false)
 }
 
-func runCacheProof(ctx context.Context, base, size, role string, result document) (proofErr error) {
+func runCacheProof(ctx context.Context, base, runtimeEndpoint, size, role string, result document) (proofErr error) {
 	check := document{"name": size + "-" + role + "-session-cache", "endpoint": "/v1/messages", "native_endpoint": "/status", "passed": false, "assertions": []string{"same request token accounting stable", "same session reuses prompt tokens", "new session does not reuse prompt tokens", "cached plus processed equals prompt"}}
 	defer func() {
 		if proofErr != nil {
@@ -921,6 +928,16 @@ func runCacheProof(ctx context.Context, base, size, role string, result document
 	result["checks"] = append(result["checks"].([]any), check)
 	samples := []document{}
 	check["native_accounting"] = []any{}
+	status, err := request(ctx, runtimeEndpoint+"/status", nil, 5*time.Second)
+	if err != nil {
+		return err
+	}
+	if reason := cacheProofSkipReason(status); reason != "" {
+		check["skipped"] = true
+		check["skip_reason"] = reason
+		check["memory_pressure"] = mapping(status["memory"])["pressure"]
+		return nil
+	}
 	payload := proofPayload("messages", role, false, false)
 	payload["messages"] = []any{document{"role": "user", "content": "Synthetic session isolation proof. Reply with exactly " + marker + " and no other final text."}}
 	check["synthetic_request"] = payload
@@ -940,7 +957,7 @@ func runCacheProof(ctx context.Context, base, size, role string, result document
 		if _, err = validateProofJSON("messages", d, false); err != nil {
 			return err
 		}
-		native, err := request(ctx, runtimeURL+"/status", nil, 5*time.Second)
+		native, err := request(ctx, runtimeEndpoint+"/status", nil, 5*time.Second)
 		if err != nil {
 			return err
 		}
