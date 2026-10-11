@@ -385,6 +385,26 @@ func TestTelemetryRejectsInvalidIdentityAndCounters(t *testing.T) {
 	}
 }
 
+func TestTelemetryAcceptsAllSupportedLastCompletedClients(t *testing.T) {
+	for _, client := range []string{"anthropic_messages", "openai_responses", "openai_chat_completions"} {
+		t.Run(client, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				if r.URL.Path == "/sentinel/activity" {
+					json.NewEncoder(w).Encode(document{"scope": "local-adapter-attempts", "queued": 0, "active": []any{}, "last_completed": document{"accepted": true, "role": "haiku", "model": "sentinel-haiku", "client": client, "request_id": "req_test", "attempt_id": "attempt_test", "usage": document{"input_tokens": 12, "output_tokens": 4}}})
+					return
+				}
+				json.NewEncoder(w).Encode(document{"mode": "serving", "policy": "local-only", "startup_billing_opt_in": false, "role_budgets": document{"haiku": 1024}, "quality_checks": document{"rejections": 0, "recovery_attempts": 0}})
+			}))
+			defer server.Close()
+			result := document{"checks": []any{}}
+			if err := runTelemetryProof(context.Background(), server.URL, "small", "haiku", result); err != nil {
+				t.Fatalf("valid %s adapter activity rejected: %v", client, err)
+			}
+		})
+	}
+}
+
 func TestIntegrationFlagRequiresGateway(t *testing.T) {
 	var out strings.Builder
 	if code := Run([]string{"--integration-proofs"}, nil, &out, &out); code != 2 {

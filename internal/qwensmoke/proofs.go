@@ -816,7 +816,8 @@ func runTelemetryProof(ctx context.Context, base, size, role string, result docu
 	}
 	last := mapping(activity["last_completed"])
 	usage := mapping(last["usage"])
-	if activity["scope"] != "local-adapter-attempts" || activity["queued"] != float64(0) || len(list(activity["active"])) != 0 || last["accepted"] != true || last["role"] != role || last["model"] != "sentinel-"+role || text(last["request_id"]) == "" || text(last["attempt_id"]) == "" || last["client"] != "anthropic_messages" || positiveUsage(usage, "input_tokens", "output_tokens", false) != nil {
+	client := text(last["client"])
+	if activity["scope"] != "local-adapter-attempts" || activity["queued"] != float64(0) || len(list(activity["active"])) != 0 || last["accepted"] != true || last["role"] != role || last["model"] != "sentinel-"+role || text(last["request_id"]) == "" || text(last["attempt_id"]) == "" || (client != "anthropic_messages" && client != "openai_responses" && client != "openai_chat_completions") || positiveUsage(usage, "input_tokens", "output_tokens", false) != nil {
 		return errors.New("invalid idle activity identity or accounting")
 	}
 	control, err := request(ctx, base+"/sentinel/control", nil, 5*time.Second)
@@ -833,7 +834,7 @@ func runTelemetryProof(ctx context.Context, base, size, role string, result docu
 	if control["mode"] != "serving" || control["policy"] != "local-only" || control["startup_billing_opt_in"] != false || mapping(control["role_budgets"])[role] == nil {
 		return errors.New("invalid local control identity")
 	}
-	check["validated_response"] = document{"role": role, "client": last["client"], "accepted": true, "queued": 0, "active_count": 0, "usage": usage, "quality_checks": quality, "mode": control["mode"]}
+	check["validated_response"] = document{"role": role, "client": client, "accepted": true, "queued": 0, "active_count": 0, "usage": usage, "quality_checks": quality, "mode": control["mode"]}
 	check["passed"] = true
 	return nil
 }
