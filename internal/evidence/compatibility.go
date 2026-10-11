@@ -34,8 +34,8 @@ var regressionChecks = []struct {
 	tests        []string
 }{
 	{"messages", 0, []string{"TestClaudeToolRoundTripAndStream"}},
-	{"responses", 0, []string{"TestResponsesTextProtocol", "TestResponsesValidatedToolStreamAndHistory"}},
-	{"chat-completions", 0, []string{"TestChatCompletionsFunctionRoundTrip", "TestChatStreamingUsesCompletionChunks"}},
+	{"responses", 0, []string{"TestResponsesTextProtocol", "TestResponsesValidatedToolStreamAndHistory", "TestHybridForwardsOpenAIResponsesImageURL"}},
+	{"chat-completions", 0, []string{"TestChatCompletionsFunctionRoundTrip", "TestChatStreamingUsesCompletionChunks", "TestHybridForwardsLargeOpenAIImageAndRedactsItFromCapture"}},
 	{"capture", 1, nil}, {"controls", 2, nil}, {"claude-mod", 3, nil},
 	{"quality-harness", 4, nil}, {"telemetry", 5, nil},
 }

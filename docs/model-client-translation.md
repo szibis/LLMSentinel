@@ -53,7 +53,8 @@ launcher does not automatically import personal integrations.
 | Permissions and sandbox | Original CLI executor remains responsible | Gateway never executes calls; add client proofs for denied operations |
 | Conversation and tool-result continuation | Explicit history and call IDs translated | Existing API tests; real probes completed tool + answer turns |
 | Compaction, resume and long context | Client-supplied text history within backend limits | Provider compaction APIs and opaque/stored histories not implemented; large-context retention needs proofs |
-| Images, audio and arbitrary custom grammars | Explicitly unsupported locally | Add backend capability and client fixtures before enabling |
+| Images and audio | Local inference rejects them before dispatch. The opt-in OpenAI hybrid route preserves OpenAI image inputs, including URL/data-URL fields, only when paid routing selects the configured provider; this is provider passthrough, not local vision. OpenAI Responses file IDs require files uploaded directly to that provider because Sentinel does not proxy the Files API. | OpenAI image requests are capped at Sentinel's 16 MiB request limit. Current MLX-Flash reports vision unsupported, so local image support remains disabled until the runtime implements it and advertises a tested capability. API regression verifies hybrid forwarding and capture redaction. |
+| Arbitrary custom grammars | Unsupported locally | Add backend capability and client fixtures before enabling |
 | Provider web/file search and hosted tools | Explicitly unsupported locally | Use a configured client-executed tool or compatible commercial route; never invent results |
 | Provider reasoning signatures, native cache billing and cloud sessions | No local equivalence claimed | Local thinking/cache telemetry is separate; vendor-only behavior needs a supported vendor route |
 

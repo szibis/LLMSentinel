@@ -246,9 +246,18 @@ var trainingSecrets = []*regexp.Regexp{
 func redactTrainingValue(value any) any {
 	switch value := value.(type) {
 	case map[string]any:
+		imageBlock, _ := value["type"].(string)
 		for key, item := range value {
 			normalized := strings.ToLower(strings.NewReplacer("-", "_", " ", "_").Replace(key))
 			switch normalized {
+			case "image_url", "input_image":
+				value[key] = "[REDACTED IMAGE]"
+			case "source":
+				if imageBlock == "image" {
+					value[key] = "[REDACTED IMAGE]"
+				} else {
+					value[key] = redactTrainingValue(item)
+				}
 			case "authorization", "proxy_authorization", "api_key", "apikey", "anthropic_api_key", "openai_api_key", "access_token", "refresh_token", "password", "secret", "client_secret", "aws_secret_access_key", "aws_session_token":
 				value[key] = "[REDACTED]"
 			default:

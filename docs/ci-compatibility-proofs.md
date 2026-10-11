@@ -7,7 +7,7 @@ including documentation changes. Existing whole-repository race tests and the
 
 | Check | Measured evidence |
 | --- | --- |
-| `api-regression` | Complete uncached Go JSON events from six packages, with named Messages, Responses and Chat Completions tool/stream regressions plus capture, controls, mod, quality-harness and telemetry checks |
+| `api-regression` | Complete uncached Go JSON events from six packages, with named Messages, Responses and Chat Completions tool/stream regressions, including OpenAI image forwarding/redaction, plus capture, controls, mod, quality-harness and telemetry checks |
 | `client-compatibility` | Claude Code 2.1.291 and Codex 0.160.1 execute a native file-read tool through the production gateway, send the correlated result, and complete the exact expected final answer |
 | `claude-mod` | Plugin validation, native command/capture/pane framework tests, and actual CLI status/panel/failures commands with zero model turns |
 | `test` | Whole-repository race tests, complete compressed execution log, global coverage profile and summary |
