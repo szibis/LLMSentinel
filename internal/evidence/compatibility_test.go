@@ -21,7 +21,7 @@ var fixturePackages = []string{
 	"github.com/szibis/claude-escalate/internal/labstatus",
 }
 
-var fixtureAPITests = []string{"TestClaudeToolRoundTripAndStream", "TestResponsesTextProtocol", "TestResponsesValidatedToolStreamAndHistory", "TestChatCompletionsFunctionRoundTrip", "TestChatStreamingUsesCompletionChunks"}
+var fixtureAPITests = []string{"TestClaudeToolRoundTripAndStream", "TestResponsesTextProtocol", "TestResponsesValidatedToolStreamAndHistory", "TestChatCompletionsFunctionRoundTrip", "TestChatStreamingUsesCompletionChunks", "TestHybridForwardsLargeOpenAIImageAndRedactsItFromCapture", "TestHybridForwardsOpenAIResponsesImageURL"}
 
 func eventJSON(t *testing.T, action, pkg, test, output string) string {
 	t.Helper()
@@ -77,13 +77,13 @@ func TestRegressionCountsCompleteNamedPassesAndFixedSafeChecks(t *testing.T) {
 	if report.SourceRevision != strings.Repeat("a", 40) || report.ControlRevision != strings.Repeat("b", 40) {
 		t.Fatal("wrong provenance")
 	}
-	if len(report.Packages) != 6 || len(report.Checks) != 8 || len(report.Reasons) != 0 {
+	if len(report.Packages) != 6 || len(report.Checks) != 9 || len(report.Reasons) != 0 {
 		t.Fatalf("wrong complete summary: %+v", report)
 	}
 	for i, pkg := range report.Packages {
 		wantCount := 1
 		if i == 0 {
-			wantCount = 5
+			wantCount = 7
 		}
 		if i == 1 {
 			wantCount = 3
@@ -92,7 +92,7 @@ func TestRegressionCountsCompleteNamedPassesAndFixedSafeChecks(t *testing.T) {
 			t.Fatalf("package counts: %+v", report.Packages)
 		}
 	}
-	wantChecks := []string{"messages", "responses", "chat-completions", "capture", "controls", "claude-mod", "quality-harness", "telemetry"}
+	wantChecks := []string{"messages", "responses", "chat-completions", "openai-images", "capture", "controls", "claude-mod", "quality-harness", "telemetry"}
 	for i, check := range report.Checks {
 		if check.Name != wantChecks[i] || !check.Passed {
 			t.Fatalf("wrong checks: %+v", report.Checks)
@@ -115,6 +115,7 @@ func TestRegressionRejectsIncompleteMalformedAndFailedEvents(t *testing.T) {
 		{"empty", "", "missing_package"},
 		{"missing-package", strings.ReplaceAll(complete, eventJSON(t, "start", capture, "", "")+eventJSON(t, "run", capture, "TestSyntheticFixture", "")+eventJSON(t, "output", capture, "TestSyntheticFixture", "PRIVATE_TEST_OUTPUT /private/path\n")+eventJSON(t, "pass", capture, "TestSyntheticFixture", "")+eventJSON(t, "run", capture, "TestParallel", "")+eventJSON(t, "run", capture, "TestParallel/child", "")+eventJSON(t, "pause", capture, "TestParallel/child", "")+eventJSON(t, "cont", capture, "TestParallel/child", "")+eventJSON(t, "pass", capture, "TestParallel/child", "")+eventJSON(t, "pass", capture, "TestParallel", "")+eventJSON(t, "pass", capture, "", ""), ""), "missing_package"},
 		{"missing-required-api", strings.ReplaceAll(complete, eventJSON(t, "run", gateway, fixtureAPITests[0], "")+eventJSON(t, "output", gateway, fixtureAPITests[0], "PRIVATE_TEST_OUTPUT /private/path\n")+eventJSON(t, "pass", gateway, fixtureAPITests[0], ""), ""), "required_test_missing"},
+		{"missing-openai-image-proof", strings.ReplaceAll(complete, eventJSON(t, "run", gateway, fixtureAPITests[5], "")+eventJSON(t, "output", gateway, fixtureAPITests[5], "PRIVATE_TEST_OUTPUT /private/path\n")+eventJSON(t, "pass", gateway, fixtureAPITests[5], ""), ""), "required_test_missing"},
 		{"test-failed", strings.Replace(complete, eventJSON(t, "pass", gateway, fixtureAPITests[0], ""), eventJSON(t, "fail", gateway, fixtureAPITests[0], ""), 1), "test_failed"},
 		{"required-skipped", strings.Replace(complete, eventJSON(t, "pass", gateway, fixtureAPITests[0], ""), eventJSON(t, "skip", gateway, fixtureAPITests[0], ""), 1), "required_test_missing"},
 		{"package-failed", strings.Replace(complete, eventJSON(t, "pass", capture, "", ""), eventJSON(t, "fail", capture, "", ""), 1), "package_failed"},

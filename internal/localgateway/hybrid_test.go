@@ -155,6 +155,80 @@ func TestHybridPreservesCompletedSSEAndExactUsage(t *testing.T) {
 	}
 }
 
+func TestHybridForwardsLargeOpenAIImageAndRedactsItFromCapture(t *testing.T) {
+	t.Setenv("SENTINEL_HYBRID_TEST_KEY", "test-key-marker")
+	recorder, err := newTrainingRecorder(&TrainingConfig{Directory: filepath.Join(t.TempDir(), "private")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	h, err := newHybridRouter(&HybridConfig{AllowPaidAPI: true, OpenAIBaseURL: "https://api.openai.com/v1", OpenAIModel: "vendor-vision", OpenAIAPIKeyEnv: "SENTINEL_HYBRID_TEST_KEY"}, recorder)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := h.setPolicy("quality"); err != nil {
+		t.Fatal(err)
+	}
+	imageURL := "data:image/jpeg;base64," + strings.Repeat("QUJD", 600_000)
+	h.transport = handlerTransport{func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.String() != "https://api.openai.com/v1/chat/completions" || r.Header.Get("Authorization") != "Bearer test-key-marker" {
+			t.Errorf("wrong OpenAI request destination or auth: %s %v", r.URL, r.Header)
+		}
+		body, readErr := io.ReadAll(r.Body)
+		if readErr != nil {
+			t.Errorf("read forwarded request: %v", readErr)
+		}
+		var payload map[string]any
+		if json.Unmarshal(body, &payload) != nil || payload["model"] != "vendor-vision" || !strings.Contains(string(body), imageURL) {
+			t.Errorf("image request was not preserved for OpenAI")
+		}
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprint(w, `{"choices":[{"message":{"content":"The image is visible."},"finish_reason":"stop"}],"usage":{"prompt_tokens":2,"completion_tokens":4}}`)
+	}}
+	requestBody := `{"model":"local","messages":[{"role":"user","content":[{"type":"text","text":"Describe this image"},{"type":"image_url","image_url":{"url":"` + imageURL + `","detail":"high"}}]}]}`
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest("POST", "/v1/chat/completions", strings.NewReader(requestBody))
+	if !h.serve(w, r) || w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "The image is visible") {
+		t.Fatalf("large image request did not reach OpenAI: %d %s", w.Code, w.Body.String())
+	}
+	capture, err := os.ReadFile(filepath.Join(recorder.directory, "training.jsonl"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(capture), "QUJD") || !strings.Contains(string(capture), "[REDACTED IMAGE]") {
+		t.Fatal("image payload was retained in the optional training capture")
+	}
+}
+
+func TestHybridForwardsOpenAIResponsesImageURL(t *testing.T) {
+	t.Setenv("SENTINEL_HYBRID_TEST_KEY", "test-key-marker")
+	h, err := newHybridRouter(&HybridConfig{AllowPaidAPI: true, OpenAIBaseURL: "https://api.openai.com/v1", OpenAIModel: "vendor-vision", OpenAIAPIKeyEnv: "SENTINEL_HYBRID_TEST_KEY"}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := h.setPolicy("quality"); err != nil {
+		t.Fatal(err)
+	}
+	imageURL := "https://images.example.test/diagram.png"
+	h.transport = handlerTransport{func(w http.ResponseWriter, r *http.Request) {
+		body, readErr := io.ReadAll(r.Body)
+		if readErr != nil {
+			t.Errorf("read forwarded request: %v", readErr)
+		}
+		var payload map[string]any
+		if r.URL.String() != "https://api.openai.com/v1/responses" || json.Unmarshal(body, &payload) != nil || payload["model"] != "vendor-vision" || !strings.Contains(string(body), imageURL) || !strings.Contains(string(body), `"type":"input_image"`) {
+			t.Errorf("Responses image request was not preserved for OpenAI")
+		}
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprint(w, `{"id":"resp_test","object":"response","status":"completed","output":[],"usage":{"input_tokens":2,"output_tokens":1,"total_tokens":3}}`)
+	}}
+	requestBody := `{"model":"local","input":[{"role":"user","content":[{"type":"input_text","text":"Review this diagram"},{"type":"input_image","image_url":"` + imageURL + `","detail":"auto"}]}]}`
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest("POST", "/v1/responses", strings.NewReader(requestBody))
+	if !h.serve(w, r) || w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "resp_test") {
+		t.Fatalf("Responses image request did not reach OpenAI: %d %s", w.Code, w.Body.String())
+	}
+}
+
 func TestHybridNeverRetriesOrFallsBackOnVendorFailure(t *testing.T) {
 	t.Setenv("SENTINEL_HYBRID_TEST_KEY", "test-key-marker")
 	h, err := newHybridRouter(&HybridConfig{AllowPaidAPI: true, OpenAIBaseURL: "https://api.openai.com/v1", OpenAIModel: "test", OpenAIAPIKeyEnv: "SENTINEL_HYBRID_TEST_KEY"}, nil)

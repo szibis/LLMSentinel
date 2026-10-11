@@ -54,7 +54,7 @@ func newHybridRouter(cfg *HybridConfig, training *trainingRecorder) (*hybridRout
 	if !configured {
 		return nil, nil
 	}
-	h := &hybridRouter{policy: "balanced", providers: map[string]hybridProvider{}, training: training, transport: &http.Transport{Proxy: nil, TLSHandshakeTimeout: 10 * time.Second, ResponseHeaderTimeout: 2 * time.Minute, IdleConnTimeout: 30 * time.Second}, maxRequestBytes: 2 * 1024 * 1024, maxResponseBytes: 8 * 1024 * 1024, maxStreamBytes: 64 * 1024 * 1024, maxCaptureBytes: 8 * 1024 * 1024}
+	h := &hybridRouter{policy: "balanced", providers: map[string]hybridProvider{}, training: training, transport: &http.Transport{Proxy: nil, TLSHandshakeTimeout: 10 * time.Second, ResponseHeaderTimeout: 2 * time.Minute, IdleConnTimeout: 30 * time.Second}, maxRequestBytes: 16 * 1024 * 1024, maxResponseBytes: 8 * 1024 * 1024, maxStreamBytes: 64 * 1024 * 1024, maxCaptureBytes: 8 * 1024 * 1024}
 	envName := regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
 	for _, provider := range []struct{ name, base, model, keyEnv string }{{"anthropic", cfg.AnthropicBaseURL, cfg.AnthropicModel, cfg.AnthropicAPIKeyEnv}, {"openai", cfg.OpenAIBaseURL, cfg.OpenAIModel, cfg.OpenAIAPIKeyEnv}} {
 		if provider.base == "" && provider.model == "" && provider.keyEnv == "" {
