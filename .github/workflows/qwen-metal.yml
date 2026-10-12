@@ -22,11 +22,11 @@ jobs:
     name: Model-free smoke harness tests
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           ref: ${{ github.workflow_sha }}
           persist-credentials: false
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
       - run: go test -race -v ./internal/qwensmoke ./internal/release
@@ -59,19 +59,19 @@ jobs:
       SENTINEL_CI_LAB_ROOT: ${{ vars.SENTINEL_CI_LAB_ROOT }}
       SENTINEL_EXTENDED_QUALITY_REQUIRED: ${{ vars.SENTINEL_EXTENDED_QUALITY_REQUIRED || 'false' }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           ref: ${{ inputs.source_ref || github.sha }}
           persist-credentials: false
       - name: Check out pinned native inference dependency
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           repository: szibis/MLX-Flash
           ref: 626d702970ef46284185401a1144af1607b0fe72
           path: .qwen-mlx-source
           persist-credentials: false
       - name: Check out current smoke controls for historical release retries
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           ref: ${{ github.workflow_sha }}
           path: .qwen-ci-controls
@@ -85,7 +85,7 @@ jobs:
             echo "GOCACHE=$CACHE_ROOT/build"
             echo "GOMODCACHE=$CACHE_ROOT/mod"
           } >> "$GITHUB_ENV"
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with:
           go-version-file: .qwen-ci-controls/go.mod
           cache: false
@@ -157,7 +157,7 @@ jobs:
           "$RUNNER_TEMP/qwen-sentinel-tools" evidence verify --root "$PWD/qwen-metal-artifacts" --manifest "$PWD/qwen-metal-artifacts/evidence.json"
       - name: Upload sanitized health, results, and server logs
         if: always()
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: qwen-metal-${{ github.run_id }}-${{ github.run_attempt }}
           path: |

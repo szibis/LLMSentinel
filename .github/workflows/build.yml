@@ -22,14 +22,14 @@ jobs:
       HEAD_REVISION: ${{ inputs.source_sha || github.event.pull_request.head.sha || github.sha }}
       CONTROL_REVISION: ${{ github.workflow_sha }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ inputs.source_sha || github.sha }}
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
           cache: true
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: '24'
       - name: Build evidence helper and record checkout
@@ -53,7 +53,7 @@ jobs:
           gzip -n -9 proof-api/regression-events.jsonl
           .verification/sentinel-tools evidence create --root "$PWD/proof-api" --manifest "$PWD/proof-api/evidence.json" --source-revision "$SOURCE_REVISION" --control-revision "$CONTROL_REVISION" --artifact provenance.json --artifact regression.json --artifact regression-events.jsonl.gz
           .verification/sentinel-tools evidence verify --root "$PWD/proof-api" --manifest "$PWD/proof-api/evidence.json"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: api-regression-${{ github.run_id }}-${{ github.run_attempt }}
@@ -70,13 +70,13 @@ jobs:
       HEAD_REVISION: ${{ inputs.source_sha || github.event.pull_request.head.sha || github.sha }}
       CONTROL_REVISION: ${{ github.workflow_sha }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ inputs.source_sha || github.sha }}
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: '24'
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
           cache: true
@@ -125,7 +125,7 @@ jobs:
           node scripts/record-ci-proof.cjs native-client-fixture proof-clients
           .verification/sentinel-tools evidence create --root "$PWD/proof-clients" --manifest "$PWD/proof-clients/evidence.json" --source-revision "$SOURCE_REVISION" --control-revision "$CONTROL_REVISION" --artifact provenance.json --artifact native-clients.json
           .verification/sentinel-tools evidence verify --root "$PWD/proof-clients" --manifest "$PWD/proof-clients/evidence.json"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: native-client-fixture-${{ github.run_id }}-${{ github.run_attempt }}
@@ -141,13 +141,13 @@ jobs:
       HEAD_REVISION: ${{ inputs.source_sha || github.event.pull_request.head.sha || github.sha }}
       CONTROL_REVISION: ${{ github.workflow_sha }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ inputs.source_sha || github.sha }}
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: '24'
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
           cache: true
@@ -177,7 +177,7 @@ jobs:
           node scripts/record-ci-proof.cjs claude-mod proof-mod
           .verification/claude-mod/sentinel-tools evidence create --root "$PWD/proof-mod" --manifest "$PWD/proof-mod/evidence.json" --source-revision "$SOURCE_REVISION" --control-revision "$CONTROL_REVISION" --artifact provenance.json --artifact claude-mod.json
           .verification/claude-mod/sentinel-tools evidence verify --root "$PWD/proof-mod" --manifest "$PWD/proof-mod/evidence.json"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: claude-mod-${{ github.run_id }}-${{ github.run_attempt }}
@@ -190,10 +190,10 @@ jobs:
   web:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ inputs.source_sha || github.sha }}
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: '24'
           cache: npm
@@ -218,12 +218,12 @@ jobs:
         goos: [linux, darwin]
         goarch: [amd64, arm64]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ inputs.source_sha || github.sha }}
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
           cache: true
@@ -241,12 +241,12 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ inputs.source_sha || github.sha }}
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
           cache: true
@@ -308,7 +308,7 @@ jobs:
 
       - name: Upload coverage
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: coverage
           path: |
@@ -322,17 +322,17 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ inputs.source_sha || github.sha }}
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
           cache: true
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: '24'
 
@@ -345,12 +345,12 @@ jobs:
   security:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ inputs.source_sha || github.sha }}
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
           cache: true
@@ -363,15 +363,15 @@ jobs:
   docker-build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ inputs.source_sha || github.sha }}
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
 
       - name: Build Docker image (verify only)
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           push: false

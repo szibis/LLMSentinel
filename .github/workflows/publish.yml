@@ -30,11 +30,11 @@ jobs:
       version: ${{ steps.select.outputs.version }}
       ref: ${{ steps.select.outputs.ref }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: main
           persist-credentials: false
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
       - name: Build Go release helper
