@@ -9,6 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.6.2] - 2026-10-11
+
+### Commit subjects since v3.6.0
+
+- fix: validate native client tools and route Haiku agent requests by quality (#62)
+- chore: release v3.6.1 (#64)
+- fix: harden client and MLX protocols with HTTP edge tests and fuzzing (#65)
+- feat: establish verified local quality and CI evidence (#66)
+- Correct native recovery prompts and bound coding turns (#67)
+- feat: add native Claude controls and PR compatibility proofs (#68)
+- Fix forced tool call prompt policy (#69)
+- fix: preserve OpenAI image inputs in hybrid routing (#70)
+- fix: skip cache proof under memory warning (#71)
+- fix: accept supported clients in telemetry proof (#72)
+
 ## [3.6.1] - 2026-10-08
 
 ### Commit subjects since v3.6.0
