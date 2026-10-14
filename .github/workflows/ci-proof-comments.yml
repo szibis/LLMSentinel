@@ -24,14 +24,14 @@ jobs:
     steps:
       # workflow_run uses trusted default-branch code. Never check out or execute
       # the triggering PR branch, downloaded logs, or artifact scripts here.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ github.workflow_sha }}
           persist-credentials: false
       - name: Download public proof data from the completed run
         id: download
         continue-on-error: true
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v8
         with:
           github-token: ${{ github.token }}
           run-id: ${{ github.event.workflow_run.id }}
@@ -40,7 +40,7 @@ jobs:
           merge-multiple: false
       - name: Download existing sealed repository coverage
         continue-on-error: true
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v8
         with:
           github-token: ${{ github.token }}
           run-id: ${{ github.event.workflow_run.id }}
@@ -48,7 +48,7 @@ jobs:
           path: proof-evidence/coverage
       - name: Publish verified current-commit proof comment
         if: always()
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             const { publish } = require('./scripts/ci-proof-comment.cjs')
